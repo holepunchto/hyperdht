@@ -23,4 +23,3 @@ node.announce(topic, { port: 12345 }, function (err) {
       })
     })
 })
-
