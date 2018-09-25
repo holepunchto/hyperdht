@@ -6,7 +6,8 @@
   "dependencies": {
     "dht-rpc": "^4.0.1",
     "ipv4-peers": "^1.1.1",
-    "protocol-buffers-encodings": "^1.1.0"
+    "protocol-buffers-encodings": "^1.1.0",
+    "record-cache": "^1.1.0"
   },
   "devDependencies": {
     "protocol-buffers": "^4.1.0",
