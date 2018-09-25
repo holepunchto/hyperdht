@@ -9,7 +9,7 @@ class HyperDHT extends DHT {
   constructor (opts) {
     super(opts)
 
-    const cache = recordCache({
+    const peers = recordCache({
       maxSize: 65536,
       maxAge: 12 * 60 * 1000
     })
@@ -19,6 +19,7 @@ class HyperDHT extends DHT {
 
     const onpeers = this._onpeers.bind(this)
 
+    this.once('close', peers.destroy.bind(peers))
     this.command('peers', {
       inputEncoding: PeersInput,
       outputEncoding: PeersOutput,
@@ -70,8 +71,8 @@ class HyperDHT extends DHT {
     const localSuffix = localRecord && localRecord.slice(2)
 
     if (query.type === DHT.QUERY) {
-      const local = localCache ? filter(this._cache.get(localCache, 64), localSuffix) : []
-      const remote = filter(this._cache.get(remoteCache, 128 - local.length), remoteRecord)
+      const local = localCache ? filter(this._peers.get(localCache, 64), localSuffix) : []
+      const remote = filter(this._peers.get(remoteCache, 128 - local.length), remoteRecord)
       this.emit('lookup', query.target, from)
 
       return cb(null, {
@@ -81,12 +82,12 @@ class HyperDHT extends DHT {
     }
 
     if (value.unannounce) {
-      if (remoteRecord) this._cache.remove(remoteCache, remoteRecord)
-      if (localRecord) this._cache.remove(localCache, localSuffix)
+      if (remoteRecord) this._peers.remove(remoteCache, remoteRecord)
+      if (localRecord) this._peers.remove(localCache, localSuffix)
       this.emit('unannounce', query.target, from)
     } else {
-      if (remoteRecord) this._cache.add(remoteCache, remoteRecord)
-      if (localRecord) this._cache.add(localCache, localSuffix)
+      if (remoteRecord) this._peers.add(remoteCache, remoteRecord)
+      if (localRecord) this._peers.add(localCache, localSuffix)
       this.emit('announce', query.target, from)
     }
 
