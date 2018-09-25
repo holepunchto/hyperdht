@@ -3,10 +3,19 @@ const recordCache = require('record-cache')
 const { PeersInput, PeersOutput } = require('./messages')
 const peers = require('ipv4-peers')
 
+const DEFAULT_BOOTSTRAP = [
+  'bootstrap1.hyperdht.org:49737',
+  'bootstrap2.hyperdht.org:49737',
+  'bootstrap3.hyperdht.org:49737'
+]
+
 module.exports = opts => new HyperDHT(opts)
 
 class HyperDHT extends DHT {
   constructor (opts) {
+    if (!opts) opts = {}
+    if (opts.bootstrap === undefined) opts.bootstrap = DEFAULT_BOOTSTRAP
+
     super(opts)
 
     const peers = recordCache({
@@ -27,28 +36,41 @@ class HyperDHT extends DHT {
     })
   }
 
-  lookup (key, query, cb) {
-    if (typeof query === 'function') return this.lookup(key, null, query)
-    if (!query) query = {}
-    const port = query.port
-    const localAddress = query.localAddress ? peers.encode([ query.localAddress ]) : null
-    return this.query('peers', key, { port, localAddress }, cb).map(mapPeers.bind(null, localAddress))
+  lookup (key, opts, cb) {
+    if (typeof opts === 'function') return this.lookup(key, null, opts)
+    if (!opts) opts = {}
+
+    const query = {
+      port: opts.port,
+      localAddress: encodeAddress(opts.localAddress)
+    }
+
+    return this.query('peers', key, opts, cb).map(mapPeers.bind(null, query.localAddress))
   }
 
-  announce (key, ann, cb) {
-    if (typeof ann === 'function') return this.announce(key, null, ann)
-    if (!ann) ann = {}
-    const port = ann.port
-    const localAddress = ann.localAddress ? peers.encode([ ann.localAddress ]) : null
-    return this.queryAndUpdate('peers', key, { port, localAddress }, cb).map(mapPeers.bind(null, localAddress))
+  announce (key, opts, cb) {
+    if (typeof opts === 'function') return this.announce(key, null, opts)
+    if (!opts) opts = {}
+
+    const ann = {
+      port: opts.port,
+      localAddress: encodeAddress(opts.localAddress)
+    }
+
+    return this.queryAndUpdate('peers', key, ann, cb).map(mapPeers.bind(null, ann.localAddress))
   }
 
-  unannounce (key, ann, cb) {
-    if (typeof ann === 'function') return this.unannounce(key, null, ann)
-    if (!ann) ann = {}
-    const port = ann.port
-    const localAddress = ann.localAddress ? peers.encode([ ann.localAddress ]) : null
-    this.update('peers', key, { port, localAddress, unannounce: true }, cb)
+  unannounce (key, opts, cb) {
+    if (typeof opts === 'function') return this.unannounce(key, null, opts)
+    if (!opts) opts = {}
+
+    const ann = {
+      port: opts.port,
+      localAddress: encodeAddress(opts.localAddress),
+      unannounce: true
+    }
+
+    this.update('peers', key, ann, cb)
   }
 
   _onpeers (query, cb) {
@@ -92,6 +114,10 @@ class HyperDHT extends DHT {
 
     cb(null, null)
   }
+}
+
+function encodeAddress (addr) {
+  return addr ? peers.encode([ addr ]) : null
 }
 
 function filter (list, item) {
