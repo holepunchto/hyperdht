@@ -14,8 +14,7 @@ class HyperDHT extends DHT {
       maxAge: 12 * 60 * 1000
     })
 
-    this._cache = cache
-    this.once('close', cache.destroy.bind(cache))
+    this._peers = peers
 
     const onpeers = this._onpeers.bind(this)
 
