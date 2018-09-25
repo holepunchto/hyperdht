@@ -10,45 +10,46 @@ var encodings = require('protocol-buffers-encodings')
 var varint = encodings.varint
 var skip = encodings.skip
 
-var Input = exports.Input = {
+var PeersInput = exports.PeersInput = {
   buffer: true,
   encodingLength: null,
   encode: null,
   decode: null
 }
 
-var Output = exports.Output = {
+var PeersOutput = exports.PeersOutput = {
   buffer: true,
   encodingLength: null,
   encode: null,
   decode: null
 }
 
-defineInput()
-defineOutput()
+definePeersInput()
+definePeersOutput()
 
-function defineInput () {
+function definePeersInput () {
   var enc = [
     encodings.varint,
-    encodings.bytes
+    encodings.bytes,
+    encodings.bool
   ]
 
-  Input.encodingLength = encodingLength
-  Input.encode = encode
-  Input.decode = decode
+  PeersInput.encodingLength = encodingLength
+  PeersInput.encode = encode
+  PeersInput.decode = decode
 
   function encodingLength (obj) {
     var length = 0
-    if (defined(obj.type)) {
-      var len = enc[0].encodingLength(obj.type)
-      length += 1 + len
-    }
     if (defined(obj.port)) {
       var len = enc[0].encodingLength(obj.port)
       length += 1 + len
     }
     if (defined(obj.localAddress)) {
       var len = enc[1].encodingLength(obj.localAddress)
+      length += 1 + len
+    }
+    if (defined(obj.unannounce)) {
+      var len = enc[2].encodingLength(obj.unannounce)
       length += 1 + len
     }
     return length
@@ -58,20 +59,20 @@ function defineInput () {
     if (!offset) offset = 0
     if (!buf) buf = Buffer.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if (defined(obj.type)) {
-      buf[offset++] = 8
-      enc[0].encode(obj.type, buf, offset)
-      offset += enc[0].encode.bytes
-    }
     if (defined(obj.port)) {
-      buf[offset++] = 16
+      buf[offset++] = 8
       enc[0].encode(obj.port, buf, offset)
       offset += enc[0].encode.bytes
     }
     if (defined(obj.localAddress)) {
-      buf[offset++] = 26
+      buf[offset++] = 18
       enc[1].encode(obj.localAddress, buf, offset)
       offset += enc[1].encode.bytes
+    }
+    if (defined(obj.unannounce)) {
+      buf[offset++] = 24
+      enc[2].encode(obj.unannounce, buf, offset)
+      offset += enc[2].encode.bytes
     }
     encode.bytes = offset - oldOffset
     return buf
@@ -83,9 +84,9 @@ function defineInput () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      type: 0,
       port: 0,
-      localAddress: null
+      localAddress: null,
+      unannounce: false
     }
     while (true) {
       if (end <= offset) {
@@ -97,16 +98,16 @@ function defineInput () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.type = enc[0].decode(buf, offset)
-        offset += enc[0].decode.bytes
-        break
-        case 2:
         obj.port = enc[0].decode(buf, offset)
         offset += enc[0].decode.bytes
         break
-        case 3:
+        case 2:
         obj.localAddress = enc[1].decode(buf, offset)
         offset += enc[1].decode.bytes
+        break
+        case 3:
+        obj.unannounce = enc[2].decode(buf, offset)
+        offset += enc[2].decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)
@@ -115,14 +116,14 @@ function defineInput () {
   }
 }
 
-function defineOutput () {
+function definePeersOutput () {
   var enc = [
     encodings.bytes
   ]
 
-  Output.encodingLength = encodingLength
-  Output.encode = encode
-  Output.decode = decode
+  PeersOutput.encodingLength = encodingLength
+  PeersOutput.encode = encode
+  PeersOutput.decode = decode
 
   function encodingLength (obj) {
     var length = 0
