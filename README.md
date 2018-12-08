@@ -107,7 +107,7 @@ Options include:
 
 ```js
 {
-  // Explicitly set the port you want ot announce.
+  // Explicitly set the port you want to announce.
   // Per default you UDP socket port is announced.
   port: 12345,
   // Optionally announce a LAN address as well.
