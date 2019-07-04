@@ -17,10 +17,10 @@ class HyperDHT extends DHT {
     if (opts.bootstrap === undefined) opts.bootstrap = DEFAULT_BOOTSTRAP
 
     super(opts)
-
+    const { maxAge = 12 * 60 * 1000 } = opts
     const peers = recordCache({
       maxSize: 65536,
-      maxAge: 12 * 60 * 1000
+      maxAge
     })
 
     this._peers = peers

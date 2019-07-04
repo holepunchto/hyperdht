@@ -50,7 +50,9 @@ Options include:
   bootstrap: ['host:port'],
   // If you are a shortlived client or don't want to host
   // data join as an ephemeral node. (defaults to false)
-  ephemeral: true
+  ephemeral: true,
+  // time until a peer is dropped
+  maxAge: 12 * 60 * 1000
 }
 ```
 
