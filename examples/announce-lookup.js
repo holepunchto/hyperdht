@@ -1,4 +1,4 @@
-const dht = require('./')
+const dht = require('../')
 const crypto = require('crypto')
 
 const node = dht({
