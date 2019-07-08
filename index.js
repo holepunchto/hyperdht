@@ -47,24 +47,33 @@ class HyperDHT extends DHT {
 
     this._peers = peers
     this._store = LRU(maxValues)
-
-    const onpeers = this._onpeers.bind(this)
-
+    this._bound = false
+    this.once('listening', () => {
+      this._bound = true
+    })
+    
     this.once('close', () => {
       this._peers.destroy()
       this._store.clear()
     })
+
+    const onpeers = this._onpeers.bind(this)
     this.command('peers', {
       inputEncoding: PeersInput,
       outputEncoding: PeersOutput,
       update: onpeers,
       query: onpeers
     })
-
     this.command('store', store(this._store))
   }
 
   get (opts, cb) {
+    if (this._bound === false) {
+      this.once('listening', () => {
+        this.put(opts, cb)
+      })
+      return
+    }
     if (typeof opts !== 'object') throw Error('Options is required')
     if (typeof cb !== 'function') throw Error('Callback is required')
     const { k } = opts
@@ -84,12 +93,19 @@ class HyperDHT extends DHT {
   }
 
   put (opts, cb) {
+    if (this._bound === false) {
+      this.once('listening', () => {
+        this.put(opts, cb)
+      })
+      return
+    }
     if ('k' in opts) throw Error('Mutable put not supported')
     const { v } = opts
     if (v === undefined) throw Error('v is required')
     if (v.length > PUT_VALUE_MAX_SIZE) { throw Error(`v size must be <= ${PUT_VALUE_MAX_SIZE}`) }
     const value = v
     const key = createHash('sha256').update(value).digest()
+    
     this.update('store', key, value, (err) => {
       if (err) {
         cb(err)
