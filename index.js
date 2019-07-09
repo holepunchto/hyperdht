@@ -70,7 +70,7 @@ class HyperDHT extends DHT {
   get (opts, cb) {
     if (this._bound === false) {
       this.once('listening', () => {
-        this.put(opts, cb)
+        this.get(opts, cb)
       })
       return
     }
