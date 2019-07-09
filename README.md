@@ -138,6 +138,18 @@ Fully destroy this DHT node.
 Explicitly listen on a UDP port.
 If you do not call this it will use a random free port.
 
+
+#### `node.immutable.put(value, callback = (err, key) => {})`
+
+Store an immutable value in the DHT. When successful, the second argument passed
+to `callback` contains the generated key (a hash) for that value.
+
+#### `node.immutable.get(key, callback = (err, value) => {})`
+
+Fetch an immutable value from the DHT. When successful, the second argument passed
+to `callback` contains the resolved value.
+
+
 #### `node.on('listening')`
 
 Emitted when the node starts listening

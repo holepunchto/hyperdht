@@ -1,32 +1,15 @@
 'use strict'
-const { createHash } = require('crypto')
 const { DHT } = require('dht-rpc')
 const recordCache = require('record-cache')
 const { PeersInput, PeersOutput } = require('./messages')
 const peers = require('ipv4-peers')
 const LRU = require('hashlru')
-const PUT_VALUE_MAX_SIZE = 1000
-
+const stores = require('./stores')
 const DEFAULT_BOOTSTRAP = [
   'bootstrap1.hyperdht.org:49737',
   'bootstrap2.hyperdht.org:49737',
   'bootstrap3.hyperdht.org:49737'
 ]
-
-const store = (store) => ({
-  update ({ value }, cb) {
-    if (value == null) {
-      cb(null)
-      return
-    }
-    const key = createHash('sha256').update(value).digest('hex')
-    store.set(key, value)
-    cb(null)
-  },
-  query ({ target }, cb) {
-    cb(null, store.get(target.toString('hex')))
-  }
-})
 
 module.exports = opts => new HyperDHT(opts)
 
@@ -44,74 +27,33 @@ class HyperDHT extends DHT {
       maxSize: 65536,
       maxAge
     })
+    const onpeers = this._onpeers.bind(this)
 
     this._peers = peers
     this._store = LRU(maxValues)
-    this._bound = false
-    this.once('listening', () => {
-      this._bound = true
-    })
-    
-    this.once('close', () => {
-      this._peers.destroy()
-      this._store.clear()
-    })
 
-    const onpeers = this._onpeers.bind(this)
+    const mutable = stores.mutable(this._store)
+    const immutable = stores.immutable(this._store)
+
+    this.mutable = {
+      get: mutable.get.bind(this),
+      put: mutable.put.bind(this)
+    }
+    this.immutable = {
+      get: immutable.get.bind(this),
+      put: immutable.put.bind(this)
+    }
+    this.command('mutable-store', mutable.command)
+    this.command('immutable-store', immutable.command)
     this.command('peers', {
       inputEncoding: PeersInput,
       outputEncoding: PeersOutput,
       update: onpeers,
       query: onpeers
     })
-    this.command('store', store(this._store))
-  }
-
-  get (opts, cb) {
-    if (this._bound === false) {
-      this.once('listening', () => {
-        this.get(opts, cb)
-      })
-      return
-    }
-    if (typeof opts !== 'object') throw Error('Options is required')
-    if (typeof cb !== 'function') throw Error('Callback is required')
-    const { k } = opts
-    const key = k
-    this.query('store', key, (err, out) => {
-      if (err) {
-        cb(err)
-        return
-      }
-      const [ result ] = out
-      if (result === undefined) {
-        cb(Error('Not Found'))
-        return
-      }
-      cb(null, result.value)
-    })
-  }
-
-  put (opts, cb) {
-    if (this._bound === false) {
-      this.once('listening', () => {
-        this.put(opts, cb)
-      })
-      return
-    }
-    if ('k' in opts) throw Error('Mutable put not supported')
-    const { v } = opts
-    if (v === undefined) throw Error('v is required')
-    if (v.length > PUT_VALUE_MAX_SIZE) { throw Error(`v size must be <= ${PUT_VALUE_MAX_SIZE}`) }
-    const value = v
-    const key = createHash('sha256').update(value).digest()
-    
-    this.update('store', key, value, (err) => {
-      if (err) {
-        cb(err)
-        return
-      }
-      cb(null, key)
+    this.once('close', () => {
+      this._peers.destroy()
+      this._store.clear()
     })
   }
 
