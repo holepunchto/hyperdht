@@ -8,3 +8,11 @@ message PeersOutput {
   optional bytes peers = 1;
   optional bytes localPeers = 2;
 }
+
+message MutableStore {
+  required bytes key = 1;
+  required bytes value = 2;
+  required bytes sig = 3;
+  required uint64 seq = 4;
+  optional bytes salt = 5;
+}

@@ -36,6 +36,7 @@ class HyperDHT extends DHT {
     const immutable = stores.immutable(this._store)
 
     this.mutable = {
+      keypair: mutable.keypair,
       get: mutable.get.bind(this),
       put: mutable.put.bind(this)
     }

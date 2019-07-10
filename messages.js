@@ -24,8 +24,16 @@ var PeersOutput = exports.PeersOutput = {
   decode: null
 }
 
+var MutableStore = exports.MutableStore = {
+  buffer: true,
+  encodingLength: null,
+  encode: null,
+  decode: null
+}
+
 definePeersInput()
 definePeersOutput()
+defineMutableStore()
 
 function definePeersInput () {
   var enc = [
@@ -181,6 +189,108 @@ function definePeersOutput () {
         case 2:
         obj.localPeers = enc[0].decode(buf, offset)
         offset += enc[0].decode.bytes
+        break
+        default:
+        offset = skip(prefix & 7, buf, offset)
+      }
+    }
+  }
+}
+
+function defineMutableStore () {
+  var enc = [
+    encodings.bytes,
+    encodings.varint
+  ]
+
+  MutableStore.encodingLength = encodingLength
+  MutableStore.encode = encode
+  MutableStore.decode = decode
+
+  function encodingLength (obj) {
+    var length = 0
+    if (defined(obj.key)) {
+      var len = enc[0].encodingLength(obj.key)
+      length += 1 + len
+    }
+    if (defined(obj.value)) {
+      var len = enc[0].encodingLength(obj.value)
+      length += 1 + len
+    }
+    if (defined(obj.sig)) {
+      var len = enc[0].encodingLength(obj.sig)
+      length += 1 + len
+    }
+    if (defined(obj.seq)) {
+      var len = enc[1].encodingLength(obj.seq)
+      length += 1 + len
+    }
+    return length
+  }
+
+  function encode (obj, buf, offset) {
+    if (!offset) offset = 0
+    if (!buf) buf = Buffer.allocUnsafe(encodingLength(obj))
+    var oldOffset = offset
+    if (defined(obj.key)) {
+      buf[offset++] = 10
+      enc[0].encode(obj.key, buf, offset)
+      offset += enc[0].encode.bytes
+    }
+    if (defined(obj.value)) {
+      buf[offset++] = 18
+      enc[0].encode(obj.value, buf, offset)
+      offset += enc[0].encode.bytes
+    }
+    if (defined(obj.sig)) {
+      buf[offset++] = 26
+      enc[0].encode(obj.sig, buf, offset)
+      offset += enc[0].encode.bytes
+    }
+    if (defined(obj.seq)) {
+      buf[offset++] = 32
+      enc[1].encode(obj.seq, buf, offset)
+      offset += enc[1].encode.bytes
+    }
+    encode.bytes = offset - oldOffset
+    return buf
+  }
+
+  function decode (buf, offset, end) {
+    if (!offset) offset = 0
+    if (!end) end = buf.length
+    if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
+    var oldOffset = offset
+    var obj = {
+      key: null,
+      value: null,
+      sig: null,
+      seq: 0
+    }
+    while (true) {
+      if (end <= offset) {
+        decode.bytes = offset - oldOffset
+        return obj
+      }
+      var prefix = varint.decode(buf, offset)
+      offset += varint.decode.bytes
+      var tag = prefix >> 3
+      switch (tag) {
+        case 1:
+        obj.key = enc[0].decode(buf, offset)
+        offset += enc[0].decode.bytes
+        break
+        case 2:
+        obj.value = enc[0].decode(buf, offset)
+        offset += enc[0].decode.bytes
+        break
+        case 3:
+        obj.sig = enc[0].decode(buf, offset)
+        offset += enc[0].decode.bytes
+        break
+        case 4:
+        obj.seq = enc[1].decode(buf, offset)
+        offset += enc[1].decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)
