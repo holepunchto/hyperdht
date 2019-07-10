@@ -110,7 +110,7 @@ const mutable = (store) => ({
       const { key, value, sig, seq: _seq, salt } = result.value
       if (_seq === seq && verify(sig, value, key)) {
         found = true
-        cb(null, value, { sig, seq, salt })
+        cb(null, value, { key, sig, seq, salt })
         queryStream.destroy()
       }
     })

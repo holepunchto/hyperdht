@@ -149,6 +149,37 @@ to `callback` contains the generated key (a hash) for that value.
 Fetch an immutable value from the DHT. When successful, the second argument passed
 to `callback` contains the resolved value.
 
+#### `node.mutable.keypair()`
+
+Use this method to generate the required keypair for a put.
+Returns an object with `{pk, sk}`. `pk` holds a private key buffer,
+`sk` holds a public key buffer.
+
+#### `node.mutable.put(value, options, callback = (err, key, info) => {})`
+
+Store a mutable value in the DHT.
+
+Options:
+
+* keypair – REQUIRED, use `node.mutable.keypair` to generate this.
+* seq - REQUIRED, a number which should be increased every time put is passed a new value for the same keypair
+* salt - OPTIONAL - a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+
+When successful the second argument passed to `callback` is the public key
+(this is the same buffer as passed with `keypair.pk`). The third argument
+is an `info` object containing `{ key, value, sig, seq }`. 
+
+#### `node.mutable.get(key, options, callback = (err, value, info) => {})`
+
+Fetch a mutable value from the DHT. 
+
+Options:
+
+* seq - REQUIRED, a number representing the current sequence integer for a given value
+* salt - OPTIONAL - a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+
+When successful, the second argument passed to `callback` contains the resolved value. The third argument is an `info` object containing `{ key, value, sig, seq }`. 
+
 
 #### `node.on('listening')`
 
