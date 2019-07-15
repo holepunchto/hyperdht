@@ -2,6 +2,8 @@
 
 const dht = require('./')()
 
+console.log('node id: ' + dht.id.toString('hex'))
+
 dht.on('ready', function () {
   console.log('dht node fully bootstrapped')
 })
