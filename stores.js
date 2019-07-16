@@ -106,11 +106,11 @@ const mutable = (store) => ({
   get (key, opts, cb = opts) {
     if (typeof cb !== 'function') throw Error('Callback is required')
     if (typeof opts !== 'object') throw Error('Options are required')
-    const { salt, seq } = opts
-    if (typeof seq !== 'number') throw Error('seq is a required option')
+    const { salt, seq = 0 } = opts
+    if (typeof seq !== 'number') throw Error('seq should be a number')
     if (salt && !Buffer.isBuffer(key)) throw Error('salt must be a buffer')
     const queryStream = this.query('mutable-store', key)
-    let found = false
+    let found = false 
     queryStream.on('data', (result) => {
       if (result.value === null) return
       const { key, value, sig, seq: _seq, salt } = result.value
@@ -137,12 +137,12 @@ const mutable = (store) => ({
     if (typeof opts !== 'object') throw Error('Options are required')
     if (typeof cb !== 'function') throw Error('Callback is required')
     if (value.length > PUT_VALUE_MAX_SIZE) { throw Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`) }
-    const { seq, salt, keypair } = opts
+    const { seq = 0, salt, keypair } = opts
     if (!keypair) throw Error('keypair is required')
     const { secretKey, publicKey } = keypair
     if (!Buffer.isBuffer(secretKey)) throw Error('keypair.sk (secret key buffer) is required')
     if (!Buffer.isBuffer(publicKey)) throw Error('keypair.pk (public key buffer) is required')
-    if (typeof seq !== 'number') throw Error('seq is a required option')
+    if (typeof seq !== 'number') throw Error('seq should be a number')
     if (salt) {
       if (!Buffer.isBuffer(salt)) throw Error('salt must be a buffer')
       if (salt.length >= 16 && salt.length <= 64) { throw Error('salt length must be between 16 and 64 bytes (inclusive)') }

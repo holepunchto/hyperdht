@@ -161,8 +161,8 @@ Store a mutable value in the DHT.
 Options:
 
 * keypair – REQUIRED, use `node.mutable.keypair` to generate this.
-* seq - REQUIRED, a number which should be increased every time put is passed a new value for the same keypair
-* salt - OPTIONAL - a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+* seq - OPTIONAL - default `0`, a number which should be increased every time put is passed a new value for the same keypair
+* salt - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
 
 When successful the second argument passed to `callback` is the public key
 (this is the same buffer as passed with `keypair.pk`). The third argument
@@ -174,8 +174,8 @@ Fetch a mutable value from the DHT.
 
 Options:
 
-* seq - REQUIRED, a number representing the current sequence integer for a given value
-* salt - OPTIONAL - a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+* seq - OPTIONAL, default `0`, a number representing the current sequence integer for a given value
+* salt - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
 
 When successful, the second argument passed to `callback` contains the resolved value. The third argument is an `info` object containing `{ key, value, sig, seq }`. 
 
