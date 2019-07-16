@@ -16,13 +16,13 @@ const nodes = Array.from(Array(n)).map(() => dht({
 function ready () {
   if (--n) return // when n is 0 all nodes are up
   const keypair = nodes[4].mutable.keypair()
-  let seq = 0 
+  let seq = 0
   nodes[4].mutable.put(Buffer.from('hello :)'), { keypair, seq }, (err, key) => {
     if (err) throw err
     nodes[9].mutable.get(key, { seq }, (err, { value }) => {
       if (err) throw err
       console.log(value.toString())
-      
+
       seq += 1 // seq must be incremented when updating immutable data
 
       nodes[4].mutable.put(

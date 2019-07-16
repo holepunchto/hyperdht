@@ -23,7 +23,7 @@ const mutableEncoding = {
   }
 }
 
-// PUT_VALUE_MAX_SIZE + packet overhead (i.e. the key etc.) 
+// PUT_VALUE_MAX_SIZE + packet overhead (i.e. the key etc.)
 // should be less than the network MTU, normally 1400 bytes
 const PUT_VALUE_MAX_SIZE = 1000
 
@@ -43,13 +43,13 @@ class ImmutableStore {
     if (value && streamMode === false) {
       return process.nextTick(cb, null, value)
     }
-    
+
     let found = false
     const queryStream = dht.query('immutable-store', key)
-    
+
     const responseStream = Transform({
       objectMode: true,
-      transform(result, enc, next) {
+      transform (result, enc, next) {
         if (result.value === null) {
           next()
           return
@@ -119,15 +119,15 @@ class ImmutableStore {
     }
   }
 }
-class MutableStore  {
+class MutableStore {
   constructor (dht, store) {
     this.dht = dht
     this.store = store
   }
   salt (size = 16) {
-    if (size < 16 && size > 64) { 
+    if (size < 16 && size > 64) {
       console.log(size)
-      throw Error('salt size must be between 16 and 64 bytes (inclusive)') 
+      throw Error('salt size must be between 16 and 64 bytes (inclusive)')
     }
     const salt = Buffer.alloc(size)
     randomBytes(salt)
@@ -145,13 +145,13 @@ class MutableStore  {
     const { salt, seq = 0 } = opts
     if (typeof seq !== 'number') throw Error('seq should be a number')
     if (salt && !Buffer.isBuffer(key)) throw Error('salt must be a buffer')
-    const queryStream = dht.query('mutable-store', key, {salt, seq})
-    let found = false 
+    const queryStream = dht.query('mutable-store', key, { salt, seq })
+    let found = false
     const userSeq = seq
     const streamMode = typeof cb !== 'function'
     const responseStream = Transform({
       objectMode: true,
-      transform(result, enc, next) {
+      transform (result, enc, next) {
         if (result.value === null) {
           next()
           return
@@ -187,7 +187,7 @@ class MutableStore  {
     if (typeof opts !== 'object') throw Error('Options are required')
     if (typeof cb !== 'function') throw Error('Callback is required')
     if (value.length > PUT_VALUE_MAX_SIZE) { throw Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`) }
-    const { dht} = this
+    const { dht } = this
     const { seq = 0, salt, keypair } = opts
     if (!keypair) throw Error('keypair is required')
     const { secretKey, publicKey } = keypair
@@ -223,14 +223,14 @@ class MutableStore  {
         }
         const publicKey = input.target
         const { value, salt, sig, seq } = input.value
-        const key = salt ? 
-          publicKey.toString('hex') + salt.toString('hex') : 
-          publicKey.toString('hex')
+        const key = salt
+          ? publicKey.toString('hex') + salt.toString('hex')
+          : publicKey.toString('hex')
         const local = store.get(key)
         const msg = salt ? Buffer.concat([value, salt]) : value
-        const verified = verify(sig, msg, publicKey) && 
+        const verified = verify(sig, msg, publicKey) &&
           (local ? seq >= local.seq : true)
-        
+
         if (verified === false) {
           cb(Error('ERR_INVALID_INPUT'))
           return
@@ -239,11 +239,11 @@ class MutableStore  {
         store.set(key, { value, salt, sig, seq })
         cb(null)
       },
-      query ({target, value}, cb) {
+      query ({ target, value }, cb) {
         const { seq, salt } = value
-        const key = salt ? 
-          target.toString('hex') + salt.toString('hex') : 
-          target.toString('hex')
+        const key = salt
+          ? target.toString('hex') + salt.toString('hex')
+          : target.toString('hex')
         const result = store.get(key)
         if (result && result.seq >= seq) {
           cb(null, result)
@@ -254,7 +254,6 @@ class MutableStore  {
     }
   }
 }
-
 
 module.exports = {
   ImmutableStore, MutableStore
