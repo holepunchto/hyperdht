@@ -30,11 +30,12 @@ function ready () {
         { keypair, seq },
         (err) => {
           if (err) throw err
-          nodes[0].mutable.get(key, { seq }, (err, { value }) => {
-            if (err) throw err
-            console.log(value.toString())
-            destroy() // allow process to close
-          })
+          nodes[0].mutable.get(key, { seq })
+            .on('data', ({value, ...info}) => {
+              console.log('got value: ', value.toString())
+              console.log('with info', info)
+            })
+            .on('end', destroy)
         }
       )
     })

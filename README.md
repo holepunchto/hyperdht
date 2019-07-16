@@ -146,8 +146,11 @@ to `callback` contains the generated key (a hash) for that value.
 
 #### `node.immutable.get(key, callback = (err, value) => {})`
 
-Fetch an immutable value from the DHT. When successful, the second argument passed
-to `callback` contains the resolved value.
+Fetch an immutable value from the DHT. When successful, the second argument passed to `callback` contains the resolved value.
+
+#### `node.immutable.get(key) => stream`
+
+Fetch all matching immutable values from the DHT. Any found values are emited in `data` events.
 
 #### `node.mutable.keypair()`
 
@@ -168,17 +171,27 @@ When successful the second argument passed to `callback` is the public key
 (this is the same buffer as passed with `keypair.pk`). The third argument
 is an `info` object containing `{ key, value, sig, seq }`. 
 
-#### `node.mutable.get(key, options, callback = (err, value, info) => {})`
+#### `node.mutable.get(key, options, callback = (err, { value, ...info }) => {})`
 
 Fetch a mutable value from the DHT. 
 
 Options:
 
-* seq - OPTIONAL, default `0`, a number representing the current sequence integer for a given value
+* seq - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
 * salt - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
 
-When successful, the second argument passed to `callback` contains the resolved value. The third argument is an `info` object containing `{ key, value, sig, seq }`. 
+When successful, the second argument passed to `callback` is an object containing the resolved `value` with additional to meta data (`...info`): `sig`, `seq` and `salt`.
 
+#### `node.mutable.get(key, options) => stream`
+
+Fetch a mutable values from the DHT, as a stream.
+
+Options:
+
+* seq - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
+* salt - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+
+Any values found are emitted in a `data` event where the data object takes the form: `{value, sig, seq, salt}`.
 
 #### `node.on('listening')`
 

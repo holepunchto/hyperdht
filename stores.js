@@ -8,7 +8,7 @@ const {
   crypto_sign_SECRETKEYBYTES: skSize,
   crypto_sign_BYTES: signSize
 } = require('sodium-universal')
-const { finished } = require('readable-stream')
+const { Transform, finished, pipeline } = require('readable-stream')
 const { Mutable } = require('./messages')
 
 const mutableEncoding = {
@@ -32,37 +32,54 @@ class ImmutableStore {
     this.store = store
   }
   get (key, cb) {
-    if (typeof cb !== 'function') throw Error('Callback is required')
     if (!Buffer.isBuffer(key)) throw Error('Key must be a buffer')
     const { store, dht } = this
-    const hexKey = key.toString('hex')
     // if the querying node already has the immutable value
     // then there's no need to query the dht
+    const streamMode = typeof cb !== 'function'
+    const hexKey = key.toString('hex')
     const value = store.get(hexKey)
-
-    if (value) return process.nextTick(cb, null, value)
-
-    const queryStream = dht.query('immutable-store', key)
+    if (value && streamMode === false) {
+      return process.nextTick(cb, null, value)
+    }
+    
     let found = false
-    queryStream.on('data', (result) => {
-      const check = Buffer.alloc(32)
-      hash(check, result.value)
-      if (Buffer.compare(check, key) === 0) {
-        found = true
-        cb(null, result.value)
-        queryStream.destroy()
-      } // silently ignore bad values
+    const queryStream = dht.query('immutable-store', key)
+    
+    const responseStream = Transform({
+      objectMode: true,
+      transform(result, enc, next) {
+        if (result.value === null) {
+          next()
+          return
+        }
+        const check = Buffer.alloc(32)
+        hash(check, result.value)
+        if (Buffer.compare(check, key) === 0) {
+          if (streamMode) {
+            next(null, result.value)
+          } else {
+            found = true
+            cb(null, result.value)
+            queryStream.destroy()
+          }
+        }
+      }
     })
-
-    finished(queryStream, (err) => {
+    if (value && streamMode) {
+      // push local cached value to stream first
+      responseStream.push(value)
+    }
+    pipeline(queryStream, responseStream, (err) => {
       if (err) {
         cb(err)
         return
       }
-      if (found === false) {
+      if (streamMode === false && found === false) {
         cb(null, null)
       }
     })
+    if (streamMode) return responseStream
   }
   put (value, cb) {
     if (typeof cb !== 'function') throw Error('Callback is required')
@@ -112,8 +129,7 @@ class MutableStore  {
     createKeypair(publicKey, secretKey)
     return { publicKey, secretKey }
   }
-  get (key, opts, cb = opts) {
-    if (typeof cb !== 'function') throw Error('Callback is required')
+  get (key, opts, cb) {
     if (typeof opts !== 'object') throw Error('Options are required')
     const { dht } = this
     const { salt, seq = 0 } = opts
@@ -122,25 +138,37 @@ class MutableStore  {
     const queryStream = dht.query('mutable-store', key, {salt, seq})
     let found = false 
     const userSeq = seq
-    queryStream.on('data', (result) => {
-      if (result.value === null) return
-      const { value, sig, seq: storedSeq, salt } = result.value
-      if (storedSeq >= userSeq && verify(sig, value, key)) {
-        found = true
-        cb(null, value, { sig, seq, salt })
-        queryStream.destroy()
+    const streamMode = typeof cb !== 'function'
+    const responseStream = Transform({
+      objectMode: true,
+      transform(result, enc, next) {
+        if (result.value === null) {
+          next()
+          return
+        }
+        const { value, sig, seq: storedSeq, salt } = result.value
+        if (storedSeq >= userSeq && verify(sig, value, key)) {
+          if (streamMode) {
+            next(null, { value, sig, seq: storedSeq, salt })
+          } else {
+            found = true
+            cb(null, { value, sig, seq: storedSeq, salt })
+            queryStream.destroy()
+          }
+        }
       }
     })
 
-    finished(queryStream, (err) => {
+    pipeline(queryStream, responseStream, (err) => {
       if (err) {
         cb(err)
         return
       }
-      if (found === false) {
+      if (streamMode === false && found === false) {
         cb(null, null)
       }
     })
+    if (streamMode) return responseStream
   }
   put (value, opts, cb) {
     if (!Buffer.isBuffer(value)) throw Error('Value must be a buffer')
@@ -192,7 +220,7 @@ class MutableStore  {
           cb(Error('ERR_INVALID_INPUT'))
           return
         }
-        
+
         store.set(key, { key, value, sig, seq })  
         cb(null)
       },
