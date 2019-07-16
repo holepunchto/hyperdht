@@ -157,6 +157,12 @@ Fetch all matching immutable values from the DHT. Any found values are emited in
 Use this method to generate the required keypair for a put.
 Returns an object with `{publicKey, secretKey}`. `publicKey` holds a public key buffer, `secretKey` holds a private key buffer.
 
+#### `node.mutable.salt(size = 16)`
+
+Utility method for creating a random salt value. This can optionally
+be passed in `mutable.put` and `mutable.get` options.
+Salt values can be used as a sort of secondary UID, allowing multiple values to be stored under the same public key. Min `size` is 16 bytes, max `size` is 64 bytes.
+
 #### `node.mutable.put(value, options, callback = (err, key, info) => {})`
 
 Store a mutable value in the DHT.

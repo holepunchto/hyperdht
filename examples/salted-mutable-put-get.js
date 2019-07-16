@@ -16,26 +16,28 @@ const nodes = Array.from(Array(n)).map(() => dht({
 function ready () {
   if (--n) return // when n is 0 all nodes are up
   const keypair = nodes[4].mutable.keypair()
-  let seq = 0 
-  nodes[4].mutable.put(Buffer.from('hello :)'), { keypair, seq }, (err, key) => {
+  const salt = nodes[4].mutable.salt()
+  nodes[4].mutable.put(Buffer.from('hello :)'), { keypair, salt }, (err, key) => {
     if (err) throw err
-    nodes[9].mutable.get(key, { seq }, (err, { value }) => {
+    nodes[9].mutable.get(key, { salt }, (err, { value }) => {
       if (err) throw err
       console.log(value.toString())
-      
-      seq += 1 
-
+      const differentSalt = nodes[4].mutable.salt()
       nodes[4].mutable.put(
         Buffer.from('goodbye :D'),
-        { keypair, seq },
+        { keypair, salt: differentSalt },
         (err) => {
           if (err) throw err
-          nodes[0].mutable.get(key, { seq })
-            .on('data', ({value, ...info}) => {
-              console.log('got value: ', value.toString())
-              console.log('with info', info)
+          nodes[0].mutable.get(key, { salt }, (err, { value }) => {
+            if (err) throw err
+            // be "hello :)" because we're using the first salt
+            console.log(value.toString())
+            nodes[0].mutable.get(key, { salt: differentSalt }, (err, { value }) => {
+              if (err) throw err
+              console.log(value.toString())
+              destroy()
             })
-            .on('end', destroy)
+          })
         }
       )
     })

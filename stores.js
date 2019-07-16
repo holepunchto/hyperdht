@@ -6,7 +6,8 @@ const {
   crypto_sign_detached: sign,
   crypto_sign_PUBLICKEYBYTES: pkSize,
   crypto_sign_SECRETKEYBYTES: skSize,
-  crypto_sign_BYTES: signSize
+  crypto_sign_BYTES: signSize,
+  randombytes_buf: randomBytes
 } = require('sodium-universal')
 const { Transform, finished, pipeline } = require('readable-stream')
 const { Mutable } = require('./messages')
@@ -123,6 +124,15 @@ class MutableStore  {
     this.dht = dht
     this.store = store
   }
+  salt (size = 16) {
+    if (size < 16 && size > 64) { 
+      console.log(size)
+      throw Error('salt size must be between 16 and 64 bytes (inclusive)') 
+    }
+    const salt = Buffer.alloc(size)
+    randomBytes(salt)
+    return salt
+  }
   keypair () {
     const publicKey = Buffer.alloc(pkSize)
     const secretKey = Buffer.alloc(skSize)
@@ -146,8 +156,9 @@ class MutableStore  {
           next()
           return
         }
-        const { value, sig, seq: storedSeq, salt } = result.value
-        if (storedSeq >= userSeq && verify(sig, value, key)) {
+        const { value, sig, seq: storedSeq } = result.value
+        const msg = salt ? Buffer.concat([value, salt]) : value
+        if (storedSeq >= userSeq && verify(sig, msg, key)) {
           if (streamMode) {
             next(null, { value, sig, seq: storedSeq, salt })
           } else {
@@ -158,7 +169,7 @@ class MutableStore  {
         }
       }
     })
-
+    finished(queryStream, () => { responseStream.push(null) })
     pipeline(queryStream, responseStream, (err) => {
       if (err) {
         cb(err)
@@ -185,10 +196,11 @@ class MutableStore  {
     if (typeof seq !== 'number') throw Error('seq should be a number')
     if (salt) {
       if (!Buffer.isBuffer(salt)) throw Error('salt must be a buffer')
-      if (salt.length >= 16 && salt.length <= 64) { throw Error('salt length must be between 16 and 64 bytes (inclusive)') }
+      if (salt.length < 16 && salt.length > 64) { throw Error('salt size must be between 16 and 64 bytes (inclusive)') }
     }
     const sig = Buffer.alloc(signSize)
-    sign(sig, value, secretKey)
+    const msg = salt ? Buffer.concat([value, salt]) : value
+    sign(sig, msg, secretKey)
     const key = publicKey
     const info = { value, sig, seq, salt }
 
@@ -210,10 +222,13 @@ class MutableStore  {
           return
         }
         const publicKey = input.target
-        const { value, sig, seq } = input.value
-        const key = publicKey.toString('hex')
+        const { value, salt, sig, seq } = input.value
+        const key = salt ? 
+          publicKey.toString('hex') + salt.toString('hex') : 
+          publicKey.toString('hex')
         const local = store.get(key)
-        const verified = verify(sig, value, publicKey) && 
+        const msg = salt ? Buffer.concat([value, salt]) : value
+        const verified = verify(sig, msg, publicKey) && 
           (local ? seq >= local.seq : true)
         
         if (verified === false) {
@@ -221,12 +236,14 @@ class MutableStore  {
           return
         }
 
-        store.set(key, { key, value, sig, seq })  
+        store.set(key, { value, salt, sig, seq })
         cb(null)
       },
       query ({target, value}, cb) {
-        const key = target.toString('hex')
-        const { seq } = value
+        const { seq, salt } = value
+        const key = salt ? 
+          target.toString('hex') + salt.toString('hex') : 
+          target.toString('hex')
         const result = store.get(key)
         if (result && result.seq >= seq) {
           cb(null, result)
