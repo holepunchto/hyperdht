@@ -22,6 +22,8 @@ const mutableEncoding = {
   }
 }
 
+// PUT_VALUE_MAX_SIZE + packet overhead (ie the key etc) 
+// should be less than the network MTU, normally 1400 bytes
 const PUT_VALUE_MAX_SIZE = 1000
 
 const immutable = (store) => ({
