@@ -86,15 +86,10 @@ class ImmutableStore {
     const { store } = this
     return {
       update ({ target, value }, cb) {
-        if (value == null) {
-          cb(null)
-          return
-        }
         const key = Buffer.alloc(32)
         hash(key, value)
         if (Buffer.compare(key, target) !== 0) {
-          // ignoring bad input
-          cb(null)
+          cb(Error('ERR_INVALID_INPUT'))
           return
         }
         store.set(key.toString('hex'), value)
@@ -157,8 +152,8 @@ class MutableStore  {
     const { seq = 0, salt, keypair } = opts
     if (!keypair) throw Error('keypair is required')
     const { secretKey, publicKey } = keypair
-    if (!Buffer.isBuffer(secretKey)) throw Error('keypair.sk (secret key buffer) is required')
-    if (!Buffer.isBuffer(publicKey)) throw Error('keypair.pk (public key buffer) is required')
+    if (!Buffer.isBuffer(secretKey)) throw Error('keypair.secretKey is required')
+    if (!Buffer.isBuffer(publicKey)) throw Error('keypair.publicKey is required')
     if (typeof seq !== 'number') throw Error('seq should be a number')
     if (salt) {
       if (!Buffer.isBuffer(salt)) throw Error('salt must be a buffer')
@@ -192,11 +187,13 @@ class MutableStore  {
         const local = store.get(key)
         const verified = verify(sig, value, publicKey) && 
           (local ? seq >= local.seq : true)
-  
-        if (verified) {
-          store.set(key, { key, value, sig, seq })
+        
+        if (verified === false) {
+          cb(Error('ERR_INVALID_INPUT'))
+          return
         }
-  
+        
+        store.set(key, { key, value, sig, seq })  
         cb(null)
       },
       query ({target, value}, cb) {
