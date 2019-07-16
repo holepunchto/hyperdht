@@ -53,7 +53,7 @@ const immutable = (store) => ({
         return
       }
       if (found === false) {
-        cb(Error('Not Found'))
+        cb(null, null)
       }
     })
   },
