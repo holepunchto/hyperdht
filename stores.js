@@ -22,7 +22,7 @@ const mutableEncoding = {
   }
 }
 
-// PUT_VALUE_MAX_SIZE + packet overhead (ie the key etc) 
+// PUT_VALUE_MAX_SIZE + packet overhead (i.e. the key etc.) 
 // should be less than the network MTU, normally 1400 bytes
 const PUT_VALUE_MAX_SIZE = 1000
 
@@ -111,7 +111,7 @@ const mutable = (store) => ({
     const { salt, seq = 0 } = opts
     if (typeof seq !== 'number') throw Error('seq should be a number')
     if (salt && !Buffer.isBuffer(key)) throw Error('salt must be a buffer')
-    const queryStream = this.query('mutable-store', key)
+    const queryStream = this.query('mutable-store', key, {salt, seq})
     let found = false 
     queryStream.on('data', (result) => {
       if (result.value === null) return
@@ -174,10 +174,15 @@ const mutable = (store) => ({
       store.set(key.toString('hex'), { key, value, sig, seq })
       cb(null)
     },
-    query ({ target }, cb) {
+    query ({target, value}, cb) {
       const key = target.toString('hex')
+      const { seq } = value
       const result = store.get(key)
-      cb(null, result)
+      if (result && result.seq >= seq) {
+        cb(null, result)
+      } else {
+        cb(null, null)
+      }
     }
   }
 })
