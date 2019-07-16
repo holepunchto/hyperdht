@@ -152,8 +152,7 @@ to `callback` contains the resolved value.
 #### `node.mutable.keypair()`
 
 Use this method to generate the required keypair for a put.
-Returns an object with `{pk, sk}`. `pk` holds a private key buffer,
-`sk` holds a public key buffer.
+Returns an object with `{publicKey, secretKey}`. `publicKey` holds a public key buffer, `secretKey` holds a private key buffer.
 
 #### `node.mutable.put(value, options, callback = (err, key, info) => {})`
 
