@@ -84,7 +84,7 @@ const immutable = (store) => ({
       }
       const key = Buffer.alloc(32)
       hash(key, value)
-      if (Buffer.compare(key, target) === false) {
+      if (Buffer.compare(key, target) !== 0) {
         // ignoring bad input
         cb(null)
         return
@@ -113,10 +113,11 @@ const mutable = (store) => ({
     if (salt && !Buffer.isBuffer(key)) throw Error('salt must be a buffer')
     const queryStream = this.query('mutable-store', key, {salt, seq})
     let found = false 
+    const userSeq = seq
     queryStream.on('data', (result) => {
       if (result.value === null) return
-      const { key, value, sig, seq: _seq, salt } = result.value
-      if (_seq <= seq && verify(sig, value, key)) {
+      const { value, sig, seq: storedSeq, salt } = result.value
+      if (storedSeq >= userSeq && verify(sig, value, key)) {
         found = true
         cb(null, value, { key, sig, seq, salt })
         queryStream.destroy()
@@ -129,7 +130,7 @@ const mutable = (store) => ({
         return
       }
       if (found === false) {
-        cb(Error('Not Found'))
+        cb(null, null)
       }
     })
   },
@@ -164,14 +165,22 @@ const mutable = (store) => ({
   },
   command: {
     valueEncoding: mutableEncoding,
-    update (result, cb) {
-      if (result.value == null) {
+    update (input, cb) {
+      if (input.value == null) {
         cb(null)
         return
       }
-      const key = result.target
-      const { value, sig, seq } = result.value
-      store.set(key.toString('hex'), { key, value, sig, seq })
+      const publicKey = input.target
+      const { key, value, sig, seq } = input.value
+      const hexKey = publicKey.toString('hex')
+      const local = store.get(hexKey)
+      const verified = Buffer.compare(key, publicKey) === 0 && 
+        verify(sig, value, publicKey) && (local ? seq >= local.seq : true)
+
+      if (verified) {
+        store.set(hexKey, { key, value, sig, seq })
+      }
+
       cb(null)
     },
     query ({target, value}, cb) {
