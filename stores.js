@@ -9,16 +9,16 @@ const {
   crypto_sign_BYTES: signSize
 } = require('sodium-universal')
 const { finished } = require('readable-stream')
-const { MutableStore } = require('./messages')
+const { Mutable } = require('./messages')
 
 const mutableEncoding = {
   encode (o) {
     if (o == null) return o
-    return MutableStore.encode(o)
+    return Mutable.encode(o)
   },
   decode (o) {
     if (o == null) return o
-    return MutableStore.decode(o)
+    return Mutable.decode(o)
   }
 }
 
@@ -26,10 +26,15 @@ const mutableEncoding = {
 // should be less than the network MTU, normally 1400 bytes
 const PUT_VALUE_MAX_SIZE = 1000
 
-const immutable = (store) => ({
+class ImmutableStore {
+  constructor (dht, store) {
+    this.dht = dht
+    this.store = store
+  }
   get (key, cb) {
     if (typeof cb !== 'function') throw Error('Callback is required')
     if (!Buffer.isBuffer(key)) throw Error('Key must be a buffer')
+    const { store, dht } = this
     const hexKey = key.toString('hex')
     // if the querying node already has the immutable value
     // then there's no need to query the dht
@@ -37,7 +42,7 @@ const immutable = (store) => ({
 
     if (value) return process.nextTick(cb, null, value)
 
-    const queryStream = this.query('immutable-store', key)
+    const queryStream = dht.query('immutable-store', key)
     let found = false
     queryStream.on('data', (result) => {
       const check = Buffer.alloc(32)
@@ -58,60 +63,68 @@ const immutable = (store) => ({
         cb(null, null)
       }
     })
-  },
+  }
   put (value, cb) {
     if (typeof cb !== 'function') throw Error('Callback is required')
     if (!Buffer.isBuffer(value)) throw Error('Value must be a buffer')
     if (value.length > PUT_VALUE_MAX_SIZE) { throw Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`) }
+    const { store, dht } = this
     const key = Buffer.alloc(32)
     hash(key, value)
     // set locally for easy cached retrieval
     store.set(key.toString('hex'), value)
     // send to the dht
-    this.update('immutable-store', key, value, (err) => {
+    dht.update('immutable-store', key, value, (err) => {
       if (err) {
         cb(err)
         return
       }
       cb(null, key)
     })
-  },
-  command: {
-    update ({ target, value }, cb) {
-      if (value == null) {
+  }
+  _command () {
+    const { store } = this
+    return {
+      update ({ target, value }, cb) {
+        if (value == null) {
+          cb(null)
+          return
+        }
+        const key = Buffer.alloc(32)
+        hash(key, value)
+        if (Buffer.compare(key, target) !== 0) {
+          // ignoring bad input
+          cb(null)
+          return
+        }
+        store.set(key.toString('hex'), value)
         cb(null)
-        return
+      },
+      query ({ target }, cb) {
+        cb(null, store.get(target.toString('hex')))
       }
-      const key = Buffer.alloc(32)
-      hash(key, value)
-      if (Buffer.compare(key, target) !== 0) {
-        // ignoring bad input
-        cb(null)
-        return
-      }
-      store.set(key.toString('hex'), value)
-      cb(null)
-    },
-    query ({ target }, cb) {
-      cb(null, store.get(target.toString('hex')))
     }
   }
-})
-
-const mutable = (store) => ({
+}
+class MutableStore  {
+  constructor (dht, store) {
+    this.dht = dht
+    this.store = store
+  }
   keypair () {
     const publicKey = Buffer.alloc(pkSize)
     const secretKey = Buffer.alloc(skSize)
     createKeypair(publicKey, secretKey)
     return { publicKey, secretKey }
-  },
+  }
   get (key, opts, cb = opts) {
     if (typeof cb !== 'function') throw Error('Callback is required')
     if (typeof opts !== 'object') throw Error('Options are required')
+    const { dht } = this
     const { salt, seq = 0 } = opts
     if (typeof seq !== 'number') throw Error('seq should be a number')
     if (salt && !Buffer.isBuffer(key)) throw Error('salt must be a buffer')
-    const queryStream = this.query('mutable-store', key, {salt, seq})
+    const queryStream = dht.query('mutable-store', key, {salt, seq})
     let found = false 
     const userSeq = seq
     queryStream.on('data', (result) => {
@@ -119,7 +132,7 @@ const mutable = (store) => ({
       const { value, sig, seq: storedSeq, salt } = result.value
       if (storedSeq >= userSeq && verify(sig, value, key)) {
         found = true
-        cb(null, value, { key, sig, seq, salt })
+        cb(null, value, { sig, seq, salt })
         queryStream.destroy()
       }
     })
@@ -133,13 +146,14 @@ const mutable = (store) => ({
         cb(null, null)
       }
     })
-  },
+  }
   put (value, opts, cb) {
     if (!Buffer.isBuffer(value)) throw Error('Value must be a buffer')
     if (value.length > PUT_VALUE_MAX_SIZE) { throw Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`) }
     if (typeof opts !== 'object') throw Error('Options are required')
     if (typeof cb !== 'function') throw Error('Callback is required')
     if (value.length > PUT_VALUE_MAX_SIZE) { throw Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`) }
+    const { dht} = this
     const { seq = 0, salt, keypair } = opts
     if (!keypair) throw Error('keypair is required')
     const { secretKey, publicKey } = keypair
@@ -153,49 +167,53 @@ const mutable = (store) => ({
     const sig = Buffer.alloc(signSize)
     sign(sig, value, secretKey)
     const key = publicKey
-    const info = { key, value, sig, seq }
+    const info = { value, sig, seq, salt }
 
-    this.update('mutable-store', key, info, (err) => {
+    dht.update('mutable-store', key, info, (err) => {
       if (err) {
         cb(err)
         return
       }
       cb(null, key, info)
     })
-  },
-  command: {
-    valueEncoding: mutableEncoding,
-    update (input, cb) {
-      if (input.value == null) {
+  }
+  _command () {
+    const { store } = this
+    return {
+      valueEncoding: mutableEncoding,
+      update (input, cb) {
+        if (input.value == null) {
+          cb(null)
+          return
+        }
+        const publicKey = input.target
+        const { value, sig, seq } = input.value
+        const key = publicKey.toString('hex')
+        const local = store.get(key)
+        const verified = verify(sig, value, publicKey) && 
+          (local ? seq >= local.seq : true)
+  
+        if (verified) {
+          store.set(key, { key, value, sig, seq })
+        }
+  
         cb(null)
-        return
-      }
-      const publicKey = input.target
-      const { key, value, sig, seq } = input.value
-      const hexKey = publicKey.toString('hex')
-      const local = store.get(hexKey)
-      const verified = Buffer.compare(key, publicKey) === 0 && 
-        verify(sig, value, publicKey) && (local ? seq >= local.seq : true)
-
-      if (verified) {
-        store.set(hexKey, { key, value, sig, seq })
-      }
-
-      cb(null)
-    },
-    query ({target, value}, cb) {
-      const key = target.toString('hex')
-      const { seq } = value
-      const result = store.get(key)
-      if (result && result.seq >= seq) {
-        cb(null, result)
-      } else {
-        cb(null, null)
+      },
+      query ({target, value}, cb) {
+        const key = target.toString('hex')
+        const { seq } = value
+        const result = store.get(key)
+        if (result && result.seq >= seq) {
+          cb(null, result)
+        } else {
+          cb(null, null)
+        }
       }
     }
   }
-})
+}
+
 
 module.exports = {
-  mutable, immutable
+  ImmutableStore, MutableStore
 }

@@ -4,7 +4,7 @@ const recordCache = require('record-cache')
 const { PeersInput, PeersOutput } = require('./messages')
 const peers = require('ipv4-peers')
 const LRU = require('hashlru')
-const stores = require('./stores')
+const { ImmutableStore, MutableStore } = require('./stores')
 const DEFAULT_BOOTSTRAP = [
   'bootstrap1.hyperdht.org:49737',
   'bootstrap2.hyperdht.org:49737',
@@ -32,20 +32,11 @@ class HyperDHT extends DHT {
     this._peers = peers
     this._store = LRU(maxValues)
 
-    const mutable = stores.mutable(this._store)
-    const immutable = stores.immutable(this._store)
+    this.mutable = new MutableStore(this, this._store)
+    this.immutable = new ImmutableStore(this, this._store)
 
-    this.mutable = {
-      keypair: mutable.keypair,
-      get: mutable.get.bind(this),
-      put: mutable.put.bind(this)
-    }
-    this.immutable = {
-      get: immutable.get.bind(this),
-      put: immutable.put.bind(this)
-    }
-    this.command('mutable-store', mutable.command)
-    this.command('immutable-store', immutable.command)
+    this.command('mutable-store', this.mutable._command())
+    this.command('immutable-store', this.immutable._command())
     this.command('peers', {
       inputEncoding: PeersInput,
       outputEncoding: PeersOutput,

@@ -24,7 +24,7 @@ var PeersOutput = exports.PeersOutput = {
   decode: null
 }
 
-var MutableStore = exports.MutableStore = {
+var Mutable = exports.Mutable = {
   buffer: true,
   encodingLength: null,
   encode: null,
@@ -33,7 +33,7 @@ var MutableStore = exports.MutableStore = {
 
 definePeersInput()
 definePeersOutput()
-defineMutableStore()
+defineMutable()
 
 function definePeersInput () {
   var enc = [
@@ -197,22 +197,18 @@ function definePeersOutput () {
   }
 }
 
-function defineMutableStore () {
+function defineMutable () {
   var enc = [
     encodings.bytes,
     encodings.varint
   ]
 
-  MutableStore.encodingLength = encodingLength
-  MutableStore.encode = encode
-  MutableStore.decode = decode
+  Mutable.encodingLength = encodingLength
+  Mutable.encode = encode
+  Mutable.decode = decode
 
   function encodingLength (obj) {
     var length = 0
-    if (defined(obj.key)) {
-      var len = enc[0].encodingLength(obj.key)
-      length += 1 + len
-    }
     if (defined(obj.value)) {
       var len = enc[0].encodingLength(obj.value)
       length += 1 + len
@@ -225,6 +221,10 @@ function defineMutableStore () {
       var len = enc[1].encodingLength(obj.seq)
       length += 1 + len
     }
+    if (defined(obj.salt)) {
+      var len = enc[0].encodingLength(obj.salt)
+      length += 1 + len
+    }
     return length
   }
 
@@ -232,25 +232,25 @@ function defineMutableStore () {
     if (!offset) offset = 0
     if (!buf) buf = Buffer.allocUnsafe(encodingLength(obj))
     var oldOffset = offset
-    if (defined(obj.key)) {
-      buf[offset++] = 10
-      enc[0].encode(obj.key, buf, offset)
-      offset += enc[0].encode.bytes
-    }
     if (defined(obj.value)) {
-      buf[offset++] = 18
+      buf[offset++] = 10
       enc[0].encode(obj.value, buf, offset)
       offset += enc[0].encode.bytes
     }
     if (defined(obj.sig)) {
-      buf[offset++] = 26
+      buf[offset++] = 18
       enc[0].encode(obj.sig, buf, offset)
       offset += enc[0].encode.bytes
     }
     if (defined(obj.seq)) {
-      buf[offset++] = 32
+      buf[offset++] = 24
       enc[1].encode(obj.seq, buf, offset)
       offset += enc[1].encode.bytes
+    }
+    if (defined(obj.salt)) {
+      buf[offset++] = 34
+      enc[0].encode(obj.salt, buf, offset)
+      offset += enc[0].encode.bytes
     }
     encode.bytes = offset - oldOffset
     return buf
@@ -262,10 +262,10 @@ function defineMutableStore () {
     if (!(end <= buf.length && offset <= buf.length)) throw new Error("Decoded message is not valid")
     var oldOffset = offset
     var obj = {
-      key: null,
       value: null,
       sig: null,
-      seq: 0
+      seq: 0,
+      salt: null
     }
     while (true) {
       if (end <= offset) {
@@ -277,20 +277,20 @@ function defineMutableStore () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.key = enc[0].decode(buf, offset)
-        offset += enc[0].decode.bytes
-        break
-        case 2:
         obj.value = enc[0].decode(buf, offset)
         offset += enc[0].decode.bytes
         break
-        case 3:
+        case 2:
         obj.sig = enc[0].decode(buf, offset)
         offset += enc[0].decode.bytes
         break
-        case 4:
+        case 3:
         obj.seq = enc[1].decode(buf, offset)
         offset += enc[1].decode.bytes
+        break
+        case 4:
+        obj.salt = enc[0].decode(buf, offset)
+        offset += enc[0].decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)
