@@ -80,8 +80,14 @@ const immutable = (store) => ({
         cb(null)
         return
       }
-      const key = target.toString('hex')
-      store.set(key, value)
+      const key = Buffer.alloc(32)
+      hash(key, value)
+      if (Buffer.compare(key, target) === false) {
+        // ignoring bad input
+        cb(null)
+        return
+      }
+      store.set(key.toString('hex'), value)
       cb(null)
     },
     query ({ target }, cb) {
