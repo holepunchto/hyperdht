@@ -114,7 +114,7 @@ const mutable = (store) => ({
     queryStream.on('data', (result) => {
       if (result.value === null) return
       const { key, value, sig, seq: _seq, salt } = result.value
-      if (_seq === seq && verify(sig, value, key)) {
+      if (_seq <= seq && verify(sig, value, key)) {
         found = true
         cb(null, value, { key, sig, seq, salt })
         queryStream.destroy()
