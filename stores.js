@@ -1,4 +1,5 @@
 'use strict'
+const assert = require('assert')
 const {
   crypto_generichash: hash,
   crypto_sign_keypair: createKeypair,
@@ -33,7 +34,7 @@ class ImmutableStore {
     this.store = store
   }
   get (key, cb) {
-    if (!Buffer.isBuffer(key)) throw Error('Key must be a buffer')
+    assert(Buffer.isBuffer(key), 'Key must be a buffer')
     const { store, dht } = this
     // if the querying node already has the immutable value
     // then there's no need to query the dht
@@ -83,9 +84,12 @@ class ImmutableStore {
     if (streamMode) return responseStream
   }
   put (value, cb) {
-    if (typeof cb !== 'function') throw Error('Callback is required')
-    if (!Buffer.isBuffer(value)) throw Error('Value must be a buffer')
-    if (value.length > PUT_VALUE_MAX_SIZE) { throw Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`) }
+    assert(typeof cb === 'function', 'Callback is required')
+    assert(Buffer.isBuffer(value), 'Value must be a buffer')
+    assert(
+      value.length <= PUT_VALUE_MAX_SIZE,
+      `Value size must be <= ${PUT_VALUE_MAX_SIZE}`
+    )
     const { store, dht } = this
     const key = Buffer.alloc(32)
     hash(key, value)
@@ -125,9 +129,10 @@ class MutableStore {
     this.store = store
   }
   salt (size = 32) {
-    if (size < 16 && size > 64) {
-      throw Error('salt size must be between 16 and 64 bytes (inclusive)')
-    }
+    assert(
+      size >= 16 && size <= 64,
+      'salt size must be between 16 and 64 bytes (inclusive)'
+    )
     const salt = Buffer.alloc(size)
     randomBytes(salt)
     return salt
@@ -138,12 +143,17 @@ class MutableStore {
     createKeypair(publicKey, secretKey)
     return { publicKey, secretKey }
   }
-  get (key, opts, cb) {
-    if (typeof opts !== 'object') throw Error('Options are required')
+  get (key, opts = {}, cb = opts) {
     const { dht } = this
     const { salt, seq = 0 } = opts
-    if (typeof seq !== 'number') throw Error('seq should be a number')
-    if (salt && !Buffer.isBuffer(key)) throw Error('salt must be a buffer')
+    assert(typeof seq === 'number', 'seq should be a number')
+    if (salt) {
+      assert(Buffer.isBuffer(salt), 'salt must be a buffer')
+      assert(
+        salt.length >= 16 && salt.length <= 64,
+        'salt size must be between 16 and 64 bytes (inclusive)'
+      )
+    }
     const queryStream = dht.query('mutable-store', key, { salt, seq })
     let found = false
     const userSeq = seq
@@ -181,24 +191,28 @@ class MutableStore {
     if (streamMode) return responseStream
   }
   put (value, opts, cb) {
-    if (!Buffer.isBuffer(value)) throw Error('Value must be a buffer')
-    if (value.length > PUT_VALUE_MAX_SIZE) { throw Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`) }
-    if (typeof opts !== 'object') throw Error('Options are required')
-    if (typeof cb !== 'function') throw Error('Callback is required')
-    if (value.length > PUT_VALUE_MAX_SIZE) { throw Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`) }
+    assert(Buffer.isBuffer(value), 'Value must be a buffer')
+    assert(typeof opts === 'object', 'Options are required')
+    assert(typeof cb === 'function', 'Callback is required')
+    assert(value.length <= PUT_VALUE_MAX_SIZE, `Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     const { dht } = this
     const { seq = 0, salt, keypair } = opts
-    if (!keypair) throw Error('keypair is required')
+    assert(keypair, 'keypair is required')
     const { secretKey, publicKey } = keypair
-    if (!Buffer.isBuffer(secretKey)) throw Error('keypair.secretKey is required')
-    if (!Buffer.isBuffer(publicKey)) throw Error('keypair.publicKey is required')
-    if (typeof seq !== 'number') throw Error('seq should be a number')
+    assert(Buffer.isBuffer(secretKey), 'keypair.secretKey is required')
+    assert(Buffer.isBuffer(publicKey), 'keypair.publicKey is required')
+    assert(typeof seq === 'number', 'seq should be a number')
     if (salt) {
-      if (!Buffer.isBuffer(salt)) throw Error('salt must be a buffer')
-      if (salt.length < 16 && salt.length > 64) { throw Error('salt size must be between 16 and 64 bytes (inclusive)') }
+      assert(Buffer.isBuffer(salt), 'salt must be a buffer')
+      assert(
+        salt.length >= 16 && salt.length <= 64,
+        'salt size must be between 16 and 64 bytes (inclusive)'
+      )
     }
     const sig = Buffer.alloc(signSize)
-    const msg = salt ? Buffer.concat([Buffer.from([salt.length]), salt, value]) : value
+    const msg = salt
+      ? Buffer.concat([Buffer.from([salt.length]), salt, value])
+      : value
     sign(sig, msg, secretKey)
     const key = publicKey
     const info = { value, sig, seq, salt }
