@@ -126,7 +126,6 @@ class MutableStore {
   }
   salt (size = 16) {
     if (size < 16 && size > 64) {
-      console.log(size)
       throw Error('salt size must be between 16 and 64 bytes (inclusive)')
     }
     const salt = Buffer.alloc(size)
