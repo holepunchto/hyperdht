@@ -95,8 +95,21 @@ class ImmutableStore {
     hash(key, value)
     // set locally for easy cached retrieval
     store.set(key.toString('hex'), value)
+
     // send to the dht
-    dht.update('immutable-store', key, value, (err) => {
+    const queryStream = dht.update('immutable-store', key, value)
+
+    queryStream
+      .once('warning', (err = {}) => {
+        if (err.message === 'ERR_INVALID_INPUT') {
+          queryStream.destroy(err)
+        }
+      })
+      .once('data', () => {
+        queryStream.destroy()
+      })
+
+    finished(queryStream, (err) => {
       if (err) {
         cb(err)
         return
@@ -217,7 +230,19 @@ class MutableStore {
     const key = publicKey
     const info = { value, sig, seq, salt }
 
-    dht.update('mutable-store', key, info, (err) => {
+    const queryStream = dht.update('mutable-store', key, info)
+
+    queryStream
+      .once('warning', (err = {}) => {
+        if (err.message === 'ERR_INVALID_INPUT' || err.message === 'ERR_INVALID_SEQ') {
+          queryStream.destroy(err)
+        }
+      })
+      .once('data', () => {
+        queryStream.destroy()
+      })
+
+    finished(queryStream, (err) => {
       if (err) {
         cb(err)
         return
@@ -255,7 +280,6 @@ class MutableStore {
           cb(Error('ERR_INVALID_INPUT'))
           return
         }
-
         store.set(key, { value, salt, sig, seq })
         cb(null)
       },
