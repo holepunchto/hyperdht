@@ -17,7 +17,7 @@ function ready () {
   if (--n) return // when n is 0 all nodes are up
   const keypair = nodes[4].mutable.keypair()
   let seq = 0
-  nodes[4].mutable.put(Buffer.from('hello :)'), { keypair, seq }, (err, key) => {
+  nodes[4].mutable.put(Buffer.from('hello :)'), { keypair, seq }, (err, { key }) => {
     if (err) throw err
     nodes[9].mutable.get(key, { seq }, (err, { value }) => {
       if (err) throw err
@@ -28,7 +28,7 @@ function ready () {
       nodes[4].mutable.put(
         Buffer.from('goodbye :D'),
         { keypair, seq },
-        (err) => {
+        (err, { key }) => {
           if (err) throw err
           nodes[0].mutable.get(key, { seq })
             .on('data', ({ value, ...info }) => {

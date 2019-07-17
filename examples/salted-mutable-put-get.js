@@ -17,7 +17,7 @@ function ready () {
   if (--n) return // when n is 0 all nodes are up
   const keypair = nodes[4].mutable.keypair()
   const salt = nodes[4].mutable.salt()
-  nodes[4].mutable.put(Buffer.from('hello :)'), { keypair, salt }, (err, key) => {
+  nodes[4].mutable.put(Buffer.from('hello :)'), { keypair, salt }, (err, { key }) => {
     if (err) throw err
     nodes[9].mutable.get(key, { salt }, (err, { value }) => {
       if (err) throw err
@@ -26,7 +26,7 @@ function ready () {
       nodes[4].mutable.put(
         Buffer.from('goodbye :D'),
         { keypair, salt: differentSalt },
-        (err) => {
+        (err, { key }) => {
           if (err) throw err
           nodes[0].mutable.get(key, { salt }, (err, { value }) => {
             if (err) throw err

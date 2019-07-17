@@ -228,9 +228,8 @@ class MutableStore {
       : value
     sign(sig, msg, secretKey)
     const key = publicKey
-    const info = { value, sig, seq, salt }
 
-    const queryStream = dht.update('mutable-store', key, info)
+    const queryStream = dht.update('mutable-store', key, { value, sig, seq, salt })
 
     queryStream
       .once('warning', (err = {}) => {
@@ -247,7 +246,7 @@ class MutableStore {
         cb(err)
         return
       }
-      cb(null, key, info)
+      cb(null, { key, sig, seq, salt })
     })
   }
   _command () {
