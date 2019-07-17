@@ -124,7 +124,7 @@ class MutableStore {
     this.dht = dht
     this.store = store
   }
-  salt (size = 16) {
+  salt (size = 32) {
     if (size < 16 && size > 64) {
       throw Error('salt size must be between 16 and 64 bytes (inclusive)')
     }
