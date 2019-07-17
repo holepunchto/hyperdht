@@ -156,7 +156,7 @@ class MutableStore {
           return
         }
         const { value, sig, seq: storedSeq } = result.value
-        const msg = salt ? Buffer.concat([value, salt]) : value
+        const msg = salt ? Buffer.concat([Buffer.from([salt.length]), salt, value]) : value
         if (storedSeq >= userSeq && verify(sig, msg, key)) {
           if (streamMode) {
             next(null, { value, sig, seq: storedSeq, salt })
@@ -198,7 +198,7 @@ class MutableStore {
       if (salt.length < 16 && salt.length > 64) { throw Error('salt size must be between 16 and 64 bytes (inclusive)') }
     }
     const sig = Buffer.alloc(signSize)
-    const msg = salt ? Buffer.concat([value, salt]) : value
+    const msg = salt ? Buffer.concat([Buffer.from([salt.length]), salt, value]) : value
     sign(sig, msg, secretKey)
     const key = publicKey
     const info = { value, sig, seq, salt }
@@ -226,7 +226,7 @@ class MutableStore {
           ? publicKey.toString('hex') + salt.toString('hex')
           : publicKey.toString('hex')
         const local = store.get(key)
-        const msg = salt ? Buffer.concat([value, salt]) : value
+        const msg = salt ? Buffer.concat([Buffer.from([salt.length]), salt, value]) : value
         const verified = verify(sig, msg, publicKey) &&
           (local ? seq >= local.seq : true)
 
