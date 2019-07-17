@@ -240,7 +240,14 @@ class MutableStore {
           ? publicKey.toString('hex') + salt.toString('hex')
           : publicKey.toString('hex')
         const local = store.get(key)
-        const msg = salt ? Buffer.concat([Buffer.from([salt.length]), salt, value]) : value
+        const msg = salt
+          ? Buffer.concat([Buffer.from([salt.length]), salt, value])
+          : value
+
+        if (local && local.seq === seq && Buffer.compare(local.value, value) !== 0) {
+          cb(Error('ERR_INVALID_SEQ'))
+          return
+        }
         const verified = verify(sig, msg, publicKey) &&
           (local ? seq >= local.seq : true)
 
