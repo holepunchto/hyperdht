@@ -105,9 +105,8 @@ class ImmutableStore {
           queryStream.destroy(err)
         }
       })
-      .once('data', () => {
-        queryStream.destroy()
-      })
+
+    queryStream.resume()
 
     finished(queryStream, (err) => {
       if (err) {
@@ -237,9 +236,8 @@ class MutableStore {
           queryStream.destroy(err)
         }
       })
-      .once('data', () => {
-        queryStream.destroy()
-      })
+
+    queryStream.resume()
 
     finished(queryStream, (err) => {
       if (err) {
