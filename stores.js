@@ -10,7 +10,7 @@ const {
   crypto_sign_BYTES: signSize,
   randombytes_buf: randomBytes
 } = require('sodium-universal')
-const { Transform, finished, pipeline } = require('readable-stream')
+const { finished } = require('readable-stream')
 const { Mutable } = require('./messages')
 
 const mutableEncoding = {
@@ -38,50 +38,40 @@ class ImmutableStore {
     const { store, dht } = this
     // if the querying node already has the immutable value
     // then there's no need to query the dht
-    const streamMode = typeof cb !== 'function'
+    const hasCb = typeof cb === 'function'
     const hexKey = key.toString('hex')
     const value = store.get(hexKey)
-    if (value && streamMode === false) {
+    if (value && hasCb) {
       return process.nextTick(cb, null, value)
     }
 
     let found = false
-    const queryStream = dht.query('immutable-store', key)
-
-    const responseStream = Transform({
-      objectMode: true,
-      transform (result, enc, next) {
-        if (result.value === null) {
-          next()
+    const queryStream = dht.query('immutable-store', key).map((result) => {
+      if (!result.value) return
+      const check = Buffer.alloc(32)
+      hash(check, result.value)
+      if (Buffer.compare(check, key) !== 0) return
+      return result.value
+    })
+    if (value && hasCb === false) {
+      // push local cached value out of stream first
+      queryStream.push(value)
+    }
+    if (hasCb) {
+      queryStream.once('data', (value) => {
+        found = true
+        cb(null, value)
+        queryStream.destroy()
+      })
+      finished(queryStream, (err) => {
+        if (err) {
+          cb(err)
           return
         }
-        const check = Buffer.alloc(32)
-        hash(check, result.value)
-        if (Buffer.compare(check, key) === 0) {
-          if (streamMode) {
-            next(null, result.value)
-          } else {
-            found = true
-            cb(null, result.value)
-            queryStream.destroy()
-          }
-        }
-      }
-    })
-    if (value && streamMode) {
-      // push local cached value to stream first
-      responseStream.push(value)
+        if (found === false) cb(null, null)
+      })
     }
-    pipeline(queryStream, responseStream, (err) => {
-      if (err) {
-        cb(err)
-        return
-      }
-      if (streamMode === false && found === false) {
-        cb(null, null)
-      }
-    })
-    if (streamMode) return responseStream
+    return queryStream
   }
   put (value, cb) {
     assert(typeof cb === 'function', 'Callback is required')
@@ -98,16 +88,7 @@ class ImmutableStore {
 
     // send to the dht
     const queryStream = dht.update('immutable-store', key, value)
-
-    queryStream
-      .once('warning', (err = {}) => {
-        if (err.message === 'ERR_INVALID_INPUT') {
-          queryStream.destroy(err)
-        }
-      })
-
-    queryStream.resume()
-
+    process.nextTick(() => queryStream.resume())
     finished(queryStream, (err) => {
       if (err) {
         cb(err)
@@ -115,6 +96,8 @@ class ImmutableStore {
       }
       cb(null, key)
     })
+
+    return queryStream
   }
   _command () {
     const { store } = this
@@ -167,40 +150,34 @@ class MutableStore {
       )
     }
     const queryStream = dht.query('mutable-store', key, { salt, seq })
+      .map((result) => {
+        if (!result.value) return
+        const { value, sig, seq: storedSeq } = result.value
+        const msg = salt
+          ? Buffer.concat([Buffer.from([salt.length]), salt, value])
+          : value
+        if (storedSeq >= userSeq && verify(sig, msg, key)) {
+          return { value, sig, seq: storedSeq, salt }
+        }
+      })
     let found = false
+    const hasCb = typeof cb === 'function'
     const userSeq = seq
-    const streamMode = typeof cb !== 'function'
-    const responseStream = Transform({
-      objectMode: true,
-      transform (result, enc, next) {
-        if (result.value === null) {
-          next()
+    if (hasCb) {
+      queryStream.once('data', (info) => {
+        found = true
+        cb(null, info)
+        queryStream.destroy()
+      })
+      finished(queryStream, (err) => {
+        if (err) {
+          cb(err)
           return
         }
-        const { value, sig, seq: storedSeq } = result.value
-        const msg = salt ? Buffer.concat([Buffer.from([salt.length]), salt, value]) : value
-        if (storedSeq >= userSeq && verify(sig, msg, key)) {
-          if (streamMode) {
-            next(null, { value, sig, seq: storedSeq, salt })
-          } else {
-            found = true
-            cb(null, { value, sig, seq: storedSeq, salt })
-            queryStream.destroy()
-          }
-        }
-      }
-    })
-    finished(queryStream, () => { responseStream.push(null) })
-    pipeline(queryStream, responseStream, (err) => {
-      if (err) {
-        cb(err)
-        return
-      }
-      if (streamMode === false && found === false) {
-        cb(null, null)
-      }
-    })
-    if (streamMode) return responseStream
+        if (found === false) cb(null, null)
+      })
+    }
+    return queryStream
   }
   put (value, opts, cb) {
     assert(Buffer.isBuffer(value), 'Value must be a buffer')
@@ -228,17 +205,10 @@ class MutableStore {
     sign(sig, msg, secretKey)
     const key = publicKey
 
-    const queryStream = dht.update('mutable-store', key, { value, sig, seq, salt })
-
-    queryStream
-      .once('warning', (err = {}) => {
-        if (err.message === 'ERR_INVALID_INPUT' || err.message === 'ERR_INVALID_SEQ') {
-          queryStream.destroy(err)
-        }
-      })
-
-    queryStream.resume()
-
+    const queryStream = dht.update('mutable-store', key, {
+      value, sig, seq, salt
+    })
+    process.nextTick(() => queryStream.resume())
     finished(queryStream, (err) => {
       if (err) {
         cb(err)
@@ -246,6 +216,8 @@ class MutableStore {
       }
       cb(null, { key, sig, seq, salt })
     })
+
+    return queryStream
   }
   _command () {
     const { store } = this
