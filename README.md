@@ -145,7 +145,6 @@ Store an immutable value in the DHT. When successful, the second argument passed
 to `callback` contains the generated key (a hash) for that value.
 
 
-
 #### `node.immutable.get(key, callback = (err, value) => {}) => stream`
 
 Fetch an immutable value from the DHT. When successful, the second argument passed to `callback` contains the resolved value.
@@ -175,8 +174,7 @@ Options:
 * seq - OPTIONAL - default `0`, a number which should be increased every time put is passed a new value for the same keypair
 * salt - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
 
-When successful the second argument passed to `callback` is an object containing the public key
-as `key`, with additional meta data (`...info`): `sig`, `seq`, `salt`. 
+When successful the second argument passed to `callback` is an object containing the public key as `key`, with additional meta data (`...info`): `sig`, `seq`, `salt`. 
 
 #### `node.mutable.get(key, [options], callback = (err, { value, ...info }) => {}) => stream`
 
@@ -189,6 +187,9 @@ Options:
 
 When successful, the second argument passed to `callback` is an object containing the resolved `value` with additional meta data (`...info`): `sig`, `seq` and `salt`.
 
+#### `node.immutable.get(key) => stream`
+
+Fetch all matching mutable values from the DHT.
 
 Any values found are emitted in a `data` event where the data object takes the form: `{value, sig, seq, salt}`.
 

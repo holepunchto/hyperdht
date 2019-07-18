@@ -74,7 +74,6 @@ class ImmutableStore {
     return queryStream
   }
   put (value, cb) {
-    assert(typeof cb === 'function', 'Callback is required')
     assert(Buffer.isBuffer(value), 'Value must be a buffer')
     assert(
       value.length <= PUT_VALUE_MAX_SIZE,
@@ -88,7 +87,7 @@ class ImmutableStore {
 
     // send to the dht
     const queryStream = dht.update('immutable-store', key, value)
-    process.nextTick(() => queryStream.resume())
+    queryStream.resume()
     finished(queryStream, (err) => {
       if (err) {
         cb(err)
@@ -182,7 +181,6 @@ class MutableStore {
   put (value, opts, cb) {
     assert(Buffer.isBuffer(value), 'Value must be a buffer')
     assert(typeof opts === 'object', 'Options are required')
-    assert(typeof cb === 'function', 'Callback is required')
     assert(value.length <= PUT_VALUE_MAX_SIZE, `Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     const { dht } = this
     const { seq = 0, salt, keypair } = opts
@@ -208,7 +206,7 @@ class MutableStore {
     const queryStream = dht.update('mutable-store', key, {
       value, sig, seq, salt
     })
-    process.nextTick(() => queryStream.resume())
+    queryStream.resume()
     finished(queryStream, (err) => {
       if (err) {
         cb(err)
@@ -243,7 +241,7 @@ class MutableStore {
           return
         }
         const verified = verify(sig, msg, publicKey) &&
-          (local ? seq >= local.seq : true)
+          (local ? seq > local.seq : true)
 
         if (verified === false) {
           cb(Error('ERR_INVALID_INPUT'))
