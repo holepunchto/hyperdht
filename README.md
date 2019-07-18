@@ -138,6 +138,74 @@ Fully destroy this DHT node.
 Explicitly listen on a UDP port.
 If you do not call this it will use a random free port.
 
+
+#### `node.immutable.put(value, callback = (err, key) => {}) => stream`
+
+Store an immutable value in the DHT. When successful, the second argument passed
+to `callback` contains the generated key (a hash) for that value.
+
+
+#### `node.immutable.get(key, callback = (err, value) => {}) => stream`
+
+Fetch an immutable value from the DHT. When successful, the second argument passed to `callback` contains the resolved value.
+
+#### `node.immutable.get(key) => stream`
+
+Fetch all matching immutable values from the DHT. Any found values are emited in `data` events.
+
+#### `node.mutable.keypair()`
+
+Use this method to generate the required keypair for a put.
+Returns an object with `{publicKey, secretKey}`. `publicKey` holds a public key buffer, `secretKey` holds a private key buffer.
+
+#### `node.mutable.salt(size = 32)`
+
+Utility method for creating a random salt value. This can optionally
+be passed in `mutable.put` and `mutable.get` options.
+Salt values can be used as a sort of secondary UID, allowing multiple values to be stored under the same public key. Min `size` is 16 bytes, max `size` is 64 bytes.
+
+#### `node.mutable.put(value, options, callback = (err, { key, ...info }) => {}) => stream`
+
+Store a mutable value in the DHT.
+
+Options:
+
+* keypair – REQUIRED, use `node.mutable.keypair` to generate this.
+* seq - OPTIONAL - default `0`, a number which should be increased every time put is passed a new value for the same keypair
+* salt - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+
+When successful the second argument passed to `callback` is an object containing the public key as `key`, with additional meta data (`...info`): `sig`, `seq`, `salt`. 
+
+#### `node.mutable.get(key, [options], callback = (err, { value, ...info }) => {}) => stream`
+
+Fetch a mutable value from the DHT. 
+
+Options:
+
+* seq - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
+* salt - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+
+When successful, the second argument passed to `callback` is an object containing the resolved `value` with additional meta data (`...info`): `sig`, `seq` and `salt`.
+
+#### `node.immutable.get(key) => stream`
+
+Fetch all matching mutable values from the DHT.
+
+Any values found are emitted in a `data` event where the data object takes the form: `{value, sig, seq, salt}`.
+
+#### Put / Get Stream Interface
+
+All mutable and immutable Put / Get methods return a stream.
+
+In addition to usual Node.js stream behaviour, the returned stream 
+will emit `warning` events which may contain error information from other
+Nodes. The stream instance also has the following stat counters
+
+* `inflight` - how many requests are currently active/ongoing
+* `responses` - how many responses have been received
+* `errors` - how many errors occured (locally)
+* `updates` - how many updates were made
+
 #### `node.on('listening')`
 
 Emitted when the node starts listening

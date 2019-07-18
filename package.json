@@ -5,9 +5,12 @@
   "main": "index.js",
   "dependencies": {
     "dht-rpc": "^4.0.1",
+    "hashlru": "^2.3.0",
     "ipv4-peers": "^1.1.1",
     "protocol-buffers-encodings": "^1.1.0",
-    "record-cache": "^1.1.0"
+    "readable-stream": "^3.4.0",
+    "record-cache": "^1.1.0",
+    "sodium-universal": "^2.0.0"
   },
   "devDependencies": {
     "protocol-buffers": "^4.1.0",

@@ -1,8 +1,10 @@
+'use strict'
 const { DHT } = require('dht-rpc')
 const recordCache = require('record-cache')
 const { PeersInput, PeersOutput } = require('./messages')
 const peers = require('ipv4-peers')
-
+const LRU = require('hashlru')
+const { ImmutableStore, MutableStore } = require('./stores')
 const DEFAULT_BOOTSTRAP = [
   'bootstrap1.hyperdht.org:49737',
   'bootstrap2.hyperdht.org:49737',
@@ -17,22 +19,33 @@ class HyperDHT extends DHT {
     if (opts.bootstrap === undefined) opts.bootstrap = DEFAULT_BOOTSTRAP
 
     super(opts)
-    const { maxAge = 12 * 60 * 1000 } = opts
+    const {
+      maxAge = 12 * 60 * 1000,
+      maxValues = 5000
+    } = opts
     const peers = recordCache({
       maxSize: 65536,
       maxAge
     })
-
-    this._peers = peers
-
     const onpeers = this._onpeers.bind(this)
 
-    this.once('close', peers.destroy.bind(peers))
+    this._peers = peers
+    this._store = LRU(maxValues)
+
+    this.mutable = new MutableStore(this, this._store)
+    this.immutable = new ImmutableStore(this, this._store)
+
+    this.command('mutable-store', this.mutable._command())
+    this.command('immutable-store', this.immutable._command())
     this.command('peers', {
       inputEncoding: PeersInput,
       outputEncoding: PeersOutput,
       update: onpeers,
       query: onpeers
+    })
+    this.once('close', () => {
+      this._peers.destroy()
+      this._store.clear()
     })
   }
 

@@ -8,3 +8,10 @@ message PeersOutput {
   optional bytes peers = 1;
   optional bytes localPeers = 2;
 }
+
+message Mutable {
+  optional bytes value = 1;
+  optional bytes sig = 2;
+  optional uint64 seq = 3;
+  optional bytes salt = 4;
+}
