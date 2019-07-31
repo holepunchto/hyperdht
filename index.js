@@ -57,8 +57,7 @@ class HyperDHT extends DHT {
       port: opts.port,
       localAddress: encodeAddress(opts.localAddress)
     }
-
-    return this.query('peers', key, opts, cb).map(mapPeers.bind(null, query.localAddress))
+    return this.query('peers', key, query, cb).map(mapPeers.bind(null, query.localAddress))
   }
 
   announce (key, opts, cb) {
@@ -87,17 +86,15 @@ class HyperDHT extends DHT {
   }
 
   _onpeers (query, cb) {
-    const value = query.value || {}
+    const value = query.value
     const from = {
       port: value.port || query.node.port,
       host: query.node.host
     }
-
     if (!(from.port > 0 && from.port < 65536)) return cb(new Error('Invalid port'))
 
     const localRecord = value.localAddress
     const remoteRecord = peers.encode([ from ])
-
     const remoteCache = query.target.toString('hex')
     const localCache = localRecord &&
       remoteCache + '@local.' + localRecord.slice(0, 2).toString('hex')
@@ -114,13 +111,12 @@ class HyperDHT extends DHT {
         localPeers: local.length ? Buffer.concat(local) : null
       })
     }
-
     if (value.unannounce) {
-      if (remoteRecord) this._peers.remove(remoteCache, remoteRecord)
+      this._peers.remove(remoteCache, remoteRecord)
       if (localRecord) this._peers.remove(localCache, localSuffix)
       this.emit('unannounce', query.target, from)
     } else {
-      if (remoteRecord) this._peers.add(remoteCache, remoteRecord)
+      this._peers.add(remoteCache, remoteRecord)
       if (localRecord) this._peers.add(localCache, localSuffix)
       this.emit('announce', query.target, from)
     }
@@ -134,8 +130,6 @@ function encodeAddress (addr) {
 }
 
 function filter (list, item) {
-  if (!item) return list
-
   for (var i = 0; i < list.length; i++) {
     if (list[i].equals(item)) {
       list[i] = list[list.length - 1]
@@ -143,14 +137,12 @@ function filter (list, item) {
       break
     }
   }
-
   return list
 }
 
 function mapPeers (prefix, data) {
   const v = data.value
   if (!v || (!v.peers && !v.localPeers)) return null
-
   try {
     return {
       node: data.node,
@@ -158,7 +150,11 @@ function mapPeers (prefix, data) {
       localPeers: prefix && v.localPeers && decodeLocalPeers(prefix, v.localPeers)
     }
   } catch (err) {
-    return null
+    return {
+      node: data.node,
+      peers: [],
+      localPeers: prefix && v.localPeers && decodeLocalPeers(prefix, v.localPeers)
+    }
   }
 }
 
