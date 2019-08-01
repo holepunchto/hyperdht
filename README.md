@@ -214,7 +214,7 @@ Emitted when the node starts listening
 
 Emitted when the node is fully closed.
 
-#### `node.on('announce', topic, peer)
+#### `node.on('announce', topic, peer)`
 
 Emitted when an announce is received.
 

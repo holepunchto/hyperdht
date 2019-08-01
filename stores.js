@@ -13,17 +13,6 @@ const {
 const { finished } = require('readable-stream')
 const { Mutable } = require('./messages')
 
-const mutableEncoding = {
-  encode (o) {
-    if (o == null) return o
-    return Mutable.encode(o)
-  },
-  decode (o) {
-    if (o == null) return o
-    return Mutable.decode(o)
-  }
-}
-
 // PUT_VALUE_MAX_SIZE + packet overhead (i.e. the key etc.)
 // should be less than the network MTU, normally 1400 bytes
 const PUT_VALUE_MAX_SIZE = 1000
@@ -55,7 +44,7 @@ class ImmutableStore {
     })
     if (value && hasCb === false) {
       // push local cached value out of stream first
-      queryStream.push(value)
+      process.nextTick(() => queryStream.emit('data', value))
     }
     if (hasCb) {
       queryStream.once('data', (value) => {
@@ -79,6 +68,7 @@ class ImmutableStore {
       value.length <= PUT_VALUE_MAX_SIZE,
       `Value size must be <= ${PUT_VALUE_MAX_SIZE}`
     )
+    assert(typeof cb === 'function', 'Callback is required')
     const { store, dht } = this
     const key = Buffer.alloc(32)
     hash(key, value)
@@ -140,6 +130,7 @@ class MutableStore {
   get (key, opts = {}, cb = opts) {
     const { dht } = this
     const { salt, seq = 0 } = opts
+    assert(Buffer.isBuffer(key), 'Key must be a buffer')
     assert(typeof seq === 'number', 'seq should be a number')
     if (salt) {
       assert(Buffer.isBuffer(salt), 'salt must be a buffer')
@@ -173,7 +164,7 @@ class MutableStore {
           cb(err)
           return
         }
-        if (found === false) cb(null, null)
+        if (found === false) cb(null, { value: null })
       })
     }
     return queryStream
@@ -181,6 +172,7 @@ class MutableStore {
   put (value, opts, cb) {
     assert(Buffer.isBuffer(value), 'Value must be a buffer')
     assert(typeof opts === 'object', 'Options are required')
+    assert(typeof cb === 'function', 'Callback is required')
     assert(value.length <= PUT_VALUE_MAX_SIZE, `Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     const { dht } = this
     const { seq = 0, salt, keypair } = opts
@@ -220,9 +212,9 @@ class MutableStore {
   _command () {
     const { store } = this
     return {
-      valueEncoding: mutableEncoding,
+      valueEncoding: Mutable,
       update (input, cb) {
-        if (input.value == null) {
+        if (input.value.value == null || input.value.sig == null) {
           cb(null)
           return
         }
@@ -232,6 +224,7 @@ class MutableStore {
           ? publicKey.toString('hex') + salt.toString('hex')
           : publicKey.toString('hex')
         const local = store.get(key)
+
         const msg = salt
           ? Buffer.concat([Buffer.from([salt.length]), salt, value])
           : value
