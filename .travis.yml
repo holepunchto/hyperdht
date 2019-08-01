@@ -10,3 +10,4 @@ os:
   - osx
 script:
   - npm run ci
+  
