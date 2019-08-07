@@ -94,7 +94,8 @@ class HyperDHT extends DHT {
     if (!(from.port > 0 && from.port < 65536)) return cb(new Error('Invalid port'))
 
     const localRecord = value.localAddress
-    const remoteRecord = peers.encode([ from ])
+    const remoteRecord = peers.encode([from])
+
     const remoteCache = query.target.toString('hex')
     const localCache = localRecord &&
       remoteCache + '@local.' + localRecord.slice(0, 2).toString('hex')
@@ -126,7 +127,7 @@ class HyperDHT extends DHT {
 }
 
 function encodeAddress (addr) {
-  return addr ? peers.encode([ addr ]) : null
+  return addr ? peers.encode([addr]) : null
 }
 
 function filter (list, item) {

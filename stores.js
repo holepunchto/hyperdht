@@ -22,6 +22,7 @@ class ImmutableStore {
     this.dht = dht
     this.store = store
   }
+
   get (key, cb) {
     assert(Buffer.isBuffer(key), 'Key must be a buffer')
     const { store, dht } = this
@@ -62,6 +63,7 @@ class ImmutableStore {
     }
     return queryStream
   }
+
   put (value, cb) {
     assert(Buffer.isBuffer(value), 'Value must be a buffer')
     assert(
@@ -88,6 +90,7 @@ class ImmutableStore {
 
     return queryStream
   }
+
   _command () {
     const { store } = this
     return {
@@ -112,6 +115,7 @@ class MutableStore {
     this.dht = dht
     this.store = store
   }
+
   salt (size = 32) {
     assert(
       size >= 16 && size <= 64,
@@ -121,12 +125,14 @@ class MutableStore {
     randomBytes(salt)
     return salt
   }
+
   keypair () {
     const publicKey = Buffer.alloc(pkSize)
     const secretKey = Buffer.alloc(skSize)
     createKeypair(publicKey, secretKey)
     return { publicKey, secretKey }
   }
+
   get (key, opts = {}, cb = opts) {
     const { dht } = this
     const { salt, seq = 0 } = opts
@@ -169,6 +175,7 @@ class MutableStore {
     }
     return queryStream
   }
+
   put (value, opts, cb) {
     assert(Buffer.isBuffer(value), 'Value must be a buffer')
     assert(typeof opts === 'object', 'Options are required')
@@ -209,6 +216,7 @@ class MutableStore {
 
     return queryStream
   }
+
   _command () {
     const { store } = this
     return {

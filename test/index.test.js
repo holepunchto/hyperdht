@@ -345,7 +345,7 @@ test('announce & lookup localAddress', async ({ is, fail }) => {
       port: 20000
     }
   })
-  const [ localPeer ] = localPeers
+  const [localPeer] = localPeers
   is(localPeer.host, '192.168.100.100')
   is(localPeer.port, 20000)
   is(peers.length, 1)
@@ -391,7 +391,7 @@ test('unnanounce localAddress', async ({ is, fail }) => {
       port: 20000
     }
   })
-  const [ localPeer ] = localPeers
+  const [localPeer] = localPeers
   is(localPeer.host, '192.168.100.100')
   is(localPeer.port, 20000)
   is(peers.length, 1)
@@ -443,7 +443,7 @@ test('unnanounce localAddress on same peer', async ({ is, fail }) => {
       port: 20000
     }
   })
-  const [ localPeer ] = localPeers
+  const [localPeer] = localPeers
   is(localPeer.host, '192.168.100.100')
   is(localPeer.port, 20000)
   is(peers.length, 1)
@@ -610,7 +610,7 @@ test('corrupt peer data (wrong buffer length)', async ({ is, fail }) => {
     return _map(data)
   }
   const [{ node, peers, localPeers }] = await once(stream, 'data')
-  const [ localPeer ] = localPeers
+  const [localPeer] = localPeers
   is(localPeer.host, '192.168.100.100')
   is(localPeer.port, 20000)
   is(peers.length, 0)
@@ -652,7 +652,7 @@ test('corrupt peer data (nill buffer)', async ({ is, fail }) => {
     return _map(data)
   }
   const [{ node, peers, localPeers }] = await once(stream, 'data')
-  const [ localPeer ] = localPeers
+  const [localPeer] = localPeers
   is(localPeer.host, '192.168.100.100')
   is(localPeer.port, 20000)
   is(peers.length, 0)
