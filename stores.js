@@ -10,8 +10,8 @@ const {
   crypto_sign_BYTES: signSize,
   randombytes_buf: randomBytes
 } = require('sodium-universal')
-const { finished } = require('readable-stream')
 const { Mutable } = require('./messages')
+const finished = require('end-of-stream')
 
 // PUT_VALUE_MAX_SIZE + packet overhead (i.e. the key etc.)
 // should be less than the network MTU, normally 1400 bytes
