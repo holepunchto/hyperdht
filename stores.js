@@ -11,6 +11,7 @@ const {
   randombytes_buf: randomBytes
 } = require('sodium-universal')
 const { Mutable } = require('./messages')
+const { PassThrough } = require('stream')
 const finished = require('end-of-stream')
 
 // PUT_VALUE_MAX_SIZE + packet overhead (i.e. the key etc.)
@@ -32,7 +33,12 @@ class ImmutableStore {
     const hexKey = key.toString('hex')
     const value = store.get(hexKey)
     if (value && hasCb) {
-      return process.nextTick(cb, null, value)
+      const localStream = PassThrough()
+      process.nextTick(() => {
+        localStream.emit('data', value)
+        cb(null, value)
+      })
+      return localStream
     }
 
     let found = false
