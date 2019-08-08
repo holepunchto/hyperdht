@@ -35,8 +35,9 @@ class ImmutableStore {
     if (value && hasCb) {
       const localStream = PassThrough()
       process.nextTick(() => {
-        localStream.emit('data', value)
-        cb(null, value)
+        const { id } = this.dht
+        localStream.emit('data', { id, value })
+        cb(null, value, { id })
       })
       return localStream
     }
@@ -44,19 +45,24 @@ class ImmutableStore {
     let found = false
     const queryStream = dht.query('immutable-store', key).map((result) => {
       if (!result.value) return
+      const { value } = result
       const check = Buffer.alloc(32)
-      hash(check, result.value)
+      hash(check, value)
       if (Buffer.compare(check, key) !== 0) return
-      return result.value
+      const { node } = result
+      return { id: node.id, value }
     })
     if (value && hasCb === false) {
       // push local cached value out of stream first
-      process.nextTick(() => queryStream.emit('data', value))
+      process.nextTick(() => {
+        const { id } = this.dht
+        queryStream.emit('data', { id, value })
+      })
     }
     if (hasCb) {
-      queryStream.once('data', (value) => {
+      queryStream.once('data', ({ id, value }) => {
         found = true
-        cb(null, value)
+        cb(null, value, { id })
         queryStream.destroy()
       })
       finished(queryStream, (err) => {
@@ -64,7 +70,7 @@ class ImmutableStore {
           cb(err)
           return
         }
-        if (found === false) cb(null, null)
+        if (found === false) cb(null, null, null)
       })
     }
     return queryStream
@@ -159,7 +165,8 @@ class MutableStore {
           ? Buffer.concat([Buffer.from([salt.length]), salt, value])
           : value
         if (storedSeq >= userSeq && verify(sig, msg, key)) {
-          return { value, sig, seq: storedSeq, salt }
+          const id = result.node.id
+          return { id, value, sig, seq: storedSeq, salt }
         }
       })
     let found = false
