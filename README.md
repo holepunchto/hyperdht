@@ -145,13 +145,15 @@ Store an immutable value in the DHT. When successful, the second argument passed
 to `callback` contains the generated key (a hash) for that value.
 
 
-#### `node.immutable.get(key, callback = (err, value) => {}) => stream`
+#### `node.immutable.get(key, callback = (err, value, info) => {}) => stream`
 
-Fetch an immutable value from the DHT. When successful, the second argument passed to `callback` contains the resolved value.
+Fetch an immutable value from the DHT. When successful, the second argument passed to `callback` contains the resolved value. The third argument `info` is an object containing `id` which is the ID of the responding Node.
 
 #### `node.immutable.get(key) => stream`
 
-Fetch all matching immutable values from the DHT. Any found values are emited in `data` events.
+Fetch all matching immutable values from the DHT. 
+
+Any values found are emitted in a `data` event where the data object takes the form: `{id, value}`. The `id` is the ID of the responding Node.
 
 #### `node.mutable.keypair()`
 
@@ -191,7 +193,7 @@ When successful, the second argument passed to `callback` is an object containin
 
 Fetch all matching mutable values from the DHT.
 
-Any values found are emitted in a `data` event where the data object takes the form: `{value, sig, seq, salt}`.
+Any values found are emitted in a `data` event where the data object takes the form: `{id, value, sig, seq, salt}`. The `id` is the ID of the responding Node.
 
 #### Put / Get Stream Interface
 
