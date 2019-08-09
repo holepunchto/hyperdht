@@ -33,12 +33,17 @@ class ImmutableStore {
     const hexKey = key.toString('hex')
     const value = store.get(hexKey)
     if (value && hasCb) {
-      const localStream = PassThrough()
-      process.nextTick(() => {
-        const { id } = this.dht
-        localStream.emit('data', { id, value })
+      const { id } = this.dht
+      const localStream = PassThrough({ objectMode: true })
+      finished(localStream, (err) => {
+        if (err) {
+          cb(err)
+          return
+        }
         cb(null, value, { id })
       })
+      localStream.end({ id, value })
+      process.nextTick(() => localStream.resume())
       return localStream
     }
 

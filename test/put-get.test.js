@@ -100,6 +100,40 @@ test('immutable put, get stream - same peer', async ({ is }) => {
   closeDht()
 })
 
+test('immutable put, get stream - same peer, w/ get cb', async ({ is, plan }) => {
+  plan(3)
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const input = Buffer.from('test')
+  promisifyMethod(peer.immutable, 'put')
+  const key = await peer.immutable.put(input)
+  const stream = peer.immutable.get(key, (err, value) => {
+    is(err, null)
+    is(input.equals(value), true)
+  })
+  const [{ value }] = await once(stream, 'data')
+  is(input.equals(value), true)
+  peer.destroy()
+  closeDht()
+})
+
+test('immutable put, get stream - same peer, w/ get cb, stream destroy', async ({ is, plan }) => {
+  plan(1)
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const input = Buffer.from('test')
+  promisifyMethod(peer.immutable, 'put')
+  const key = await peer.immutable.put(input)
+  const testErr = Error('test')
+  const stream = peer.immutable.get(key, (err) => {
+    is(err, testErr)
+    peer.destroy()
+    closeDht()
+  })
+  stream.destroy(testErr)
+  try { await once(stream, 'end') } catch (e) {}
+})
+
 test('immutable get non-existant', async ({ is }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
@@ -183,6 +217,10 @@ test('immutable get corrupt hashes/values are filtered out', async ({ fail, pass
   peer.destroy()
   peer2.destroy()
   closeDht()
+})
+
+test('tbd', async ({ fail, pass }) => {
+
 })
 
 test('mutable.keypair', async ({ is }) => {
