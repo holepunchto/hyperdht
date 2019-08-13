@@ -160,10 +160,15 @@ Any values found are emitted in a `data` event where the data object takes the f
 Use this method to generate the required keypair for a put.
 Returns an object with `{publicKey, secretKey}`. `publicKey` holds a public key buffer, `secretKey` holds a private key buffer.
 
-#### `node.mutable.salt(size = 32)`
+#### `node.mutable.salt([str, ]size = 32)`
 
-Utility method for creating a random salt value. This can optionally
-be passed in `mutable.put` and `mutable.get` options.
+Utility method for creating a random or hashed salt value. 
+
+If called with a string the string will be hashed, to a generic hash of `size` length.
+
+If called without any inputs, or with a number, random butes of `size` length will be generated.
+
+The `salt` can optionally be passed in `mutable.put` and `mutable.get` options.
 Salt values can be used as a sort of secondary UID, allowing multiple values to be stored under the same public key. Min `size` is 16 bytes, max `size` is 64 bytes.
 
 #### `node.mutable.sign(value, options)`

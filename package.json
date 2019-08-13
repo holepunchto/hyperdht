@@ -4,6 +4,7 @@
   "description": "The DHT backing the HyperSwarm stack",
   "main": "index.js",
   "dependencies": {
+    "@hyperswarm/hypersign": "^0.1.1",
     "dht-rpc": "^4.1.6",
     "end-of-stream": "^1.4.1",
     "hashlru": "^2.3.0",
