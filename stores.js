@@ -155,9 +155,9 @@ class MutableStore {
     assert(Buffer.isBuffer(secretKey), 'keypair.secretKey is required')
     assert(Buffer.isBuffer(publicKey), 'keypair.publicKey is required')
     const msg = this.signable(value, opts)
-    const sig = Buffer.alloc(signSize)
-    sign(sig, msg, secretKey)
-    return sig
+    const signature = Buffer.alloc(signSize)
+    sign(signature, msg, secretKey)
+    return signature
   }
 
   signable (value, opts = {}) {
@@ -188,13 +188,13 @@ class MutableStore {
     const queryStream = dht.query('mutable-store', key, { salt, seq })
       .map((result) => {
         if (!result.value) return
-        const { value, sig, seq: storedSeq } = result.value
+        const { value, signature, seq: storedSeq } = result.value
         const msg = salt
           ? Buffer.concat([Buffer.from([salt.length]), salt, value])
           : value
-        if (storedSeq >= userSeq && verify(sig, msg, key)) {
+        if (storedSeq >= userSeq && verify(signature, msg, key)) {
           const id = result.node.id
-          return { id, value, sig, seq: storedSeq, salt }
+          return { id, value, signature, seq: storedSeq, salt }
         }
       })
     let found = false
@@ -223,17 +223,17 @@ class MutableStore {
     assert(typeof cb === 'function', 'Callback is required')
     assert(value.length <= PUT_VALUE_MAX_SIZE, `Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     const { dht } = this
-    const { seq = 0, salt, keypair, sig = this.sign(value, opts) } = opts
-    if (opts.sig) {
+    const { seq = 0, salt, keypair, signature = this.sign(value, opts) } = opts
+    if (opts.signature) {
       assert(keypair, 'keypair is required')
       const { secretKey, publicKey } = keypair
       assert(Buffer.isBuffer(publicKey), 'keypair.publicKey is required')
-      assert(!secretKey, 'only opts.sig OR opts.keypair.secretKey should be supplied')
+      assert(!secretKey, 'only opts.signature OR opts.keypair.secretKey should be supplied')
     }
     const { publicKey: key } = keypair
     assert(typeof seq === 'number', 'seq should be a number')
     const queryStream = dht.update('mutable-store', key, {
-      value, sig, seq, salt
+      value, signature, seq, salt
     })
     queryStream.resume()
     finished(queryStream, (err) => {
@@ -241,7 +241,7 @@ class MutableStore {
         cb(err)
         return
       }
-      cb(null, { key, sig, seq, salt })
+      cb(null, { key, signature, seq, salt })
     })
 
     return queryStream
@@ -252,12 +252,12 @@ class MutableStore {
     return {
       valueEncoding: Mutable,
       update (input, cb) {
-        if (input.value.value == null || input.value.sig == null) {
+        if (input.value.value == null || input.value.signature == null) {
           cb(null)
           return
         }
         const publicKey = input.target
-        const { value, salt, sig, seq } = input.value
+        const { value, salt, signature, seq } = input.value
         const key = salt
           ? publicKey.toString('hex') + salt.toString('hex')
           : publicKey.toString('hex')
@@ -271,14 +271,14 @@ class MutableStore {
           cb(Error('ERR_INVALID_SEQ'))
           return
         }
-        const verified = verify(sig, msg, publicKey) &&
+        const verified = verify(signature, msg, publicKey) &&
           (local ? seq > local.seq : true)
 
         if (verified === false) {
           cb(Error('ERR_INVALID_INPUT'))
           return
         }
-        store.set(key, { value, salt, sig, seq })
+        store.set(key, { value, salt, signature, seq })
         cb(null)
       },
       query ({ target, value }, cb) {

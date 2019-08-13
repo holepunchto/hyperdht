@@ -566,7 +566,7 @@ test('mutable put/get - same peer', async ({ is }) => {
   closeDht()
 })
 
-test('mutable put/get - sig option', async ({ is }) => {
+test('mutable put/get - signature option', async ({ is }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -574,9 +574,9 @@ test('mutable put/get - sig option', async ({ is }) => {
   promisifyMethod(peer.mutable, 'put')
   promisifyMethod(peer.mutable, 'get')
   const input = Buffer.from('test')
-  const sig = peer.mutable.sign(input, { keypair })
+  const signature = peer.mutable.sign(input, { keypair })
   const { key } = await peer.mutable.put(input, {
-    sig,
+    signature,
     keypair: { publicKey }
   })
   const { value } = await peer.mutable.get(key)
@@ -585,7 +585,7 @@ test('mutable put/get - sig option', async ({ is }) => {
   closeDht()
 })
 
-test('mutable put/get - salted sig option', async ({ is }) => {
+test('mutable put/get - salted signature option', async ({ is }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
   const salt = peer.mutable.salt()
@@ -594,9 +594,9 @@ test('mutable put/get - salted sig option', async ({ is }) => {
   promisifyMethod(peer.mutable, 'put')
   promisifyMethod(peer.mutable, 'get')
   const input = Buffer.from('test')
-  const sig = peer.mutable.sign(input, { keypair, salt })
+  const signature = peer.mutable.sign(input, { keypair, salt })
   const { key } = await peer.mutable.put(input, {
-    sig,
+    signature,
     salt,
     keypair: { publicKey }
   })
@@ -766,7 +766,7 @@ test('mutable update with null value is handled', async ({ pass }) => {
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   const stream = peer.update('mutable-store', keypair.publicKey, {
-    value: null, sig: Buffer.alloc(signSize)
+    value: null, signature: Buffer.alloc(signSize)
   })
   stream.resume()
   await once(stream, 'end')
@@ -775,16 +775,16 @@ test('mutable update with null value is handled', async ({ pass }) => {
   closeDht()
 })
 
-test('mutable update with null sig is handled', async ({ pass }) => {
+test('mutable update with null signature is handled', async ({ pass }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   const stream = peer.update('mutable-store', keypair.publicKey, {
-    value: Buffer.from('test'), sig: null
+    value: Buffer.from('test'), signature: null
   })
   stream.resume()
   await once(stream, 'end')
-  pass('null sig handled')
+  pass('null signature handled')
   peer.destroy()
   closeDht()
 })
@@ -809,7 +809,7 @@ test('mutable corrupt value update', async ({ is }) => {
   closeDht()
 })
 
-test('mutable corrupt sig update', async ({ is }) => {
+test('mutable corrupt signature update', async ({ is }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -817,7 +817,7 @@ test('mutable corrupt sig update', async ({ is }) => {
   const { update } = peer
   peer.update = (cmd, key, obj) => {
     if (cmd === 'mutable-store') {
-      obj.sig = Buffer.alloc(signSize)
+      obj.signature = Buffer.alloc(signSize)
     }
     return update.call(peer, cmd, key, obj)
   }
@@ -873,7 +873,7 @@ test('mutable get corrupt values are filtered out', async ({ fail, pass }) => {
   closeDht()
 })
 
-test('mutable get corrupt sigs are filtered out', async ({ fail, pass }) => {
+test('mutable get corrupt signatures are filtered out', async ({ fail, pass }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
@@ -884,12 +884,12 @@ test('mutable get corrupt sigs are filtered out', async ({ fail, pass }) => {
   const stream = peer.mutable.get(key)
   const { _map } = stream
   stream._map = (result) => {
-    result.sig = Buffer.from('fake')
+    result.signature = Buffer.from('fake')
     return _map(result)
   }
   stream.resume()
-  stream.on('data', ({ sig }) => {
-    if (sig.toString() === 'fake') fail('corrupt sig was not filtered')
+  stream.on('data', ({ signature }) => {
+    if (signature.toString() === 'fake') fail('corrupt signature was not filtered')
   })
   await once(stream, 'end')
   pass('corrupt data was filtered')
@@ -914,8 +914,8 @@ test('mutable get corrupt salts are filtered out', async ({ fail, pass }) => {
     return _map(result)
   }
   stream.resume()
-  stream.on('data', ({ sig }) => {
-    if (sig.toString() === 'fake') fail('corrupt sig was not filtered')
+  stream.on('data', ({ signature }) => {
+    if (signature.toString() === 'fake') fail('corrupt signature was not filtered')
   })
   await once(stream, 'end')
   pass('corrupt data was filtered')
