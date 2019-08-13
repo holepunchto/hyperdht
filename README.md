@@ -166,15 +166,39 @@ Utility method for creating a random salt value. This can optionally
 be passed in `mutable.put` and `mutable.get` options.
 Salt values can be used as a sort of secondary UID, allowing multiple values to be stored under the same public key. Min `size` is 16 bytes, max `size` is 64 bytes.
 
+#### `node.mutable.sign(value, options)`
+
+Utility method which can be used to create a `sig`.
+
+The options are the exact same as those of `mutable.put` (except `sig`).
+
+Options:
+
+* `keypair` – REQUIRED, use `node.mutable.keypair` to generate this.
+* `salt` - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+
+#### `node.mutable.signable(value, options)`
+
+Utility method which returns the exact buffer that would be signed in `mutable.put`
+(that does not provide a `sig`). This is only needed when using a salt, otherwise
+it will return the same `value` passed in. This method is to facilitate out-of-band
+signing (e.g. hardware signing), do not pass the returned signable value into 
+`mutable.sign`, `mutable.sign` already uses `mutable.signable`.
+
+Options:
+
+* `salt` - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+
 #### `node.mutable.put(value, options, callback = (err, { key, ...info }) => {}) => stream`
 
 Store a mutable value in the DHT.
 
 Options:
 
-* keypair – REQUIRED, use `node.mutable.keypair` to generate this.
-* seq - OPTIONAL - default `0`, a number which should be increased every time put is passed a new value for the same keypair
-* salt - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+* `keypair` – REQUIRED, use `node.mutable.keypair` to generate this.
+* `sig` - OPTIONAL, a buffer holding an ed25519 signature corresponding to public key. This can be supplied instead of a secret key which can be useful for offline signing. If `sig` is supplied `keypair` must only contain a `publicKey` and no `secretKey`. See `signable` and `sign`.
+* `seq` - OPTIONAL - default `0`, a number which should be increased every time put is passed a new value for the same keypair
+* `salt` - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
 
 When successful the second argument passed to `callback` is an object containing the public key as `key`, with additional meta data (`...info`): `sig`, `seq`, `salt`. 
 
@@ -184,8 +208,8 @@ Fetch a mutable value from the DHT.
 
 Options:
 
-* seq - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
-* salt - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+* `seq` - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
+* `salt` - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
 
 When successful, the second argument passed to `callback` is an object containing the resolved `value` with additional meta data (`...info`): `sig`, `seq` and `salt`.
 
