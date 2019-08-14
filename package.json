@@ -36,7 +36,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/mafintosh/dht.git"
+    "url": "https://github.com/hyperswarm/dht.git"
   },
   "author": "Mathias Buus (@mafintosh)",
   "license": "MIT",

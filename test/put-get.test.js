@@ -1,7 +1,10 @@
 'use strict'
 const { test } = require('tap')
 const { randomBytes } = require('crypto')
-const { crypto_sign_BYTES: signSize } = require('sodium-universal')
+const {
+  crypto_sign_BYTES: signSize,
+  crypto_sign_verify_detached: verify
+} = require('sodium-universal')
 const { once, promisifyMethod, whenifyMethod, done } = require('nonsynchronous')
 const dht = require('../')
 const { dhtBootstrap } = require('./util')
@@ -210,6 +213,166 @@ test('mutable.salt', async ({ is, throws }) => {
   closeDht()
 })
 
+test('mutable.signable', async ({ is, same }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const salt = peer.mutable.salt()
+  const value = Buffer.from('test')
+  is(peer.mutable.signable(value), value)
+  is(peer.mutable.signable(value, { seq: 1 }), value)
+  same(
+    peer.mutable.signable(value, { salt }),
+    Buffer.concat([Buffer.from([salt.length]), salt, value])
+  )
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable signable - salt must be a buffer', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  throws(() => peer.mutable.signable(Buffer.from('test'), { salt: 'no' }), 'salt must be a buffer')
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable signable - salt size must be >= 16 bytes and <= 64 bytes', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  throws(
+    () => peer.mutable.signable(Buffer.from('test'), { salt: Buffer.alloc(15) }),
+    'salt size must be between 16 and 64 bytes (inclusive)'
+  )
+  throws(
+    () => peer.mutable.signable(Buffer.from('test'), { salt: Buffer.alloc(65) }),
+    'salt size must be between 16 and 64 bytes (inclusive)'
+  )
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable signable - value must be buffer', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  throws(() => peer.mutable.signable('test', { keypair }), 'Value must be a buffer')
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable signable - value size must be <= 1000 bytes', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  throws(
+    () => peer.mutable.signable(Buffer.alloc(1001), { keypair }),
+    'Value size must be <= 1000'
+  )
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable.sign', async ({ is, throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  const { publicKey } = keypair
+  const salt = peer.mutable.salt()
+  const value = Buffer.from('test')
+  const signable = peer.mutable.signable(value, { salt })
+  is(
+    verify(peer.mutable.sign(value, { keypair }), value, publicKey),
+    true
+  )
+  is(
+    verify(peer.mutable.sign(value, { salt, keypair }), signable, publicKey),
+    true
+  )
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable sign - salt must be a buffer', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  throws(() => peer.mutable.sign(Buffer.from('test'), { salt: 'no' }), 'salt must be a buffer')
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable sign - salt size must be >= 16 bytes and <= 64 bytes', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  throws(
+    () => peer.mutable.sign(Buffer.from('test'), { salt: Buffer.alloc(15) }),
+    'salt size must be between 16 and 64 bytes (inclusive)'
+  )
+  throws(
+    () => peer.mutable.sign(Buffer.from('test'), { salt: Buffer.alloc(65) }),
+    'salt size must be between 16 and 64 bytes (inclusive)'
+  )
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable sign - value must be buffer', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  throws(() => peer.mutable.sign('test', { keypair }), 'Value must be a buffer')
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable sign - options are required', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  throws(() => peer.mutable.sign('test'), 'Options are required')
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable sign - value size must be <= 1000 bytes', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  throws(
+    () => peer.mutable.sign(Buffer.alloc(1001), { keypair }),
+    'Value size must be <= 1000'
+  )
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable sign - keypair option is required', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  throws(
+    () => peer.mutable.sign(Buffer.alloc(1001), {}),
+    'keypair is required'
+  )
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable sign - keypair must have secretKey which must be a buffer', async ({ throws }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  keypair.secretKey = 'nope'
+  throws(
+    () => peer.mutable.sign(Buffer.alloc(1001), { keypair }),
+    'keypair.secretKey is required'
+  )
+  delete keypair.secretKey
+  throws(
+    () => peer.mutable.sign(Buffer.alloc(1001), { keypair }),
+    'keypair.secretKey is required'
+  )
+  peer.destroy()
+  closeDht()
+})
+
 test('mutable get - key must be buffer', async ({ throws }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
@@ -403,6 +566,46 @@ test('mutable put/get - same peer', async ({ is }) => {
   closeDht()
 })
 
+test('mutable put/get - signature option', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  const { publicKey } = keypair
+  promisifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer.mutable, 'get')
+  const input = Buffer.from('test')
+  const signature = peer.mutable.sign(input, { keypair })
+  const { key } = await peer.mutable.put(input, {
+    signature,
+    keypair: { publicKey }
+  })
+  const { value } = await peer.mutable.get(key)
+  is(input.equals(value), true)
+  peer.destroy()
+  closeDht()
+})
+
+test('mutable put/get - salted signature option', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const salt = peer.mutable.salt()
+  const keypair = peer.mutable.keypair()
+  const { publicKey } = keypair
+  promisifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer.mutable, 'get')
+  const input = Buffer.from('test')
+  const signature = peer.mutable.sign(input, { keypair, salt })
+  const { key } = await peer.mutable.put(input, {
+    signature,
+    salt,
+    keypair: { publicKey }
+  })
+  const { value } = await peer.mutable.get(key, { salt })
+  is(input.equals(value), true)
+  peer.destroy()
+  closeDht()
+})
+
 test('mutable put, get stream', async ({ is }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
@@ -563,7 +766,7 @@ test('mutable update with null value is handled', async ({ pass }) => {
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   const stream = peer.update('mutable-store', keypair.publicKey, {
-    value: null, sig: Buffer.alloc(signSize)
+    value: null, signature: Buffer.alloc(signSize)
   })
   stream.resume()
   await once(stream, 'end')
@@ -572,16 +775,16 @@ test('mutable update with null value is handled', async ({ pass }) => {
   closeDht()
 })
 
-test('mutable update with null sig is handled', async ({ pass }) => {
+test('mutable update with null signature is handled', async ({ pass }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   const stream = peer.update('mutable-store', keypair.publicKey, {
-    value: Buffer.from('test'), sig: null
+    value: Buffer.from('test'), signature: null
   })
   stream.resume()
   await once(stream, 'end')
-  pass('null sig handled')
+  pass('null signature handled')
   peer.destroy()
   closeDht()
 })
@@ -606,7 +809,7 @@ test('mutable corrupt value update', async ({ is }) => {
   closeDht()
 })
 
-test('mutable corrupt sig update', async ({ is }) => {
+test('mutable corrupt signature update', async ({ is }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -614,7 +817,7 @@ test('mutable corrupt sig update', async ({ is }) => {
   const { update } = peer
   peer.update = (cmd, key, obj) => {
     if (cmd === 'mutable-store') {
-      obj.sig = Buffer.alloc(signSize)
+      obj.signature = Buffer.alloc(signSize)
     }
     return update.call(peer, cmd, key, obj)
   }
@@ -670,7 +873,7 @@ test('mutable get corrupt values are filtered out', async ({ fail, pass }) => {
   closeDht()
 })
 
-test('mutable get corrupt sigs are filtered out', async ({ fail, pass }) => {
+test('mutable get corrupt signatures are filtered out', async ({ fail, pass }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
@@ -681,12 +884,12 @@ test('mutable get corrupt sigs are filtered out', async ({ fail, pass }) => {
   const stream = peer.mutable.get(key)
   const { _map } = stream
   stream._map = (result) => {
-    result.sig = Buffer.from('fake')
+    result.signature = Buffer.from('fake')
     return _map(result)
   }
   stream.resume()
-  stream.on('data', ({ sig }) => {
-    if (sig.toString() === 'fake') fail('corrupt sig was not filtered')
+  stream.on('data', ({ signature }) => {
+    if (signature.toString() === 'fake') fail('corrupt signature was not filtered')
   })
   await once(stream, 'end')
   pass('corrupt data was filtered')
@@ -711,8 +914,8 @@ test('mutable get corrupt salts are filtered out', async ({ fail, pass }) => {
     return _map(result)
   }
   stream.resume()
-  stream.on('data', ({ sig }) => {
-    if (sig.toString() === 'fake') fail('corrupt sig was not filtered')
+  stream.on('data', ({ signature }) => {
+    if (signature.toString() === 'fake') fail('corrupt signature was not filtered')
   })
   await once(stream, 'end')
   pass('corrupt data was filtered')

@@ -213,8 +213,8 @@ function defineMutable () {
       var len = enc[0].encodingLength(obj.value)
       length += 1 + len
     }
-    if (defined(obj.sig)) {
-      var len = enc[0].encodingLength(obj.sig)
+    if (defined(obj.signature)) {
+      var len = enc[0].encodingLength(obj.signature)
       length += 1 + len
     }
     if (defined(obj.seq)) {
@@ -237,9 +237,9 @@ function defineMutable () {
       enc[0].encode(obj.value, buf, offset)
       offset += enc[0].encode.bytes
     }
-    if (defined(obj.sig)) {
+    if (defined(obj.signature)) {
       buf[offset++] = 18
-      enc[0].encode(obj.sig, buf, offset)
+      enc[0].encode(obj.signature, buf, offset)
       offset += enc[0].encode.bytes
     }
     if (defined(obj.seq)) {
@@ -263,7 +263,7 @@ function defineMutable () {
     var oldOffset = offset
     var obj = {
       value: null,
-      sig: null,
+      signature: null,
       seq: 0,
       salt: null
     }
@@ -281,7 +281,7 @@ function defineMutable () {
         offset += enc[0].decode.bytes
         break
         case 2:
-        obj.sig = enc[0].decode(buf, offset)
+        obj.signature = enc[0].decode(buf, offset)
         offset += enc[0].decode.bytes
         break
         case 3:
