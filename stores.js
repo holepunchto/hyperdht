@@ -133,7 +133,7 @@ class MutableStore extends Hypersign {
   }
 
   get (key, opts = {}, cb = opts) {
-    const { dht } = this
+    const { dht, signable } = this
     const { salt, seq = 0 } = opts
     assert(Buffer.isBuffer(key), 'Key must be a buffer')
     assert(typeof seq === 'number', 'seq should be a number')
@@ -148,9 +148,7 @@ class MutableStore extends Hypersign {
       .map((result) => {
         if (!result.value) return
         const { value, signature, seq: storedSeq } = result.value
-        const msg = salt
-          ? Buffer.concat([Buffer.from([salt.length]), salt, value])
-          : value
+        const msg = signable(value, { salt, seq, key })
         if (storedSeq >= userSeq && verify(signature, msg, key)) {
           const id = result.node.id
           return { id, value, signature, seq: storedSeq, salt }
@@ -207,7 +205,7 @@ class MutableStore extends Hypersign {
   }
 
   _command () {
-    const { store } = this
+    const { store, signable } = this
     return {
       valueEncoding: Mutable,
       update (input, cb) {
@@ -222,9 +220,7 @@ class MutableStore extends Hypersign {
           : publicKey.toString('hex')
         const local = store.get(key)
 
-        const msg = salt
-          ? Buffer.concat([Buffer.from([salt.length]), salt, value])
-          : value
+        const msg = signable(value, { salt, seq, key: publicKey })
 
         if (local && local.seq === seq && Buffer.compare(local.value, value) !== 0) {
           cb(Error('ERR_INVALID_SEQ'))

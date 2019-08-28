@@ -899,7 +899,7 @@ test('mutable get corrupt values are filtered out', async ({ fail, pass }) => {
   const stream = peer.mutable.get(key)
   const { _map } = stream
   stream._map = (result) => {
-    result.value = Buffer.from('fake')
+    result.value = { value: Buffer.from('fake') }
     return _map(result)
   }
   stream.resume()
