@@ -140,15 +140,15 @@ class MutableStore extends Hypersign {
     if (salt) {
       assert(Buffer.isBuffer(salt), 'salt must be a buffer')
       assert(
-        salt.length >= 16 && salt.length <= 64,
-        'salt size must be between 16 and 64 bytes (inclusive)'
+        salt.length <= 64,
+        'salt size must be no greater than 64 bytes'
       )
     }
     const queryStream = dht.query('mutable-store', key, { salt, seq })
       .map((result) => {
         if (!result.value) return
         const { value, signature, seq: storedSeq } = result.value
-        const msg = signable(value, { salt, seq, key })
+        const msg = signable(value, { salt, seq })
         if (storedSeq >= userSeq && verify(signature, msg, key)) {
           const id = result.node.id
           return { id, value, signature, seq: storedSeq, salt }
@@ -220,7 +220,7 @@ class MutableStore extends Hypersign {
           : publicKey.toString('hex')
         const local = store.get(key)
 
-        const msg = signable(value, { salt, seq, key: publicKey })
+        const msg = signable(value, { salt, seq })
 
         if (local && local.seq === seq && Buffer.compare(local.value, value) !== 0) {
           cb(Error('ERR_INVALID_SEQ'))

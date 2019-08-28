@@ -274,16 +274,12 @@ test('mutable signable - salt must be a buffer', async ({ throws }) => {
   closeDht()
 })
 
-test('mutable signable - salt size must be >= 16 bytes and <= 64 bytes', async ({ throws }) => {
+test('mutable signable - salt size must be no greater than 64 bytes', async ({ throws }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
   throws(
-    () => peer.mutable.signable(Buffer.from('test'), { salt: Buffer.alloc(15) }),
-    'salt size must be between 16 and 64 bytes (inclusive)'
-  )
-  throws(
     () => peer.mutable.signable(Buffer.from('test'), { salt: Buffer.alloc(65) }),
-    'salt size must be between 16 and 64 bytes (inclusive)'
+    'salt size must be no greater than 64 bytes'
   )
   peer.destroy()
   closeDht()
@@ -435,16 +431,12 @@ test('mutable get - salt must be a buffer', async ({ throws }) => {
   closeDht()
 })
 
-test('mutable get - salt size must be >= 16 bytes and <= 64 bytes', async ({ throws }) => {
+test('mutable get - salt size must be no greater than 64 bytes', async ({ throws }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
   throws(
-    () => peer.mutable.get(Buffer.from('test'), { salt: Buffer.alloc(15) }),
-    'salt size must be between 16 and 64 bytes (inclusive)'
-  )
-  throws(
     () => peer.mutable.get(Buffer.from('test'), { salt: Buffer.alloc(65) }),
-    'salt size must be between 16 and 64 bytes (inclusive)'
+    'salt size must be no greater than 64 bytes'
   )
   peer.destroy()
   closeDht()

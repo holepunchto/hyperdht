@@ -181,7 +181,7 @@ The options are the exact same as those of `mutable.put` (except `signature`).
 Options:
 
 * `keypair` – REQUIRED, use `node.mutable.keypair` to generate this.
-* `salt` - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+* `salt` - OPTIONAL - default `undefined`, a buffer <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
 
 #### `node.mutable.signable(value, options)`
 
@@ -192,8 +192,8 @@ signing (e.g. hardware signing), do not pass the returned signable value into
 `mutable.sign`, `mutable.sign` already uses `mutable.signable`.
 
 Options:
-
-* `salt` - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+* `salt` - OPTIONAL - default `undefined`, a buffer <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+* `seq` - OPTIONAL - default `0`, a number which should be increased every time put is passed a new value for the same keypair
 
 #### `node.mutable.put(value, options, callback = (err, { key, ...info }) => {}) => stream`
 
@@ -204,7 +204,7 @@ Options:
 * `keypair` – REQUIRED, use `node.mutable.keypair` to generate this.
 * `signature` - OPTIONAL, a buffer holding an ed25519 signature corresponding to public key. This can be supplied instead of a secret key which can be useful for offline signing. If `signature` is supplied `keypair` must only contain a `publicKey` and no `secretKey`. See `signable` and `sign`.
 * `seq` - OPTIONAL - default `0`, a number which should be increased every time put is passed a new value for the same keypair
-* `salt` - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+* `salt` - OPTIONAL - default `undefined`, a buffer <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
 
 When successful the second argument passed to `callback` is an object containing the public key as `key`, with additional meta data (`...info`): `signature`, `seq`, `salt`. 
 
@@ -215,7 +215,7 @@ Fetch a mutable value from the DHT.
 Options:
 
 * `seq` - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
-* `salt` - OPTIONAL - default `undefined`, a buffer >= 16 and <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
+* `salt` - OPTIONAL - default `undefined`, a buffer <= 64 bytes. If supplied it will salt the signature used to verify mutable values.
 
 When successful, the second argument passed to `callback` is an object containing the resolved `value` with additional meta data (`...info`): `signature`, `seq` and `salt`.
 
