@@ -258,11 +258,11 @@ test('mutable.signable', async ({ is, same }) => {
   const value = Buffer.from('test')
   same(
     peer.mutable.signable(value),
-    Buffer.from('3:seqi01:v4:test')
+    Buffer.from('3:seqi0e1:v4:test')
   )
   same(
     peer.mutable.signable(value, { seq: 1 }),
-    Buffer.from('3:seqi11:v4:test')
+    Buffer.from('3:seqi1e1:v4:test')
   )
   same(
     peer.mutable.signable(value, { salt }),
@@ -270,7 +270,7 @@ test('mutable.signable', async ({ is, same }) => {
       Buffer.from('4:salt'),
       Buffer.from(`${salt.length}:`),
       salt,
-      Buffer.from('3:seqi01:v4:test')
+      Buffer.from('3:seqi0e1:v4:test')
     ])
   )
   peer.destroy()
