@@ -256,11 +256,22 @@ test('mutable.signable', async ({ is, same }) => {
   const peer = dht({ bootstrap })
   const salt = peer.mutable.salt()
   const value = Buffer.from('test')
-  is(peer.mutable.signable(value), value)
-  is(peer.mutable.signable(value, { seq: 1 }), value)
+  same(
+    peer.mutable.signable(value),
+    Buffer.from('3:seqi0e1:v4:test')
+  )
+  same(
+    peer.mutable.signable(value, { seq: 1 }),
+    Buffer.from('3:seqi1e1:v4:test')
+  )
   same(
     peer.mutable.signable(value, { salt }),
-    Buffer.concat([Buffer.from([salt.length]), salt, value])
+    Buffer.concat([
+      Buffer.from('4:salt'),
+      Buffer.from(`${salt.length}:`),
+      salt,
+      Buffer.from('3:seqi0e1:v4:test')
+    ])
   )
   peer.destroy()
   closeDht()
@@ -313,13 +324,28 @@ test('mutable.sign', async ({ is, throws }) => {
   const { publicKey } = keypair
   const salt = peer.mutable.salt()
   const value = Buffer.from('test')
-  const signable = peer.mutable.signable(value, { salt })
   is(
-    verify(peer.mutable.sign(value, { keypair }), value, publicKey),
+    verify(
+      peer.mutable.sign(value, { keypair }),
+      peer.mutable.signable(value),
+      publicKey
+    ),
     true
   )
   is(
-    verify(peer.mutable.sign(value, { salt, keypair }), signable, publicKey),
+    verify(
+      peer.mutable.sign(value, { salt, keypair }),
+      peer.mutable.signable(value, { salt }),
+      publicKey
+    ),
+    true
+  )
+  is(
+    verify(
+      peer.mutable.sign(value, { seq: 2, keypair }),
+      peer.mutable.signable(value, { seq: 2 }),
+      publicKey
+    ),
     true
   )
   peer.destroy()
