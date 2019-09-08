@@ -56,6 +56,8 @@ Options include:
 }
 ```
 
+*Note:* The default bootstrap servers are publicly served on behalf of the commons. To run a fully private DHT, start two or more dht nodes with an empty bootstrap array (`dht({bootstrap:[]})`) and then use the addresses of those nodes as the `bootrstrap` option in all other dht nodes.
+
 #### `node.holepunch(peer, [callback])`
 
 UDP holepunch to another peer.
