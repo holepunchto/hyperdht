@@ -148,7 +148,7 @@ class MutableStore extends Hypersign {
       .map((result) => {
         if (!result.value) return
         const { value, signature, seq: storedSeq } = result.value
-        const msg = signable(value, { salt, seq })
+        const msg = signable(value, { salt, seq: storedSeq })
         if (storedSeq >= userSeq && verify(signature, msg, key)) {
           const id = result.node.id
           return { id, value, signature, seq: storedSeq, salt }

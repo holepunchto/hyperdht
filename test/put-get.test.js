@@ -692,6 +692,24 @@ test('mutable put, get stream - same peer', async ({ is }) => {
   closeDht()
 })
 
+test('mutable put/get latest seq', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  promisifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer2.mutable, 'get')
+  const input = Buffer.from('test')
+  let seq = 1
+  const { key } = await peer.mutable.put(input, { keypair, seq })
+  seq = 0
+  const { value } = await peer2.mutable.get(key, { seq })
+  is(input.equals(value), true)
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
 test('mutable put/get update', async ({ is }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
