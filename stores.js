@@ -94,6 +94,12 @@ class ImmutableStore {
 
     // send to the dht
     const queryStream = dht.update('immutable-store', key, value)
+    queryStream.on('warning', (err) => {
+      const updateErr = err.message === 'ERR_INVALID_INPUT'
+      if (updateErr) {
+        queryStream.destroy(err)
+      }
+    })
     queryStream.resume()
     finished(queryStream, (err) => {
       if (err) {
@@ -154,6 +160,7 @@ class MutableStore extends Hypersign {
           return { id, value, signature, seq: storedSeq, salt }
         }
       })
+
     let found = false
     const hasCb = typeof cb === 'function'
     const userSeq = seq
@@ -194,13 +201,14 @@ class MutableStore extends Hypersign {
     })
     queryStream.on('warning', (err) => {
       const updateErr = err.message === 'ERR_INVALID_INPUT' ||
-        err.message === 'ERR_INVALID_SEQ'
+        err.message === 'ERR_INVALID_SEQ' ||
+        err.message === 'ERR_SEQ_LESS_THAN_CURRENT'
       if (updateErr) {
         queryStream.destroy(err)
       }
     })
     queryStream.resume()
-    finished(queryStream, (err) => {
+    finished(queryStream, (err, more, stuff) => {
       if (err) {
         cb(err)
         return
@@ -228,18 +236,20 @@ class MutableStore extends Hypersign {
         const local = store.get(key)
 
         const msg = signable(value, { salt, seq })
-
         if (local && local.seq === seq && Buffer.compare(local.value, value) !== 0) {
           cb(Error('ERR_INVALID_SEQ'))
           return
         }
-        const verified = verify(signature, msg, publicKey) &&
-          (local ? seq > local.seq : true)
+        const verified = verify(signature, msg, publicKey)
 
         if (verified === false) {
           cb(Error('ERR_INVALID_INPUT'))
           return
+        } else if (local && seq <= local.seq) {
+          cb(Error('ERR_SEQ_LESS_THAN_CURRENT'))
+          return
         }
+
         store.set(key, { value, salt, signature, seq })
         cb(null)
       },
