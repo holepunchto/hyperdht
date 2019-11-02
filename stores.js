@@ -192,6 +192,13 @@ class MutableStore extends Hypersign {
     const queryStream = dht.update('mutable-store', key, {
       value, signature, seq, salt
     })
+    queryStream.on('warning', (err) => {
+      const updateErr = err.message === 'ERR_INVALID_INPUT' ||
+        err.message === 'ERR_INVALID_SEQ'
+      if (updateErr) {
+        queryStream.destroy(err)
+      }
+    })
     queryStream.resume()
     finished(queryStream, (err) => {
       if (err) {

@@ -5,7 +5,7 @@ const {
   crypto_sign_BYTES: signSize,
   crypto_sign_verify_detached: verify
 } = require('sodium-universal')
-const { once, promisifyMethod, whenifyMethod, done } = require('nonsynchronous')
+const { once, promisifyMethod, whenifyMethod, done, when } = require('nonsynchronous')
 const dht = require('../')
 const { dhtBootstrap } = require('./util')
 
@@ -791,9 +791,12 @@ test('mutable put/get update new value with same seq', async ({ is }) => {
   const { value } = await peer2.mutable.get(key, { seq })
   is(input.equals(value), true)
   const update = Buffer.from('test2')
-  const stream = peer.mutable.put(update, { keypair, seq }, () => {})
-  const [err] = await once(stream, 'warning')
-  is(err.message, 'ERR_INVALID_SEQ')
+  const until = when()
+  peer.mutable.put(update, { keypair, seq }, (err) => {
+    is(err.message, 'ERR_INVALID_SEQ')
+    until()
+  })
+  await until.done()
   peer.destroy()
   peer2.destroy()
   closeDht()
@@ -875,10 +878,12 @@ test('mutable corrupt value update', async ({ is }) => {
     }
     return update.call(peer, cmd, key, obj)
   }
-  const stream = peer.mutable.put(value, { keypair }, () => {})
-  stream.resume()
-  const [err] = await once(stream, 'warning')
-  is(err.message, 'ERR_INVALID_INPUT')
+  const until = when()
+  peer.mutable.put(value, { keypair }, (err) => {
+    is(err.message, 'ERR_INVALID_INPUT')
+    until()
+  })
+  await until.done()
   peer.destroy()
   closeDht()
 })
@@ -895,10 +900,12 @@ test('mutable corrupt signature update', async ({ is }) => {
     }
     return update.call(peer, cmd, key, obj)
   }
-  const stream = peer.mutable.put(value, { keypair }, () => {})
-  stream.resume()
-  const [err] = await once(stream, 'warning')
-  is(err.message, 'ERR_INVALID_INPUT')
+  const until = when()
+  peer.mutable.put(value, { keypair }, (err) => {
+    is(err.message, 'ERR_INVALID_INPUT')
+    until()
+  })
+  await until.done()
   peer.destroy()
   closeDht()
 })
@@ -916,10 +923,12 @@ test('mutable corrupt salt update', async ({ is }) => {
     }
     return update.call(peer, cmd, key, obj)
   }
-  const stream = peer.mutable.put(value, { keypair, salt }, () => {})
-  stream.resume()
-  const [err] = await once(stream, 'warning')
-  is(err.message, 'ERR_INVALID_INPUT')
+  const until = when()
+  peer.mutable.put(value, { keypair, salt }, (err) => {
+    is(err.message, 'ERR_INVALID_INPUT')
+    until()
+  })
+  await until.done()
   peer.destroy()
   closeDht()
 })
