@@ -94,12 +94,7 @@ class ImmutableStore {
 
     // send to the dht
     const queryStream = dht.update('immutable-store', key, value)
-    queryStream.on('warning', (err) => {
-      const updateErr = err.message === 'ERR_INVALID_INPUT'
-      if (updateErr) {
-        queryStream.destroy(err)
-      }
-    })
+
     queryStream.resume()
     finished(queryStream, (err) => {
       if (err) {
