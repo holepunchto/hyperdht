@@ -802,6 +802,57 @@ test('mutable put/get update new value with same seq', async ({ is }) => {
   closeDht()
 })
 
+test('mutable put/get update new value with lower seq', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  whenifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer2.mutable, 'get')
+  const input = Buffer.from('test')
+  const seq = 2
+  const key = keypair.publicKey
+  peer.mutable.put(input, { keypair, seq }, () => {})
+  await peer.mutable.put[done]
+  const { value } = await peer2.mutable.get(key, { seq })
+  is(input.equals(value), true)
+  const update = Buffer.from('test2')
+  const until = when()
+  peer.mutable.put(update, { keypair, seq: 1 }, (err) => {
+    is(err.message, 'ERR_SEQ_LESS_THAN_CURRENT')
+    until()
+  })
+  await until.done()
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
+test('mutable put/get update with same value with same seq', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  whenifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer2.mutable, 'get')
+  const input = Buffer.from('test')
+  const seq = 0
+  const key = keypair.publicKey
+  peer.mutable.put(input, { keypair, seq }, () => {})
+  await peer.mutable.put[done]
+  const { value } = await peer2.mutable.get(key, { seq })
+  is(input.equals(value), true)
+  const until = when()
+  peer.mutable.put(input, { keypair, seq }, (err) => {
+    is(err.message, 'ERR_SEQ_LESS_THAN_CURRENT')
+    until()
+  })
+  await until.done()
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
 test('mutable get propagates query stream error', async ({ is, plan }) => {
   plan(1)
   const { bootstrap, closeDht } = await dhtBootstrap()
