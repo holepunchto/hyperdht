@@ -20,6 +20,7 @@ class ImmutableStore {
   constructor (dht, store) {
     this.dht = dht
     this.store = store
+    this.prefix = 'i'
   }
 
   get (key, cb) {
@@ -28,8 +29,8 @@ class ImmutableStore {
     // if the querying node already has the immutable value
     // then there's no need to query the dht
     const hasCb = typeof cb === 'function'
-    const hexKey = key.toString('hex')
-    const value = store.get(hexKey)
+    const storeKey = this.prefix + key.toString('hex')
+    const value = store.get(storeKey)
     if (value && hasCb) {
       const { id } = this.dht
       const localStream = PassThrough({ objectMode: true })
@@ -90,7 +91,7 @@ class ImmutableStore {
     const key = Buffer.alloc(32)
     hash(key, value)
     // set locally for easy cached retrieval
-    store.set(key.toString('hex'), value)
+    store.set(this.prefix + key.toString('hex'), value)
 
     // send to the dht
     const queryStream = dht.update('immutable-store', key, value)
@@ -108,7 +109,7 @@ class ImmutableStore {
   }
 
   _command () {
-    const { store } = this
+    const { store, prefix } = this
     return {
       update ({ target, value }, cb) {
         const key = Buffer.alloc(32)
@@ -117,11 +118,11 @@ class ImmutableStore {
           cb(Error('ERR_INVALID_INPUT'))
           return
         }
-        store.set(key.toString('hex'), value)
+        store.set(prefix + key.toString('hex'), value)
         cb(null)
       },
       query ({ target }, cb) {
-        cb(null, store.get(target.toString('hex')))
+        cb(null, store.get(prefix + target.toString('hex')))
       }
     }
   }
@@ -131,6 +132,7 @@ class MutableStore extends Hypersign {
     super()
     this.dht = dht
     this.store = store
+    this.prefix = 'm'
   }
 
   get (key, opts = {}, cb = opts) {
@@ -215,7 +217,7 @@ class MutableStore extends Hypersign {
   }
 
   _command () {
-    const { store, signable } = this
+    const { store, signable, prefix } = this
     return {
       valueEncoding: Mutable,
       update (input, cb) {
@@ -226,8 +228,8 @@ class MutableStore extends Hypersign {
         const publicKey = input.target
         const { value, salt, signature, seq } = input.value
         const key = salt
-          ? publicKey.toString('hex') + salt.toString('hex')
-          : publicKey.toString('hex')
+          ? prefix + publicKey.toString('hex') + salt.toString('hex')
+          : prefix + publicKey.toString('hex')
         const local = store.get(key)
 
         const msg = signable(value, { salt, seq })
@@ -251,8 +253,8 @@ class MutableStore extends Hypersign {
       query ({ target, value }, cb) {
         const { seq, salt } = value
         const key = salt
-          ? target.toString('hex') + salt.toString('hex')
-          : target.toString('hex')
+          ? prefix + target.toString('hex') + salt.toString('hex')
+          : prefix + target.toString('hex')
         const result = store.get(key)
         if (result && result.seq >= seq) {
           cb(null, result)

@@ -764,6 +764,37 @@ test('mutable put/get w/ salt + updates', async ({ is }) => {
   closeDht()
 })
 
+test('mutable put, immutable get', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  promisifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer2.immutable, 'get')
+  const input = Buffer.from('test')
+  const { key } = await peer.mutable.put(input, { keypair })
+  const value = await peer2.immutable.get(key)
+  is(value, null)
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
+test('immutable put, mutable get', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  promisifyMethod(peer.immutable, 'put')
+  promisifyMethod(peer2.mutable, 'get')
+  const input = Buffer.from('test')
+  const key = await peer.immutable.put(input)
+  const { value } = await peer2.mutable.get(key)
+  is(value, null)
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
 test('mutable get non-existant', async ({ is }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
