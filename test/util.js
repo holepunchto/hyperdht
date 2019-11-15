@@ -3,8 +3,8 @@ const { once } = require('nonsynchronous')
 
 const dht = require('../')
 
-async function dhtBootstrap () {
-  const node = dht({ bootstrap: [] })
+async function dhtBootstrap ({ ephemeral = false } = {}) {
+  const node = dht({ bootstrap: [], ephemeral })
   node.listen()
   await once(node, 'listening')
   const { port } = node.address()

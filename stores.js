@@ -196,16 +196,26 @@ class MutableStore extends Hypersign {
     const queryStream = dht.update('mutable-store', key, {
       value, signature, seq, salt
     })
+    const rvErrs = [] // remote validation errors
+    var response = false
     queryStream.on('warning', (err) => {
-      const updateErr = err.message === 'ERR_INVALID_INPUT' ||
-        err.message === 'ERR_INVALID_SEQ' ||
-        err.message === 'ERR_SEQ_LESS_THAN_CURRENT'
-      if (updateErr) {
-        queryStream.destroy(err)
-      }
+      const validationError = err.message === 'ERR_INVALID_INPUT' ||
+        err.message === 'ERR_SEQ_MUST_EXCEED_CURRENT' ||
+        err.message === 'ERR_INVALID_SEQ'
+      if (validationError) rvErrs.push(err)
     })
-    queryStream.resume()
-    finished(queryStream, (err, more, stuff) => {
+    queryStream.on('data', ({ value }) => {
+      if (value !== null) response = true
+    })
+    finished(queryStream, (err) => {
+      const validationError = response === false && rvErrs.length > 0
+      if (validationError) {
+        // if there's multiple errors, choose the error by prioritizing:
+        // ERR_INVALID_INPUT > ERR_SEQ_MUST_EXCEED_CURRENT > ERR_INVALID_SEQ
+        err = rvErrs.find(({ message }) => message === 'ERR_INVALID_INPUT') ||
+          rvErrs.find(({ message }) => message === 'ERR_SEQ_MUST_EXCEED_CURRENT') ||
+          rvErrs.find(({ message }) => message === 'ERR_INVALID_SEQ')
+      }
       if (err) {
         cb(err)
         return
@@ -243,7 +253,7 @@ class MutableStore extends Hypersign {
           cb(Error('ERR_INVALID_INPUT'))
           return
         } else if (local && seq <= local.seq) {
-          cb(Error('ERR_SEQ_LESS_THAN_CURRENT'))
+          cb(Error('ERR_SEQ_MUST_EXCEED_CURRENT'))
           return
         }
 

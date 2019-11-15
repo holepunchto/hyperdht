@@ -850,7 +850,7 @@ test('mutable put/get update new value with lower seq', async ({ is }) => {
   const update = Buffer.from('test2')
   const until = when()
   peer.mutable.put(update, { keypair, seq: 1 }, (err) => {
-    is(err.message, 'ERR_SEQ_LESS_THAN_CURRENT')
+    is(err.message, 'ERR_SEQ_MUST_EXCEED_CURRENT')
     until()
   })
   await until.done()
@@ -875,7 +875,7 @@ test('mutable put/get update with same value with same seq', async ({ is }) => {
   is(input.equals(value), true)
   const until = when()
   peer.mutable.put(input, { keypair, seq }, (err) => {
-    is(err.message, 'ERR_SEQ_LESS_THAN_CURRENT')
+    is(err.message, 'ERR_SEQ_MUST_EXCEED_CURRENT')
     until()
   })
   await until.done()
@@ -949,8 +949,13 @@ test('mutable update with null signature is handled', async ({ pass }) => {
 })
 
 test('mutable corrupt value update', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ ephemeral: true })
+  const store = dht({ bootstrap })
+  store.listen()
+  await once(store, 'listening')
   const peer = dht({ bootstrap })
+  peer.listen()
+  await once(peer, 'listening')
   const keypair = peer.mutable.keypair()
   const value = Buffer.from('test')
   const { update } = peer
@@ -966,6 +971,7 @@ test('mutable corrupt value update', async ({ is }) => {
     until()
   })
   await until.done()
+  store.destroy()
   peer.destroy()
   closeDht()
 })
