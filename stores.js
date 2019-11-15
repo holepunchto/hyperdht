@@ -196,26 +196,17 @@ class MutableStore extends Hypersign {
     const queryStream = dht.update('mutable-store', key, {
       value, signature, seq, salt
     })
-    const rvErrs = [] // remote validation errors
-    var response = false
-    queryStream.on('warning', (err) => {
-      const validationError = err.message === 'ERR_INVALID_INPUT' ||
-        err.message === 'ERR_SEQ_MUST_EXCEED_CURRENT' ||
-        err.message === 'ERR_INVALID_SEQ'
-      if (validationError) rvErrs.push(err)
-    })
-    queryStream.on('data', ({ value }) => {
-      if (value !== null) response = true
-    })
-    finished(queryStream, (err) => {
-      const validationError = response === false && rvErrs.length > 0
-      if (validationError) {
-        // if there's multiple errors, choose the error by prioritizing:
-        // ERR_INVALID_INPUT > ERR_SEQ_MUST_EXCEED_CURRENT > ERR_INVALID_SEQ
-        err = rvErrs.find(({ message }) => message === 'ERR_INVALID_INPUT') ||
-          rvErrs.find(({ message }) => message === 'ERR_SEQ_MUST_EXCEED_CURRENT') ||
-          rvErrs.find(({ message }) => message === 'ERR_INVALID_SEQ')
+
+    queryStream.once('warning', (err, proof) => {
+      if (proof) {
+        const { value, signature, seq, salt } = proof
+        const msg = this.signable(value, { salt, seq })
+        const verified = verify(signature, msg, key)
+        if (verified) queryStream.destroy(err)
       }
+    })
+    queryStream.resume()
+    finished(queryStream, (err) => {
       if (err) {
         cb(err)
         return
@@ -241,19 +232,17 @@ class MutableStore extends Hypersign {
           ? prefix + publicKey.toString('hex') + salt.toString('hex')
           : prefix + publicKey.toString('hex')
         const local = store.get(key)
-
         const msg = signable(value, { salt, seq })
-        if (local && local.seq === seq && Buffer.compare(local.value, value) !== 0) {
-          cb(Error('ERR_INVALID_SEQ'))
-          return
-        }
         const verified = verify(signature, msg, publicKey)
 
         if (verified === false) {
           cb(Error('ERR_INVALID_INPUT'))
           return
+        } else if (local && local.seq === seq && Buffer.compare(local.value, value) !== 0) {
+          cb(Error('ERR_INVALID_SEQ'), local)
+          return
         } else if (local && seq <= local.seq) {
-          cb(Error('ERR_SEQ_MUST_EXCEED_CURRENT'))
+          cb(Error('ERR_SEQ_MUST_EXCEED_CURRENT'), local)
           return
         }
 

@@ -949,13 +949,8 @@ test('mutable update with null signature is handled', async ({ pass }) => {
 })
 
 test('mutable corrupt value update', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap({ ephemeral: true })
-  const store = dht({ bootstrap })
-  store.listen()
-  await once(store, 'listening')
+  const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
-  peer.listen()
-  await once(peer, 'listening')
   const keypair = peer.mutable.keypair()
   const value = Buffer.from('test')
   const { update } = peer
@@ -965,13 +960,10 @@ test('mutable corrupt value update', async ({ is }) => {
     }
     return update.call(peer, cmd, key, obj)
   }
-  const until = when()
-  peer.mutable.put(value, { keypair }, (err) => {
-    is(err.message, 'ERR_INVALID_INPUT')
-    until()
-  })
-  await until.done()
-  store.destroy()
+  const stream = peer.mutable.put(value, { keypair }, () => {})
+  stream.resume()
+  const [err] = await once(stream, 'warning')
+  is(err.message, 'ERR_INVALID_INPUT')
   peer.destroy()
   closeDht()
 })
@@ -988,12 +980,10 @@ test('mutable corrupt signature update', async ({ is }) => {
     }
     return update.call(peer, cmd, key, obj)
   }
-  const until = when()
-  peer.mutable.put(value, { keypair }, (err) => {
-    is(err.message, 'ERR_INVALID_INPUT')
-    until()
-  })
-  await until.done()
+  const stream = peer.mutable.put(value, { keypair }, () => {})
+  stream.resume()
+  const [err] = await once(stream, 'warning')
+  is(err.message, 'ERR_INVALID_INPUT')
   peer.destroy()
   closeDht()
 })
@@ -1011,12 +1001,10 @@ test('mutable corrupt salt update', async ({ is }) => {
     }
     return update.call(peer, cmd, key, obj)
   }
-  const until = when()
-  peer.mutable.put(value, { keypair, salt }, (err) => {
-    is(err.message, 'ERR_INVALID_INPUT')
-    until()
-  })
-  await until.done()
+  const stream = peer.mutable.put(value, { keypair, salt }, () => {})
+  stream.resume()
+  const [err] = await once(stream, 'warning')
+  is(err.message, 'ERR_INVALID_INPUT')
   peer.destroy()
   closeDht()
 })

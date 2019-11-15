@@ -5,7 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "@hyperswarm/hypersign": "^2.0.0",
-    "dht-rpc": "^4.1.7",
+    "dht-rpc": "git://github.com/mafintosh/dht-rpc.git#d8d6dc3",
     "end-of-stream": "^1.4.1",
     "hashlru": "^2.3.0",
     "ipv4-peers": "^2.0.0",
