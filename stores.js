@@ -198,7 +198,10 @@ class MutableStore extends Hypersign {
     })
 
     queryStream.once('warning', (err, proof) => {
-      if (proof) {
+      if (err && proof) {
+        const valid = err.message === 'ERR_SEQ_MUST_EXCEED_CURRENT' ||
+          err.message === 'ERR_INVALID_SEQ'
+        if (valid === false) return
         const { value, signature, seq, salt } = proof
         const msg = this.signable(value, { salt, seq })
         const verified = verify(signature, msg, key)
