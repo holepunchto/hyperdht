@@ -15,6 +15,13 @@ const { Mutable } = require('./messages')
 // PUT_VALUE_MAX_SIZE (1000B) + packet overhead (i.e. the key etc.)
 // should be less than the network MTU, normally 1400 bytes
 const PUT_VALUE_MAX_SIZE = VALUE_MAX_SIZE
+const maybeSeqError = (seqA, seqB, valueA, valueB) => {
+  if (valueA && valueB && seqA === seqB && Buffer.compare(valueA, valueB) !== 0) {
+    return Error('ERR_INVALID_SEQ')
+  }
+  if (seqA <= seqB) return Error('ERR_SEQ_MUST_EXCEED_CURRENT')
+  return null
+}
 
 class ImmutableStore {
   constructor (dht, store) {
@@ -199,13 +206,13 @@ class MutableStore extends Hypersign {
 
     queryStream.once('warning', (err, proof) => {
       if (err && proof) {
-        const valid = err.message === 'ERR_SEQ_MUST_EXCEED_CURRENT' ||
-          err.message === 'ERR_INVALID_SEQ'
-        if (valid === false) return
-        const { value, signature, seq, salt } = proof
-        const msg = this.signable(value, { salt, seq })
-        const verified = verify(signature, msg, key)
-        if (verified) queryStream.destroy(err)
+        const seqErr = maybeSeqError(seq, proof.seq, proof.value, value)
+        if (seqErr) {
+          const { value, signature, seq, salt } = proof
+          const msg = this.signable(value, { salt, seq })
+          const verified = verify(signature, msg, key)
+          if (verified) queryStream.destroy(err)
+        }
       }
     })
     queryStream.resume()
@@ -241,12 +248,10 @@ class MutableStore extends Hypersign {
         if (verified === false) {
           cb(Error('ERR_INVALID_INPUT'))
           return
-        } else if (local && local.seq === seq && Buffer.compare(local.value, value) !== 0) {
-          cb(Error('ERR_INVALID_SEQ'), local)
-          return
-        } else if (local && seq <= local.seq) {
-          cb(Error('ERR_SEQ_MUST_EXCEED_CURRENT'), local)
-          return
+        }
+        if (local) {
+          const err = maybeSeqError(seq, local.seq, local.value, value)
+          if (err) cb(err, local)
         }
 
         store.set(key, { value, salt, signature, seq })
