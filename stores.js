@@ -211,7 +211,7 @@ class MutableStore extends Hypersign {
           const { value, signature, seq, salt } = proof
           const msg = this.signable(value, { salt, seq })
           const verified = verify(signature, msg, key)
-          if (verified) queryStream.destroy(err)
+          if (verified) queryStream.destroy(seqErr)
         }
       }
     })
