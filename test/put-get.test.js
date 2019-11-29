@@ -5,7 +5,7 @@ const {
   crypto_sign_BYTES: signSize,
   crypto_sign_verify_detached: verify
 } = require('sodium-universal')
-const { once, promisifyMethod, whenifyMethod, done } = require('nonsynchronous')
+const { once, promisifyMethod, whenifyMethod, done, when } = require('nonsynchronous')
 const dht = require('../')
 const { dhtBootstrap } = require('./util')
 
@@ -764,6 +764,37 @@ test('mutable put/get w/ salt + updates', async ({ is }) => {
   closeDht()
 })
 
+test('mutable put, immutable get', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  promisifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer2.immutable, 'get')
+  const input = Buffer.from('test')
+  const { key } = await peer.mutable.put(input, { keypair })
+  const value = await peer2.immutable.get(key)
+  is(value, null)
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
+test('immutable put, mutable get', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  promisifyMethod(peer.immutable, 'put')
+  promisifyMethod(peer2.mutable, 'get')
+  const input = Buffer.from('test')
+  const key = await peer.immutable.put(input)
+  const { value } = await peer2.mutable.get(key)
+  is(value, null)
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
 test('mutable get non-existant', async ({ is }) => {
   const { bootstrap, closeDht } = await dhtBootstrap()
   const peer = dht({ bootstrap })
@@ -791,9 +822,63 @@ test('mutable put/get update new value with same seq', async ({ is }) => {
   const { value } = await peer2.mutable.get(key, { seq })
   is(input.equals(value), true)
   const update = Buffer.from('test2')
-  const stream = peer.mutable.put(update, { keypair, seq }, () => {})
-  const [err] = await once(stream, 'warning')
-  is(err.message, 'ERR_INVALID_SEQ')
+  const until = when()
+  peer.mutable.put(update, { keypair, seq }, (err) => {
+    is(err.message, 'ERR_INVALID_SEQ')
+    until()
+  })
+  await until.done()
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
+test('mutable put/get update new value with lower seq', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  whenifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer2.mutable, 'get')
+  const input = Buffer.from('test')
+  const seq = 2
+  const key = keypair.publicKey
+  peer.mutable.put(input, { keypair, seq }, () => {})
+  await peer.mutable.put[done]
+  const { value } = await peer2.mutable.get(key, { seq })
+  is(input.equals(value), true)
+  const update = Buffer.from('test2')
+  const until = when()
+  peer.mutable.put(update, { keypair, seq: 1 }, (err) => {
+    is(err.message, 'ERR_SEQ_MUST_EXCEED_CURRENT')
+    until()
+  })
+  await until.done()
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
+test('mutable put/get update with same value with same seq', async ({ is }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap()
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  whenifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer2.mutable, 'get')
+  const input = Buffer.from('test')
+  const seq = 0
+  const key = keypair.publicKey
+  peer.mutable.put(input, { keypair, seq }, () => {})
+  await peer.mutable.put[done]
+  const { value } = await peer2.mutable.get(key, { seq })
+  is(input.equals(value), true)
+  const until = when()
+  peer.mutable.put(input, { keypair, seq }, (err) => {
+    is(err.message, 'ERR_SEQ_MUST_EXCEED_CURRENT')
+    until()
+  })
+  await until.done()
   peer.destroy()
   peer2.destroy()
   closeDht()
