@@ -1,6 +1,10 @@
 const dht = require('../')
 const crypto = require('crypto')
 
+// uses the public bootstrap servers, for an equivalent
+// example that starts a bootstrap server and a node to hold state
+// see examples/local-bootstrap.js
+
 const node = dht({
   // just join as an ephemeral node
   // as we are shortlived

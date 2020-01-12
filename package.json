@@ -5,13 +5,14 @@
   "main": "index.js",
   "dependencies": {
     "@hyperswarm/hypersign": "^2.0.0",
-    "dht-rpc": "^4.2.0",
+    "dht-rpc": "git+https://github.com/davidmarkclements/dht-rpc.git#turn-non-ephemeral",
     "end-of-stream": "^1.4.1",
     "hashlru": "^2.3.0",
     "ipv4-peers": "^2.0.0",
     "protocol-buffers-encodings": "^1.1.0",
     "record-cache": "^1.1.0",
-    "sodium-universal": "^2.0.0"
+    "sodium-universal": "^2.0.0",
+    "wrap": "file:../wrap"
   },
   "devDependencies": {
     "get-port": "^5.0.0",
@@ -24,16 +25,10 @@
     "hyperswarm-dht": "./bin.js"
   },
   "scripts": {
-    "test": "tap  -R classic test/*.test.js  && standard --fix",
-    "cov": "tap -R classic --100 --coverage-report=html test/*.test.js",
+    "test": "tap --nyc-arg='--exclude=messages.js'  -R classic test/*.test.js && standard --fix",
+    "cov": "tap --nyc-arg='--exclude=messages.js' -R classic --100 --coverage-report=html test/*.test.js",
     "ci": "standard && npm test",
     "protobuf": "protocol-buffers schema.proto -o messages.js"
-  },
-  "nyc": {
-    "exclude": [
-      "messages.js",
-      "**/test/**"
-    ]
   },
   "repository": {
     "type": "git",

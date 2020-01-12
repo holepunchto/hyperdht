@@ -5,11 +5,14 @@ const { PeersInput, PeersOutput } = require('./messages')
 const peers = require('ipv4-peers')
 const LRU = require('hashlru')
 const { ImmutableStore, MutableStore } = require('./stores')
+
 const DEFAULT_BOOTSTRAP = [
   'bootstrap1.hyperdht.org:49737',
   'bootstrap2.hyperdht.org:49737',
   'bootstrap3.hyperdht.org:49737'
 ]
+
+const ADAPT_EPHEMERALITY_AFTER = 1000 * 60 * 2 // 2 minutes
 
 module.exports = opts => new HyperDHT(opts)
 
@@ -17,7 +20,6 @@ class HyperDHT extends DHT {
   constructor (opts) {
     if (!opts) opts = {}
     if (opts.bootstrap === undefined) opts.bootstrap = DEFAULT_BOOTSTRAP
-
     super(opts)
     const {
       maxAge = 12 * 60 * 1000,
@@ -47,6 +49,22 @@ class HyperDHT extends DHT {
       this._peers.destroy()
       this._store.clear()
     })
+
+    if (this.ephemeral && opts.adaptive) {
+      this.once('ready', () => {
+        const timeout = setTimeout(() => {
+          this.joinDht((err) => {
+            if (err) {
+              err.message = `Unable to dynamically become non-ephemeral: ${err.message}`
+              this.emit('warning', err)
+              return
+            }
+            this.emit('dynamically-non-ephemeral')
+          })
+        }, ADAPT_EPHEMERALITY_AFTER)
+        timeout.unref()
+      })
+    }
   }
 
   lookup (key, opts, cb) {
