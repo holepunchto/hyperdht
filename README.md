@@ -52,7 +52,7 @@ Options include:
   // data join as an ephemeral node. (defaults to false)
   ephemeral: true,
   // if set to true, the adaptive option will cause the
-  // node to become non-ephemeral after the nodes has shown
+  // node to become non-ephemeral after the node has shown
   // to be long-lived (defaults to false)
   adaptive: true,
   // time until a peer is dropped
