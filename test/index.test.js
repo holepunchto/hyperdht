@@ -40,6 +40,22 @@ test('bootstrap option', async ({ is }) => {
   closeDht()
 })
 
+test('adaptive option validation', async ({ throws, doesNotThrow }) => {
+  throws(() => {
+    dht({
+      ephemeral: false,
+      adaptive: true
+    })
+  }, Error('adaptive mode can only applied when ephemeral: true'))
+  throws(() => {
+    dht({ adaptive: true })
+  }, Error('adaptive mode can only applied when ephemeral: true'))
+  doesNotThrow(() => {
+    const node = dht({ adaptive: true, ephemeral: true })
+    node.destroy()
+  })
+})
+
 test('emits listening event when bound', async ({ pass }) => {
   const node = dht()
   node.listen()
@@ -664,7 +680,7 @@ test('corrupt peer data (nill buffer)', async ({ is, fail }) => {
   closeDht()
 })
 
-test('adaptive ephemerality', async ({ is, resolves, rejects, tearDown }) => {
+test('adaptive ephemerality', async ({ is, pass, resolves, rejects, tearDown }) => {
   const { setTimeout } = global
   const divideTimeBy = 1000
   const ADAPT_EPHEMERALITY_AFTER_ADJUSTED = (1000 * 60 * 2) / divideTimeBy
@@ -697,11 +713,19 @@ test('adaptive ephemerality', async ({ is, resolves, rejects, tearDown }) => {
     Error('No close nodes responded'),
     'expected no nodes found'
   )
+  const { joinDht } = adapt
+  let joinDhtCalled = false
+  adapt.joinDht = (cb) => {
+    joinDhtCalled = true
+    return joinDht.call(adapt, cb)
+  }
   is(adapt.ephemeral, true)
-  const event = once(adapt, 'dynamically-non-ephemeral')
-  resolves(event, 'relevant event occured')
+  const dhtJoined = once(adapt, 'dynamically-non-ephemeral')
+  resolves(dhtJoined, 'dht joined event fired')
+  is(joinDhtCalled, false)
   await timeout(ADAPT_EPHEMERALITY_AFTER_ADJUSTED)
-
+  is(joinDhtCalled, true)
+  await dhtJoined
   is(adapt.ephemeral, false)
   await peer.announce(topic, { port: 12345 })
 

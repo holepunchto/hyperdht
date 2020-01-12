@@ -50,7 +50,11 @@ class HyperDHT extends DHT {
       this._store.clear()
     })
 
-    if (this.ephemeral && opts.adaptive) {
+    if (opts.adaptive) {
+      if (this.ephemeral !== true) {
+        this.destroy()
+        throw Error('adaptive mode can only applied when ephemeral: true')
+      }
       this.once('ready', () => {
         const timeout = setTimeout(() => {
           this.joinDht((err) => {
