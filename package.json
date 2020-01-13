@@ -11,7 +11,7 @@
     "ipv4-peers": "^2.0.0",
     "protocol-buffers-encodings": "^1.1.0",
     "record-cache": "^1.1.0",
-    "sodium-universal": "^2.0.0"
+    "sodium-universal": "^2.0.0"  
   },
   "devDependencies": {
     "get-port": "^5.0.0",
@@ -24,8 +24,8 @@
     "hyperswarm-dht": "./bin.js"
   },
   "scripts": {
-    "test": "tap --nyc-arg='--exclude=messages.js'  -R classic test/*.test.js && standard --fix",
-    "cov": "tap --nyc-arg='--exclude=messages.js' -R classic --100 --coverage-report=html test/*.test.js",
+    "test": "tap --nyc-arg=--exclude=messages.js  -R classic test/*.test.js && standard --fix",
+    "cov": "tap --nyc-arg=--exclude messages.js -R classic --100 --coverage-report=html test/*.test.js",
     "ci": "standard && npm test",
     "protobuf": "protocol-buffers schema.proto -o messages.js"
   },
