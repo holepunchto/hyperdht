@@ -24,8 +24,8 @@
     "hyperswarm-dht": "./bin.js"
   },
   "scripts": {
-    "test": "tap  -R classic test/*.test.js  && standard --fix",
-    "cov": "tap -R classic --100 --coverage-report=html test/*.test.js",
+    "test": "tap --nyc-arg=--exclude=messages.js  -R classic test/*.test.js && standard --fix",
+    "cov": "tap --nyc-arg=--exclude=messages.js -R classic --100 --coverage-report=html test/*.test.js",
     "ci": "standard && npm test",
     "protobuf": "protocol-buffers schema.proto -o messages.js"
   },

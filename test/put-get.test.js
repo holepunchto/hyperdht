@@ -48,7 +48,7 @@ test('immutable put - callback is required', async ({ throws }) => {
 })
 
 test('immutable put/get', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   promisifyMethod(peer.immutable, 'put')
@@ -63,7 +63,7 @@ test('immutable put/get', async ({ is }) => {
 })
 
 test('immutable put/get - same peer', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   promisifyMethod(peer.immutable, 'put')
   promisifyMethod(peer.immutable, 'get')
@@ -76,7 +76,7 @@ test('immutable put/get - same peer', async ({ is }) => {
 })
 
 test('immutable put, get stream', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const input = Buffer.from('test')
@@ -91,7 +91,7 @@ test('immutable put, get stream', async ({ is }) => {
 })
 
 test('immutable put, get stream - same peer', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const input = Buffer.from('test')
   promisifyMethod(peer.immutable, 'put')
@@ -105,7 +105,7 @@ test('immutable put, get stream - same peer', async ({ is }) => {
 
 test('immutable put, get stream - same peer, w/ get cb', async ({ is, plan }) => {
   plan(3)
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const input = Buffer.from('test')
   promisifyMethod(peer.immutable, 'put')
@@ -122,7 +122,7 @@ test('immutable put, get stream - same peer, w/ get cb', async ({ is, plan }) =>
 
 test('immutable put, get stream - same peer, w/ get cb, stream destroy', async ({ is, plan }) => {
   plan(1)
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const input = Buffer.from('test')
   promisifyMethod(peer.immutable, 'put')
@@ -138,7 +138,7 @@ test('immutable put, get stream - same peer, w/ get cb, stream destroy', async (
 })
 
 test('immutable get non-existant', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   promisifyMethod(peer.immutable, 'put')
@@ -153,7 +153,7 @@ test('immutable get non-existant', async ({ is }) => {
 
 test('immutable get propagates query stream error', async ({ is, plan }) => {
   plan(1)
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   promisifyMethod(peer.immutable, 'put')
@@ -188,7 +188,7 @@ test('immutable put propagates query stream error', async ({ is, plan }) => {
 })
 
 test('immutable corrupt hash update', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const key = Buffer.alloc(32).fill(99)
   const value = Buffer.from('test')
@@ -201,7 +201,7 @@ test('immutable corrupt hash update', async ({ is }) => {
 })
 
 test('immutable get corrupt hashes/values are filtered out', async ({ fail, pass }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const val = Buffer.from('test')
@@ -593,7 +593,7 @@ test('mutable put - salt size must be >= 16 bytes and <= 64 bytes', async ({ thr
 })
 
 test('mutable put/get', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -609,7 +609,7 @@ test('mutable put/get', async ({ is }) => {
 })
 
 test('mutable put/get - same peer', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   promisifyMethod(peer.mutable, 'put')
@@ -623,7 +623,7 @@ test('mutable put/get - same peer', async ({ is }) => {
 })
 
 test('mutable put/get - signature option', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   const { publicKey } = keypair
@@ -642,7 +642,7 @@ test('mutable put/get - signature option', async ({ is }) => {
 })
 
 test('mutable put/get - salted signature option', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const salt = peer.mutable.salt()
   const keypair = peer.mutable.keypair()
@@ -663,7 +663,7 @@ test('mutable put/get - salted signature option', async ({ is }) => {
 })
 
 test('mutable put, get stream', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -679,7 +679,7 @@ test('mutable put, get stream', async ({ is }) => {
 })
 
 test('mutable put, get stream - same peer', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   promisifyMethod(peer.mutable, 'put')
@@ -693,7 +693,7 @@ test('mutable put, get stream - same peer', async ({ is }) => {
 })
 
 test('mutable put/get latest seq', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -711,7 +711,7 @@ test('mutable put/get latest seq', async ({ is }) => {
 })
 
 test('mutable put/get update', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const peer3 = dht({ bootstrap })
@@ -737,7 +737,7 @@ test('mutable put/get update', async ({ is }) => {
 })
 
 test('mutable put/get w/ salt + updates', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const peer3 = dht({ bootstrap })
@@ -765,7 +765,7 @@ test('mutable put/get w/ salt + updates', async ({ is }) => {
 })
 
 test('mutable put, immutable get', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -781,7 +781,7 @@ test('mutable put, immutable get', async ({ is }) => {
 })
 
 test('immutable put, mutable get', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   promisifyMethod(peer.immutable, 'put')
@@ -796,7 +796,7 @@ test('immutable put, mutable get', async ({ is }) => {
 })
 
 test('mutable get non-existant', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   promisifyMethod(peer.mutable, 'get')
@@ -808,7 +808,7 @@ test('mutable get non-existant', async ({ is }) => {
 })
 
 test('mutable put/get update new value with same seq', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -834,7 +834,7 @@ test('mutable put/get update new value with same seq', async ({ is }) => {
 })
 
 test('mutable put/get update new value with lower seq', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -860,7 +860,7 @@ test('mutable put/get update new value with lower seq', async ({ is }) => {
 })
 
 test('mutable put/get update with same value with same seq', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -886,7 +886,7 @@ test('mutable put/get update with same value with same seq', async ({ is }) => {
 
 test('mutable get propagates query stream error', async ({ is, plan }) => {
   plan(1)
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   promisifyMethod(peer.mutable, 'put')
@@ -907,7 +907,7 @@ test('mutable get propagates query stream error', async ({ is, plan }) => {
 
 test('mutable put propagates query stream error', async ({ is, plan }) => {
   plan(1)
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   whenifyMethod(peer.immutable, 'put')
   const input = Buffer.from('test')
@@ -921,7 +921,7 @@ test('mutable put propagates query stream error', async ({ is, plan }) => {
 })
 
 test('mutable update with null value is handled', async ({ pass }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   const stream = peer.update('mutable-store', keypair.publicKey, {
@@ -935,7 +935,7 @@ test('mutable update with null value is handled', async ({ pass }) => {
 })
 
 test('mutable update with null signature is handled', async ({ pass }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   const stream = peer.update('mutable-store', keypair.publicKey, {
@@ -949,7 +949,7 @@ test('mutable update with null signature is handled', async ({ pass }) => {
 })
 
 test('mutable corrupt value update', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   const value = Buffer.from('test')
@@ -969,7 +969,7 @@ test('mutable corrupt value update', async ({ is }) => {
 })
 
 test('mutable corrupt signature update', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   const value = Buffer.from('test')
@@ -989,7 +989,7 @@ test('mutable corrupt signature update', async ({ is }) => {
 })
 
 test('mutable corrupt salt update', async ({ is }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
   const salt = peer.mutable.salt()
@@ -1010,7 +1010,7 @@ test('mutable corrupt salt update', async ({ is }) => {
 })
 
 test('mutable get corrupt values are filtered out', async ({ fail, pass }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -1033,7 +1033,7 @@ test('mutable get corrupt values are filtered out', async ({ fail, pass }) => {
 })
 
 test('mutable get corrupt signatures are filtered out', async ({ fail, pass }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -1058,7 +1058,7 @@ test('mutable get corrupt signatures are filtered out', async ({ fail, pass }) =
 })
 
 test('mutable get corrupt salts are filtered out', async ({ fail, pass }) => {
-  const { bootstrap, closeDht } = await dhtBootstrap()
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
   const peer = dht({ bootstrap })
   const peer2 = dht({ bootstrap })
   const keypair = peer.mutable.keypair()
@@ -1078,6 +1078,87 @@ test('mutable get corrupt salts are filtered out', async ({ fail, pass }) => {
   })
   await once(stream, 'end')
   pass('corrupt data was filtered')
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
+test('put error without proof', async ({ is, pass }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  whenifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer2.mutable, 'get')
+  const input = Buffer.from('test')
+  const seq = 2
+  const key = keypair.publicKey
+  peer.mutable.put(input, { keypair, seq }, () => {})
+  await peer.mutable.put[done]
+  const { value } = await peer2.mutable.get(key, { seq })
+  is(input.equals(value), true)
+  const update = Buffer.from('test2')
+  const until = when()
+  const stream = peer.mutable.put(update, { keypair, seq: 2 }, () => {
+    pass('happy path completed without error')
+    until()
+  })
+  stream.emit('warning', Error('fake'))
+  await until.done()
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
+test('put error with empty proof', async ({ is, pass }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  whenifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer2.mutable, 'get')
+  const input = Buffer.from('test')
+  const seq = 2
+  const key = keypair.publicKey
+  peer.mutable.put(input, { keypair, seq }, () => {})
+  await peer.mutable.put[done]
+  const { value } = await peer2.mutable.get(key, { seq })
+  is(input.equals(value), true)
+  const update = Buffer.from('test2')
+  const until = when()
+  const stream = peer.mutable.put(update, { keypair, seq: 2 }, () => {
+    pass('happy path completed without error')
+    until()
+  })
+  stream.emit('warning', Error('fake'), {})
+  await until.done()
+  peer.destroy()
+  peer2.destroy()
+  closeDht()
+})
+
+test('put error with bad proof', async ({ is, pass }) => {
+  const { bootstrap, closeDht } = await dhtBootstrap({ aux: true })
+  const peer = dht({ bootstrap })
+  const peer2 = dht({ bootstrap })
+  const keypair = peer.mutable.keypair()
+  whenifyMethod(peer.mutable, 'put')
+  promisifyMethod(peer2.mutable, 'get')
+  const input = Buffer.from('test')
+  const seq = 2
+  const key = keypair.publicKey
+  peer.mutable.put(input, { keypair, seq }, () => {})
+  await peer.mutable.put[done]
+  const { value } = await peer2.mutable.get(key, { seq })
+  is(input.equals(value), true)
+  const update = Buffer.from('test2')
+  const until = when()
+  const stream = peer.mutable.put(update, { keypair, seq: 2 }, () => {
+    pass('happy path completed without error')
+    until()
+  })
+  stream.emit('warning', Error('fake'), { seq: 2, value, signature: peer.mutable.sign(Buffer.from('bad'), { keypair }) })
+  await until.done()
   peer.destroy()
   peer2.destroy()
   closeDht()

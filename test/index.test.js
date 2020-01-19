@@ -56,7 +56,7 @@ test('emits close event when destroyed', async ({ pass }) => {
 })
 
 test('announce & lookup', async ({ is }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -70,13 +70,13 @@ test('announce & lookup', async ({ is }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.destroy()
   closeDht()
 })
 
 test('announce & lookup stream', async ({ is }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -90,13 +90,13 @@ test('announce & lookup stream', async ({ is }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.destroy()
   closeDht()
 })
 
 test('announce & lookup port', async ({ is, fail }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -117,14 +117,14 @@ test('announce & lookup port', async ({ is, fail }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.destroy()
   peer2.destroy()
   closeDht()
 })
 
 test('lookup event', async ({ is, fail }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: false
@@ -148,14 +148,14 @@ test('lookup event', async ({ is, fail }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.destroy()
   peer2.destroy()
   closeDht()
 })
 
 test('announce own port', async ({ is }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -174,14 +174,14 @@ test('announce own port', async ({ is }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.destroy()
   peer2.destroy()
   closeDht()
 })
 
 test('unannounce', async ({ is }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -196,7 +196,7 @@ test('unannounce', async ({ is }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   await peer.unannounce(topic, { port })
   const result = await peer.lookup(topic)
   is(result.length, 0)
@@ -205,7 +205,7 @@ test('unannounce', async ({ is }) => {
 })
 
 test('unannounce own port', async ({ is }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -225,7 +225,7 @@ test('unannounce own port', async ({ is }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   await peer.unannounce(topic)
   const result = await peer2.lookup(topic)
   is(result.length, 0)
@@ -235,7 +235,7 @@ test('unannounce own port', async ({ is }) => {
 })
 
 test('announce event', async ({ is }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -258,7 +258,7 @@ test('announce event', async ({ is }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   await peer.unannounce(topic)
   const result = await peer2.lookup(topic)
   is(result.length, 0)
@@ -268,7 +268,7 @@ test('announce event', async ({ is }) => {
 })
 
 test('unannounce event', async ({ is }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -290,7 +290,7 @@ test('unannounce event', async ({ is }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.unannounce(topic)
   await once(peer2, 'unannounce')
   const result = await peer2.lookup(topic)
@@ -319,7 +319,7 @@ test('announce bad port', async ({ is }) => {
 })
 
 test('announce & lookup localAddress', async ({ is, fail }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -350,7 +350,7 @@ test('announce & lookup localAddress', async ({ is, fail }) => {
   is(localPeer.port, 20000)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   const result = await peer2.lookup(topic, {
     localAddress: {
       host: '192.169.100.100',
@@ -364,7 +364,7 @@ test('announce & lookup localAddress', async ({ is, fail }) => {
 })
 
 test('unnanounce localAddress', async ({ is, fail }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -396,7 +396,7 @@ test('unnanounce localAddress', async ({ is, fail }) => {
   is(localPeer.port, 20000)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   await peer.unannounce(topic, {
     localAddress: {
       host: '192.168.100.100',
@@ -415,8 +415,8 @@ test('unnanounce localAddress', async ({ is, fail }) => {
   closeDht()
 })
 
-test('unnanounce localAddress on same peer', async ({ is, fail }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+test('unnanounce localAddress on same peer', async ({ is }) => {
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -448,7 +448,7 @@ test('unnanounce localAddress on same peer', async ({ is, fail }) => {
   is(localPeer.port, 20000)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   await peer.unannounce(topic, {
     localAddress: {
       host: '192.168.100.100',
@@ -468,7 +468,7 @@ test('unnanounce localAddress on same peer', async ({ is, fail }) => {
 })
 
 test('double announce', async ({ is }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -488,14 +488,14 @@ test('double announce', async ({ is }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.destroy()
   peer2.destroy()
   closeDht()
 })
 
 test('corrupt localAddress data (wrong buffer length)', async ({ is, fail }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -530,14 +530,14 @@ test('corrupt localAddress data (wrong buffer length)', async ({ is, fail }) => 
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.destroy()
   peer2.destroy()
   closeDht()
 })
 
-test('corrupt localAddress data (nil port)', async ({ is, fail }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+test('corrupt localAddress data (nil port)', async ({ is }) => {
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -572,14 +572,14 @@ test('corrupt localAddress data (nil port)', async ({ is, fail }) => {
   is(localPeers, null)
   is(peers.length, 1)
   is(peers[0].port, port)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.destroy()
   peer2.destroy()
   closeDht()
 })
 
-test('corrupt peer data (wrong buffer length)', async ({ is, fail }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+test('corrupt peer data (wrong buffer length)', async ({ is }) => {
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -614,14 +614,14 @@ test('corrupt peer data (wrong buffer length)', async ({ is, fail }) => {
   is(localPeer.host, '192.168.100.100')
   is(localPeer.port, 20000)
   is(peers.length, 0)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.destroy()
   peer2.destroy()
   closeDht()
 })
 
-test('corrupt peer data (nill buffer)', async ({ is, fail }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+test('corrupt peer data (nill buffer)', async ({ is }) => {
+  const { bootstrap, closeDht, auxPort } = await dhtBootstrap({ aux: true })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -656,7 +656,7 @@ test('corrupt peer data (nill buffer)', async ({ is, fail }) => {
   is(localPeer.host, '192.168.100.100')
   is(localPeer.port, 20000)
   is(peers.length, 0)
-  is(node.port, bsPort)
+  is(node.port, auxPort)
   peer.destroy()
   peer2.destroy()
   closeDht()
