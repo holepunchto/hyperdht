@@ -57,7 +57,7 @@ class HyperDHT extends DHT {
       }
       this.once('ready', () => {
         const timeout = setTimeout(() => {
-          this.joinDht((err) => {
+          this.setEphemeral(false, (err) => {
             if (err) {
               err.message = `Unable to dynamically become non-ephemeral: ${err.message}`
               this.emit('warning', err)
