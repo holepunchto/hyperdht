@@ -12,7 +12,8 @@ const DEFAULT_BOOTSTRAP = [
   'bootstrap3.hyperdht.org:49737'
 ]
 
-const ADAPT_EPHEMERALITY_AFTER = 1000 * 60 * 2 // 2 minutes
+// 20 mins but will be round(EPH_AFTER + random() * EPH_AFTER / 2), so will be between 20-30 mins
+const EPH_AFTER = 1000 * 60 * 20
 
 module.exports = opts => new HyperDHT(opts)
 
@@ -46,9 +47,12 @@ class HyperDHT extends DHT {
       query: onpeers
     })
     this.once('close', () => {
+      clearTimeout(this._adaptiveTimeout)
       this._peers.destroy()
       this._store.clear()
     })
+
+    this._adaptiveTimeout = null
 
     if (opts.adaptive) {
       if (this.ephemeral !== true) {
@@ -56,17 +60,16 @@ class HyperDHT extends DHT {
         throw Error('adaptive mode can only applied when ephemeral: true')
       }
       this.once('ready', () => {
-        const timeout = setTimeout(() => {
+        this._adaptiveTimeout = setTimeout(() => {
           this.setEphemeral(false, (err) => {
             if (err) {
               err.message = `Unable to dynamically become non-ephemeral: ${err.message}`
               this.emit('warning', err)
               return
             }
-            this.emit('dynamically-non-ephemeral')
+            this.emit('persistent')
           })
-        }, ADAPT_EPHEMERALITY_AFTER)
-        timeout.unref()
+        }, EPH_AFTER + Math.random() * EPH_AFTER / 2)
       })
     }
   }
