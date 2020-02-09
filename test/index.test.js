@@ -2,7 +2,7 @@
 const Stream = require('stream')
 const { randomBytes } = require('crypto')
 const { test } = require('tap')
-const { once, promisifyMethod, timeout, when } = require('nonsynchronous')
+const { once, promisifyMethod, when } = require('nonsynchronous')
 const getPort = require('get-port')
 const dht = require('../')
 const { dhtBootstrap } = require('./util')
@@ -680,30 +680,25 @@ test('corrupt peer data (nill buffer)', async ({ is, fail }) => {
   closeDht()
 })
 
-test('adaptive ephemerality', async ({ is, pass, resolves, rejects, tearDown }) => {
-  const { setTimeout } = global
-  const { random } = Math
-  const divideTimeBy = 10000
-  const wait = (1000 * 60 * 25) / divideTimeBy
-  global.setTimeout = (fn, t, ...args) => {
-    return setTimeout(fn, t / divideTimeBy, ...args)
-  }
-  Math.random = () => 0.5
+test('adaptive ephemerality', async ({ is, ok, pass, resolves, rejects, tearDown }) => {
   tearDown(() => {
-    global.setTimeout = setTimeout
-    Math.random = random
     peer.destroy()
     adapt.destroy()
     closeDht()
   })
-  const { bootstrap, closeDht } = await dhtBootstrap({ ephemeral: true })
+  const { bootstrap, closeDht } = await dhtBootstrap({
+    ephemeral: true,
+    size: 2
+  })
 
   const adapt = dht({
     ephemeral: true,
     adaptive: true,
     bootstrap
   })
+  adapt.name = 'adapt'
   await once(adapt, 'ready')
+
   const peer = dht({
     ephemeral: true,
     bootstrap
@@ -713,9 +708,12 @@ test('adaptive ephemerality', async ({ is, pass, resolves, rejects, tearDown }) 
   promisifyMethod(peer, 'announce')
   await rejects(
     () => peer.announce(topic, { port: 12345 }),
-    Error('No close nodes responded'),
+    Error('No nodes responded'),
     'expected no nodes found'
   )
+  const t = adapt._adaptiveTimeout
+  ok(t._idleTimeout >= 1.2e+6) // >= 20 mins
+  ok(t._idleTimeout <= 1.8e+6) // <= 30 mins
   const { setEphemeral } = adapt
   let setEphemeralCalled = false
   adapt.setEphemeral = (bool, cb) => {
@@ -727,41 +725,39 @@ test('adaptive ephemerality', async ({ is, pass, resolves, rejects, tearDown }) 
   const dhtJoined = once(adapt, 'persistent')
   resolves(dhtJoined, 'dht joined event fired')
   is(setEphemeralCalled, false)
-  await timeout(wait)
-  is(setEphemeralCalled, true)
+  // force the timeout to resolve:
+  t._onTimeout()
+  clearTimeout(t)
   await dhtJoined
+  is(setEphemeralCalled, true)
   is(adapt.ephemeral, false)
+  promisifyMethod(peer, 'bootstrap')
+  await peer.bootstrap() // speed up discovery of now non-ephemeral "adapt" peer
   await peer.announce(topic, { port: 12345 })
-
   const stream = peer.lookup(topic)
   const [{ node }] = await once(stream, 'data')
   is(Buffer.compare(node.id, adapt.id), 0)
 })
 
 test('adaptive ephemerality - emits warning on dht joining error', async ({ is, resolves, rejects, tearDown }) => {
-  const { setTimeout } = global
-  const { random } = Math
-  const divideTimeBy = 10000
-  const EPH_AFTER = (1000 * 60 * 25) / divideTimeBy
-  global.setTimeout = (fn, t, ...args) => {
-    return setTimeout(fn, t / divideTimeBy, ...args)
-  }
-  Math.random = () => 0.5
   tearDown(() => {
-    global.setTimeout = setTimeout
-    Math.random = random
     peer.destroy()
     adapt.destroy()
-    closeDht(0)
+    closeDht()
   })
-  const { bootstrap, closeDht } = await dhtBootstrap({ ephemeral: true })
+  const { bootstrap, closeDht } = await dhtBootstrap({
+    ephemeral: true,
+    size: 2
+  })
 
   const adapt = dht({
     ephemeral: true,
     adaptive: true,
     bootstrap
   })
+  adapt.name = 'adapt'
   await once(adapt, 'ready')
+
   const peer = dht({
     ephemeral: true,
     bootstrap
@@ -771,9 +767,10 @@ test('adaptive ephemerality - emits warning on dht joining error', async ({ is, 
   promisifyMethod(peer, 'announce')
   await rejects(
     () => peer.announce(topic, { port: 12345 }),
-    Error('No close nodes responded'),
+    Error('No nodes responded'),
     'expected no nodes found'
   )
+  const t = adapt._adaptiveTimeout
   is(adapt.ephemeral, true)
   const warning = once(adapt, 'warning')
   resolves(warning, 'warning emitted')
@@ -786,7 +783,9 @@ test('adaptive ephemerality - emits warning on dht joining error', async ({ is, 
     })
     return qsMock
   }
-  await timeout(EPH_AFTER)
+  //   // force the timeout to resolve:
+  t._onTimeout()
+  clearTimeout(t)
   const [err] = await warning
   is(err.message, 'Unable to dynamically become non-ephemeral: test')
   is(adapt.ephemeral, true)
@@ -796,10 +795,12 @@ test('adaptive ephemerality - timeout clears on destroy', async ({ is, pass, tea
   const { setTimeout } = global
   const until = when()
   global.setTimeout = () => {
-    return { get _onTimeout () {
-      pass('timeout cleared')
-      until()
-    } }
+    return {
+      get _onTimeout () {
+        pass('timeout cleared')
+        until()
+      }
+    }
   }
   tearDown(() => {
     global.setTimeout = setTimeout

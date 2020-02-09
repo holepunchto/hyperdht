@@ -61,15 +61,48 @@ class HyperDHT extends DHT {
       }
       this.once('ready', () => {
         this._adaptiveTimeout = setTimeout(() => {
-          this.setEphemeral(false, (err) => {
-            if (err) {
-              err.message = `Unable to dynamically become non-ephemeral: ${err.message}`
-              this.emit('warning', err)
-              return
+          this.holepunchable((err, able) => {
+            if (!err && able) {
+              this.setEphemeral(false, (err) => {
+                if (err) {
+                  err.message = `Unable to dynamically become non-ephemeral: ${err.message}`
+                  this.emit('warning', err)
+                  return
+                }
+                this.emit('persistent')
+              })
             }
-            this.emit('persistent')
           })
-        }, EPH_AFTER + Math.random() * EPH_AFTER / 2)
+        }, Math.round(EPH_AFTER + Math.random() * EPH_AFTER / 2))
+      })
+    }
+  }
+
+  holepunchable (cb) {
+    const { bootstrapNodes } = this
+    let missing = bootstrapNodes.length
+    if (missing === 0) {
+      process.nextTick(cb, Error('no nodes available'))
+      return
+    }
+    const res = []
+    const start = Date.now()
+    for (const node of this.bootstrapNodes) {
+      this.ping(node, function (_, pong) {
+        if (pong) res.push({ node, rtt: Date.now() - start, pong })
+        if (--missing > 0) return
+        if (res.length === 0) return cb(new Error('All bootstrap nodes failed'))
+        if (res.length < 2) return cb(new Error('Not enough nodes replied'))
+
+        const first = res[0].pong
+        for (var i = 1; i < res.length; i++) {
+          const pong = res[i].pong
+          if (pong.host !== first.host || pong.port !== first.port) {
+            return cb(null, false)
+          }
+        }
+
+        cb(null, true)
       })
     }
   }
