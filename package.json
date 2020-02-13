@@ -5,7 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "@hyperswarm/hypersign": "^2.0.0",
-    "dht-rpc": "git+https://github.com/davidmarkclements/dht-rpc.git#turn-non-ephemeral",
+    "dht-rpc": "^4.4.0",
     "end-of-stream": "^1.4.1",
     "hashlru": "^2.3.0",
     "ipv4-peers": "^2.0.0",
