@@ -147,12 +147,14 @@ function mapPeers (prefix, data) {
   try {
     return {
       node: data.node,
+      to: data.to,
       peers: v.peers && peers.decode(v.peers),
       localPeers: prefix && v.localPeers && decodeLocalPeers(prefix, v.localPeers)
     }
   } catch (err) {
     return {
       node: data.node,
+      to: data.to,
       peers: [],
       localPeers: prefix && v.localPeers && decodeLocalPeers(prefix, v.localPeers)
     }
