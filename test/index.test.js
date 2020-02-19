@@ -708,28 +708,29 @@ test('adaptive ephemerality', async ({ is, ok, pass, resolves, rejects, tearDown
   promisifyMethod(peer, 'announce')
   await rejects(
     () => peer.announce(topic, { port: 12345 }),
-    Error('No nodes responded'),
+    Error('No close nodes responded'),
     'expected no nodes found'
   )
   const t = adapt._adaptiveTimeout
   ok(t._idleTimeout >= 1.2e+6) // >= 20 mins
   ok(t._idleTimeout <= 1.8e+6) // <= 30 mins
-  const { setEphemeral } = adapt
-  let setEphemeralCalled = false
-  adapt.setEphemeral = (bool, cb) => {
-    setEphemeralCalled = true
-    is(bool, false)
-    return setEphemeral.call(adapt, bool, cb)
+  const { persistent } = adapt
+  let persistentCalled = false
+  adapt.persistent = (cb) => {
+    persistentCalled = true
+    return persistent.call(adapt, cb)
   }
   is(adapt.ephemeral, true)
   const dhtJoined = once(adapt, 'persistent')
   resolves(dhtJoined, 'dht joined event fired')
-  is(setEphemeralCalled, false)
+  is(persistentCalled, false)
+  // fake holepunchable
+  adapt.holepunchable = () => true
   // force the timeout to resolve:
   t._onTimeout()
   clearTimeout(t)
   await dhtJoined
-  is(setEphemeralCalled, true)
+  is(persistentCalled, true)
   is(adapt.ephemeral, false)
   promisifyMethod(peer, 'bootstrap')
   await peer.bootstrap() // speed up discovery of now non-ephemeral "adapt" peer
@@ -767,7 +768,7 @@ test('adaptive ephemerality - emits warning on dht joining error', async ({ is, 
   promisifyMethod(peer, 'announce')
   await rejects(
     () => peer.announce(topic, { port: 12345 }),
-    Error('No nodes responded'),
+    Error('No close nodes responded'),
     'expected no nodes found'
   )
   const t = adapt._adaptiveTimeout
@@ -783,7 +784,9 @@ test('adaptive ephemerality - emits warning on dht joining error', async ({ is, 
     })
     return qsMock
   }
-  //   // force the timeout to resolve:
+  // fake holepunchable
+  adapt.holepunchable = () => true
+  // force the timeout to resolve:
   t._onTimeout()
   clearTimeout(t)
   const [err] = await warning
