@@ -795,18 +795,10 @@ test('adaptive ephemerality - emits warning on dht joining error', async ({ is, 
 })
 
 test('adaptive ephemerality - timeout clears on destroy', async ({ is, pass, tearDown }) => {
-  const { setTimeout } = global
+  const { clearTimeout } = global
   const until = when()
-  global.setTimeout = () => {
-    return {
-      get _onTimeout () {
-        pass('timeout cleared')
-        until()
-      }
-    }
-  }
   tearDown(() => {
-    global.setTimeout = setTimeout
+    global.clearTimeout = clearTimeout
     closeDht(0)
   })
   const { bootstrap, closeDht } = await dhtBootstrap({ ephemeral: true })
@@ -817,6 +809,12 @@ test('adaptive ephemerality - timeout clears on destroy', async ({ is, pass, tea
     bootstrap
   })
   await once(adapt, 'ready')
+  global.clearTimeout = (t) => {
+    if (t === null) return
+    pass('timeout cleared')
+    until()
+    clearTimeout(t)
+  }
   adapt.destroy()
   await until.done()
 })

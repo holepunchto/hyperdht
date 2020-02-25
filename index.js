@@ -5,7 +5,7 @@ const { PeersInput, PeersOutput } = require('./messages')
 const peers = require('ipv4-peers')
 const LRU = require('hashlru')
 const { ImmutableStore, MutableStore } = require('./stores')
-
+const guardTimeout = require('guard-timeout')
 const DEFAULT_BOOTSTRAP = [
   'bootstrap1.hyperdht.org:49737',
   'bootstrap2.hyperdht.org:49737',
@@ -60,7 +60,7 @@ class HyperDHT extends DHT {
         throw Error('adaptive mode can only applied when ephemeral: true')
       }
       this.once('ready', () => {
-        this._adaptiveTimeout = setTimeout(() => {
+        this._adaptiveTimeout = guardTimeout(() => {
           const able = this.holepunchable()
           if (able === false) return
           this.persistent((err) => {
