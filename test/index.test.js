@@ -1,10 +1,12 @@
 'use strict'
+const Stream = require('stream')
 const { randomBytes } = require('crypto')
 const { test } = require('tap')
-const { once, promisifyMethod } = require('nonsynchronous')
+const { once, promisifyMethod, when } = require('nonsynchronous')
 const getPort = require('get-port')
 const dht = require('../')
 const { dhtBootstrap } = require('./util')
+
 test('default ephemerality', async ({ is }) => {
   const node = dht()
   is(node.ephemeral, false)
@@ -36,6 +38,22 @@ test('bootstrap option', async ({ is }) => {
   is(node.bootstrapNodes[0].port, port)
   node.destroy()
   closeDht()
+})
+
+test('adaptive option validation', async ({ throws, doesNotThrow }) => {
+  throws(() => {
+    dht({
+      ephemeral: false,
+      adaptive: true
+    })
+  }, Error('adaptive mode can only applied when ephemeral: true'))
+  throws(() => {
+    dht({ adaptive: true })
+  }, Error('adaptive mode can only applied when ephemeral: true'))
+  doesNotThrow(() => {
+    const node = dht({ adaptive: true, ephemeral: true })
+    node.destroy()
+  })
 })
 
 test('emits listening event when bound', async ({ pass }) => {
@@ -96,7 +114,7 @@ test('announce & lookup stream', async ({ is }) => {
 })
 
 test('announce & lookup port', async ({ is, fail }) => {
-  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap({ ephemeral: false })
   const peer = dht({
     bootstrap,
     ephemeral: true
@@ -660,4 +678,143 @@ test('corrupt peer data (nill buffer)', async ({ is, fail }) => {
   peer.destroy()
   peer2.destroy()
   closeDht()
+})
+
+test('adaptive ephemerality', async ({ is, ok, pass, resolves, rejects, tearDown }) => {
+  tearDown(() => {
+    peer.destroy()
+    adapt.destroy()
+    closeDht()
+  })
+  const { bootstrap, closeDht } = await dhtBootstrap({
+    ephemeral: true,
+    size: 2
+  })
+
+  const adapt = dht({
+    ephemeral: true,
+    adaptive: true,
+    bootstrap
+  })
+  adapt.name = 'adapt'
+  await once(adapt, 'ready')
+
+  const peer = dht({
+    ephemeral: true,
+    bootstrap
+  })
+
+  const topic = randomBytes(32)
+  promisifyMethod(peer, 'announce')
+  await rejects(
+    () => peer.announce(topic, { port: 12345 }),
+    Error('No close nodes responded'),
+    'expected no nodes found'
+  )
+  const t = adapt._adaptiveTimeout
+  ok(t._idleTimeout >= 1.2e+6) // >= 20 mins
+  ok(t._idleTimeout <= 1.8e+6) // <= 30 mins
+  const { persistent } = adapt
+  let persistentCalled = false
+  adapt.persistent = (cb) => {
+    persistentCalled = true
+    return persistent.call(adapt, cb)
+  }
+  is(adapt.ephemeral, true)
+  const dhtJoined = once(adapt, 'persistent')
+  resolves(dhtJoined, 'dht joined event fired')
+  is(persistentCalled, false)
+  // fake holepunchable
+  adapt.holepunchable = () => true
+  // force the timeout to resolve:
+  t._onTimeout()
+  clearTimeout(t)
+  await dhtJoined
+  is(persistentCalled, true)
+  is(adapt.ephemeral, false)
+  promisifyMethod(peer, 'bootstrap')
+  await peer.bootstrap() // speed up discovery of now non-ephemeral "adapt" peer
+  await peer.announce(topic, { port: 12345 })
+  const stream = peer.lookup(topic)
+  const [{ node }] = await once(stream, 'data')
+  is(Buffer.compare(node.id, adapt.id), 0)
+})
+
+test('adaptive ephemerality - emits warning on dht joining error', async ({ is, resolves, rejects, tearDown }) => {
+  tearDown(() => {
+    peer.destroy()
+    adapt.destroy()
+    closeDht()
+  })
+  const { bootstrap, closeDht } = await dhtBootstrap({
+    ephemeral: true,
+    size: 2
+  })
+
+  const adapt = dht({
+    ephemeral: true,
+    adaptive: true,
+    bootstrap
+  })
+  adapt.name = 'adapt'
+  await once(adapt, 'ready')
+
+  const peer = dht({
+    ephemeral: true,
+    bootstrap
+  })
+
+  const topic = randomBytes(32)
+  promisifyMethod(peer, 'announce')
+  await rejects(
+    () => peer.announce(topic, { port: 12345 }),
+    Error('No close nodes responded'),
+    'expected no nodes found'
+  )
+  const t = adapt._adaptiveTimeout
+  is(adapt.ephemeral, true)
+  const warning = once(adapt, 'warning')
+  resolves(warning, 'warning emitted')
+  adapt.query = () => {
+    const qsMock = new Stream()
+    qsMock.on('error', () => {
+    })
+    process.nextTick(() => {
+      qsMock.emit('error', Error('test'))
+    })
+    return qsMock
+  }
+  // fake holepunchable
+  adapt.holepunchable = () => true
+  // force the timeout to resolve:
+  t._onTimeout()
+  clearTimeout(t)
+  const [err] = await warning
+  is(err.message, 'Unable to dynamically become non-ephemeral: test')
+  is(adapt.ephemeral, true)
+})
+
+test('adaptive ephemerality - timeout clears on destroy', async ({ is, pass, tearDown }) => {
+  const { clearTimeout } = global
+  const until = when()
+  tearDown(() => {
+    global.clearTimeout = clearTimeout
+    closeDht(0)
+  })
+  const { bootstrap, closeDht } = await dhtBootstrap({ ephemeral: true })
+
+  const adapt = dht({
+    ephemeral: true,
+    adaptive: true,
+    bootstrap
+  })
+  await once(adapt, 'ready')
+  global.clearTimeout = (t) => {
+    if (t === null) return
+    pass('timeout cleared')
+    until()
+    clearTimeout(t)
+  }
+  adapt.destroy()
+  await until.done()
 })
