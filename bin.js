@@ -3,6 +3,12 @@
 const dht = require('./')()
 const quiet = process.argv.includes('--quiet')
 
+process.argv.forEach((arg, _) => {
+  if (arg.startsWith('--port=')) {
+    dht.listen(arg.split('=')[1])
+  }
+})
+
 console.log('node id: ' + dht.id.toString('hex'))
 
 dht.on('ready', function () {
