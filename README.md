@@ -273,6 +273,11 @@ npm install -g @hyperswarm/dht
 hyperswarm-dht # runs a DHT node
 ```
 
+CLI arguments:
+
+* `--port=0`, specify UDP listening port (default: random)
+* `--quiet`, disables query logging
+
 ## License
 
 MIT
