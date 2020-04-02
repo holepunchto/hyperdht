@@ -36,12 +36,6 @@ definePeersOutput()
 defineMutable()
 
 function definePeersInput () {
-  var enc = [
-    encodings.varint,
-    encodings.bytes,
-    encodings.bool
-  ]
-
   PeersInput.encodingLength = encodingLength
   PeersInput.encode = encode
   PeersInput.decode = decode
@@ -49,15 +43,23 @@ function definePeersInput () {
   function encodingLength (obj) {
     var length = 0
     if (defined(obj.port)) {
-      var len = enc[0].encodingLength(obj.port)
+      var len = encodings.varint.encodingLength(obj.port)
       length += 1 + len
     }
     if (defined(obj.localAddress)) {
-      var len = enc[1].encodingLength(obj.localAddress)
+      var len = encodings.bytes.encodingLength(obj.localAddress)
       length += 1 + len
     }
     if (defined(obj.unannounce)) {
-      var len = enc[2].encodingLength(obj.unannounce)
+      var len = encodings.bool.encodingLength(obj.unannounce)
+      length += 1 + len
+    }
+    if (defined(obj.length)) {
+      var len = encodings.varint.encodingLength(obj.length)
+      length += 1 + len
+    }
+    if (defined(obj.includeLength)) {
+      var len = encodings.bool.encodingLength(obj.includeLength)
       length += 1 + len
     }
     return length
@@ -69,18 +71,28 @@ function definePeersInput () {
     var oldOffset = offset
     if (defined(obj.port)) {
       buf[offset++] = 8
-      enc[0].encode(obj.port, buf, offset)
-      offset += enc[0].encode.bytes
+      encodings.varint.encode(obj.port, buf, offset)
+      offset += encodings.varint.encode.bytes
     }
     if (defined(obj.localAddress)) {
       buf[offset++] = 18
-      enc[1].encode(obj.localAddress, buf, offset)
-      offset += enc[1].encode.bytes
+      encodings.bytes.encode(obj.localAddress, buf, offset)
+      offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.unannounce)) {
       buf[offset++] = 24
-      enc[2].encode(obj.unannounce, buf, offset)
-      offset += enc[2].encode.bytes
+      encodings.bool.encode(obj.unannounce, buf, offset)
+      offset += encodings.bool.encode.bytes
+    }
+    if (defined(obj.length)) {
+      buf[offset++] = 32
+      encodings.varint.encode(obj.length, buf, offset)
+      offset += encodings.varint.encode.bytes
+    }
+    if (defined(obj.includeLength)) {
+      buf[offset++] = 40
+      encodings.bool.encode(obj.includeLength, buf, offset)
+      offset += encodings.bool.encode.bytes
     }
     encode.bytes = offset - oldOffset
     return buf
@@ -94,7 +106,9 @@ function definePeersInput () {
     var obj = {
       port: 0,
       localAddress: null,
-      unannounce: false
+      unannounce: false,
+      length: 0,
+      includeLength: false
     }
     while (true) {
       if (end <= offset) {
@@ -106,16 +120,24 @@ function definePeersInput () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.port = enc[0].decode(buf, offset)
-        offset += enc[0].decode.bytes
+        obj.port = encodings.varint.decode(buf, offset)
+        offset += encodings.varint.decode.bytes
         break
         case 2:
-        obj.localAddress = enc[1].decode(buf, offset)
-        offset += enc[1].decode.bytes
+        obj.localAddress = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
         break
         case 3:
-        obj.unannounce = enc[2].decode(buf, offset)
-        offset += enc[2].decode.bytes
+        obj.unannounce = encodings.bool.decode(buf, offset)
+        offset += encodings.bool.decode.bytes
+        break
+        case 4:
+        obj.length = encodings.varint.decode(buf, offset)
+        offset += encodings.varint.decode.bytes
+        break
+        case 5:
+        obj.includeLength = encodings.bool.decode(buf, offset)
+        offset += encodings.bool.decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)
@@ -125,10 +147,6 @@ function definePeersInput () {
 }
 
 function definePeersOutput () {
-  var enc = [
-    encodings.bytes
-  ]
-
   PeersOutput.encodingLength = encodingLength
   PeersOutput.encode = encode
   PeersOutput.decode = decode
@@ -136,11 +154,15 @@ function definePeersOutput () {
   function encodingLength (obj) {
     var length = 0
     if (defined(obj.peers)) {
-      var len = enc[0].encodingLength(obj.peers)
+      var len = encodings.bytes.encodingLength(obj.peers)
       length += 1 + len
     }
     if (defined(obj.localPeers)) {
-      var len = enc[0].encodingLength(obj.localPeers)
+      var len = encodings.bytes.encodingLength(obj.localPeers)
+      length += 1 + len
+    }
+    if (defined(obj.peersWithLength)) {
+      var len = encodings.bytes.encodingLength(obj.peersWithLength)
       length += 1 + len
     }
     return length
@@ -152,13 +174,18 @@ function definePeersOutput () {
     var oldOffset = offset
     if (defined(obj.peers)) {
       buf[offset++] = 10
-      enc[0].encode(obj.peers, buf, offset)
-      offset += enc[0].encode.bytes
+      encodings.bytes.encode(obj.peers, buf, offset)
+      offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.localPeers)) {
       buf[offset++] = 18
-      enc[0].encode(obj.localPeers, buf, offset)
-      offset += enc[0].encode.bytes
+      encodings.bytes.encode(obj.localPeers, buf, offset)
+      offset += encodings.bytes.encode.bytes
+    }
+    if (defined(obj.peersWithLength)) {
+      buf[offset++] = 26
+      encodings.bytes.encode(obj.peersWithLength, buf, offset)
+      offset += encodings.bytes.encode.bytes
     }
     encode.bytes = offset - oldOffset
     return buf
@@ -171,7 +198,8 @@ function definePeersOutput () {
     var oldOffset = offset
     var obj = {
       peers: null,
-      localPeers: null
+      localPeers: null,
+      peersWithLength: null
     }
     while (true) {
       if (end <= offset) {
@@ -183,12 +211,16 @@ function definePeersOutput () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.peers = enc[0].decode(buf, offset)
-        offset += enc[0].decode.bytes
+        obj.peers = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
         break
         case 2:
-        obj.localPeers = enc[0].decode(buf, offset)
-        offset += enc[0].decode.bytes
+        obj.localPeers = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
+        break
+        case 3:
+        obj.peersWithLength = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)
@@ -198,11 +230,6 @@ function definePeersOutput () {
 }
 
 function defineMutable () {
-  var enc = [
-    encodings.bytes,
-    encodings.varint
-  ]
-
   Mutable.encodingLength = encodingLength
   Mutable.encode = encode
   Mutable.decode = decode
@@ -210,19 +237,19 @@ function defineMutable () {
   function encodingLength (obj) {
     var length = 0
     if (defined(obj.value)) {
-      var len = enc[0].encodingLength(obj.value)
+      var len = encodings.bytes.encodingLength(obj.value)
       length += 1 + len
     }
     if (defined(obj.signature)) {
-      var len = enc[0].encodingLength(obj.signature)
+      var len = encodings.bytes.encodingLength(obj.signature)
       length += 1 + len
     }
     if (defined(obj.seq)) {
-      var len = enc[1].encodingLength(obj.seq)
+      var len = encodings.varint.encodingLength(obj.seq)
       length += 1 + len
     }
     if (defined(obj.salt)) {
-      var len = enc[0].encodingLength(obj.salt)
+      var len = encodings.bytes.encodingLength(obj.salt)
       length += 1 + len
     }
     return length
@@ -234,23 +261,23 @@ function defineMutable () {
     var oldOffset = offset
     if (defined(obj.value)) {
       buf[offset++] = 10
-      enc[0].encode(obj.value, buf, offset)
-      offset += enc[0].encode.bytes
+      encodings.bytes.encode(obj.value, buf, offset)
+      offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.signature)) {
       buf[offset++] = 18
-      enc[0].encode(obj.signature, buf, offset)
-      offset += enc[0].encode.bytes
+      encodings.bytes.encode(obj.signature, buf, offset)
+      offset += encodings.bytes.encode.bytes
     }
     if (defined(obj.seq)) {
       buf[offset++] = 24
-      enc[1].encode(obj.seq, buf, offset)
-      offset += enc[1].encode.bytes
+      encodings.varint.encode(obj.seq, buf, offset)
+      offset += encodings.varint.encode.bytes
     }
     if (defined(obj.salt)) {
       buf[offset++] = 34
-      enc[0].encode(obj.salt, buf, offset)
-      offset += enc[0].encode.bytes
+      encodings.bytes.encode(obj.salt, buf, offset)
+      offset += encodings.bytes.encode.bytes
     }
     encode.bytes = offset - oldOffset
     return buf
@@ -277,20 +304,20 @@ function defineMutable () {
       var tag = prefix >> 3
       switch (tag) {
         case 1:
-        obj.value = enc[0].decode(buf, offset)
-        offset += enc[0].decode.bytes
+        obj.value = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
         break
         case 2:
-        obj.signature = enc[0].decode(buf, offset)
-        offset += enc[0].decode.bytes
+        obj.signature = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
         break
         case 3:
-        obj.seq = enc[1].decode(buf, offset)
-        offset += enc[1].decode.bytes
+        obj.seq = encodings.varint.decode(buf, offset)
+        offset += encodings.varint.decode.bytes
         break
         case 4:
-        obj.salt = enc[0].decode(buf, offset)
-        offset += enc[0].decode.bytes
+        obj.salt = encodings.bytes.decode(buf, offset)
+        offset += encodings.bytes.decode.bytes
         break
         default:
         offset = skip(prefix & 7, buf, offset)

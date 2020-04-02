@@ -2,11 +2,14 @@ message PeersInput {
   optional uint32 port = 1;
   optional bytes localAddress = 2;
   optional bool unannounce = 3;
+  optional uint64 length = 4;
+  optional bool includeLength = 5;
 }
 
 message PeersOutput {
   optional bytes peers = 1;
   optional bytes localPeers = 2;
+  optional bytes peersWithLength = 3;
 }
 
 message Mutable {

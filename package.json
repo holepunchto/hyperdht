@@ -9,10 +9,10 @@
     "end-of-stream": "^1.4.1",
     "guard-timeout": "^1.0.0",
     "hashlru": "^2.3.0",
-    "ipv4-peers": "^2.0.0",
     "protocol-buffers-encodings": "^1.1.0",
     "record-cache": "^1.1.0",
-    "sodium-universal": "^2.0.0"
+    "sodium-universal": "^2.0.0",
+    "uint64be": "^2.0.2"
   },
   "devDependencies": {
     "get-port": "^5.0.0",

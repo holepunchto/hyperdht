@@ -93,6 +93,35 @@ test('announce & lookup', async ({ is }) => {
   closeDht()
 })
 
+test('announce & lookup with data length', async ({ is }) => {
+  const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
+  const peer = dht({
+    bootstrap,
+    ephemeral: true
+  })
+  const topic = randomBytes(32)
+  promisifyMethod(peer, 'announce')
+  promisifyMethod(peer, 'lookup')
+  const port = await getPort()
+  await peer.announce(topic, { port, length: 42 })
+  let [{ node, peers, localPeers }] = await peer.lookup(topic, { includeLength: true })
+  is(localPeers, null)
+  is(peers.length, 1)
+  is(peers[0].port, port)
+  is(peers[0].length, 42)
+
+  ;[{ node, peers, localPeers }] = await peer.lookup(topic, { includeLength: false })
+
+  is(localPeers, null)
+  is(peers.length, 1)
+  is(peers[0].port, port)
+  is(peers[0].length, undefined)
+
+  is(node.port, bsPort)
+  peer.destroy()
+  closeDht()
+})
+
 test('announce & lookup stream', async ({ is }) => {
   const { bootstrap, closeDht, port: bsPort } = await dhtBootstrap()
   const peer = dht({
@@ -631,7 +660,7 @@ test('corrupt peer data (wrong buffer length)', async ({ is, fail }) => {
   const [localPeer] = localPeers
   is(localPeer.host, '192.168.100.100')
   is(localPeer.port, 20000)
-  is(peers.length, 0)
+  is(peers, null)
   is(node.port, bsPort)
   peer.destroy()
   peer2.destroy()
@@ -673,7 +702,7 @@ test('corrupt peer data (nill buffer)', async ({ is, fail }) => {
   const [localPeer] = localPeers
   is(localPeer.host, '192.168.100.100')
   is(localPeer.port, 20000)
-  is(peers.length, 0)
+  is(peers, null)
   is(node.port, bsPort)
   peer.destroy()
   peer2.destroy()
