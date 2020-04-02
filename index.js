@@ -83,8 +83,9 @@ class HyperDHT extends DHT {
     const query = {
       port: opts.port,
       localAddress: local.encode(opts.localAddress),
-      includeLength: opts.includeLength || typeof opts.length === 'number'
+      includeLength: opts.includeLength || opts.length || typeof opts.length === 'number'
     }
+
     return this.query('peers', key, query, cb).map(mapPeers.bind(null, query.localAddress))
   }
 
@@ -92,11 +93,12 @@ class HyperDHT extends DHT {
     if (typeof opts === 'function') return this.announce(key, null, opts)
     if (!opts) opts = {}
 
+    const length = typeof opts.length === 'function' ? opts.length(key) : opts.length
     const ann = {
       port: opts.port,
       localAddress: local.encode(opts.localAddress),
-      length: opts.length,
-      includeLength: opts.includeLength || typeof opts.length === 'number'
+      length,
+      includeLength: opts.includeLength || typeof length === 'number'
     }
 
     return this.queryAndUpdate('peers', key, ann, cb).map(mapPeers.bind(null, ann.localAddress))
