@@ -148,11 +148,11 @@ class HyperDHT extends DHT {
       })
     }
     if (value.unannounce) {
-      this._peers.remove(remoteCache, remoteRecord)
+      this._peers.remove(remoteCache, remoteRecord.slice(0, 6))
       if (localRecord) this._peers.remove(localCache, localSuffix)
       this.emit('unannounce', query.target, from)
     } else {
-      this._peers.add(remoteCache, remoteRecord)
+      this._peers.add(remoteCache, remoteRecord.slice(0, 6), remoteRecord)
       if (localRecord) this._peers.add(localCache, localSuffix)
       this.emit('announce', query.target, from)
     }
