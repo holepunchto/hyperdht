@@ -9,7 +9,7 @@ const guardTimeout = require('guard-timeout')
 const DEFAULT_BOOTSTRAP = [
   'bootstrap1.hyperdht.org:49737',
   'bootstrap2.hyperdht.org:49737',
-  'bootstrap3.hyperdht.org:49737'
+  'hyperswarm.beakerbrowser.com:49737'
 ]
 
 // 20 mins but will be round(EPH_AFTER + random() * EPH_AFTER / 2), so will be between 20-30 mins
