@@ -3,6 +3,7 @@
   "version": "3.5.2",
   "description": "The DHT backing the HyperSwarm stack",
   "main": "index.js",
+  "types": "index.d.ts",
   "dependencies": {
     "@hyperswarm/hypersign": "^2.0.0",
     "dht-rpc": "^4.7.0",
@@ -15,6 +16,7 @@
     "uint64be": "^2.0.2"
   },
   "devDependencies": {
+    "@types/node": "^13.11.0",
     "get-port": "^5.0.0",
     "nonsynchronous": "^1.0.1",
     "protocol-buffers": "^4.1.0",
