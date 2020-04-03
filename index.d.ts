@@ -142,8 +142,11 @@ export declare class HyperDHT extends DhtRpc {
   private _adaptiveTimeout: any;
   mutable: Stores.MutableStore;
   immutable: Stores.ImmutableStore;
+  /** Look for peers in the DHT on the given topic. Topic should be a 32 byte buffer (normally a hash of something). */
   lookup(topic: Buffer, opts: LookupOptions, cb: () => void ): Readable;
+  /** Announce a port to the dht. */
   announce(topic: Buffer, opts: AnnounceOptions, cb: () => void ): Readable;
+  /** Unannounce a port. Takes the same options as announce. */
   unannounce(topic: Buffer, opts: AnnounceOptions, cb: () => void ): void;
   private _onpeers(query: any, cb: any): any;
 }
