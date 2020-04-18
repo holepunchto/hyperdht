@@ -5,7 +5,7 @@ const { PeersInput, PeersOutput } = require('./messages')
 const { ipv4, ipv4WithLength, local } = require('./peers')
 const LRU = require('hashlru')
 const { ImmutableStore, MutableStore } = require('./stores')
-const guardTimeout = require('guard-timeout')
+const guardTimeout = require('guard-timeout').create({ lagMs: 60 * 1000 })
 const DEFAULT_BOOTSTRAP = [
   'bootstrap1.hyperdht.org:49737',
   'bootstrap2.hyperdht.org:49737',
@@ -47,7 +47,7 @@ class HyperDHT extends DHT {
       query: onpeers
     })
     this.once('close', () => {
-      clearTimeout(this._adaptiveTimeout)
+      if (this._adaptiveTimeout) this._adaptiveTimeout.close()
       this._peers.destroy()
       this._store.clear()
     })
@@ -59,11 +59,15 @@ class HyperDHT extends DHT {
         this.destroy()
         throw Error('adaptive mode can only applied when ephemeral: true')
       }
-      this.once('ready', () => {
+      const checkPersistence = () => {
+        if (this.destroyed) return
+        const timeout = Math.round(EPH_AFTER + Math.random() * EPH_AFTER / 2)
         this._adaptiveTimeout = guardTimeout(() => {
+          if (this.destroyed) return
           const able = this.holepunchable()
-          if (able === false) return
+          if (able === false) return checkPersistence()
           this.persistent((err) => {
+            if (this.destroyed) return
             if (err) {
               err.message = `Unable to dynamically become non-ephemeral: ${err.message}`
               this.emit('warning', err)
@@ -71,8 +75,9 @@ class HyperDHT extends DHT {
             }
             this.emit('persistent')
           })
-        }, Math.round(EPH_AFTER + Math.random() * EPH_AFTER / 2))
-      })
+        }, timeout)
+      }
+      this.once('ready', checkPersistence)
     }
   }
 

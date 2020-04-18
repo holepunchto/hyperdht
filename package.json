@@ -7,7 +7,7 @@
     "@hyperswarm/hypersign": "^2.0.0",
     "dht-rpc": "^4.8.0",
     "end-of-stream": "^1.4.1",
-    "guard-timeout": "^1.0.0",
+    "guard-timeout": "^2.0.0",
     "hashlru": "^2.3.0",
     "protocol-buffers-encodings": "^1.1.0",
     "record-cache": "^1.1.0",
