@@ -9,7 +9,7 @@ const ephemeral = !process.argv.includes('--non-ephemeral')
 const idFile = path.join(os.tmpdir(), 'dht-rpc-id')
 if (!fs.existsSync(idFile)) fs.writeFileSync(idFile, dhtrpc.id())
 const id = fs.readFileSync(idFile).slice(0, 32)
-const dht = require('./')({ ephemeral, adaptive: true, id })
+const dht = require('./')({ ephemeral, adaptive: ephemeral, id })
 
 console.log('node id: ' + dht.id.toString('hex'))
 const quiet = process.argv.includes('--quiet')
