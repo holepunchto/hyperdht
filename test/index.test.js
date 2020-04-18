@@ -1,7 +1,8 @@
 'use strict'
+const Stream = require('stream')
 const { randomBytes } = require('crypto')
 const { test } = require('tap')
-const { once, promisifyMethod } = require('nonsynchronous')
+const { once, promisifyMethod, when } = require('nonsynchronous')
 const getPort = require('get-port')
 const dht = require('../')
 const { dhtBootstrap } = require('./util')
@@ -754,7 +755,6 @@ test('corrupt peer data (nill buffer)', async ({ is, fail }) => {
   closeDht()
 })
 
-/*
 test('adaptive ephemerality', async ({ is, ok, pass, resolves, rejects, tearDown }) => {
   tearDown(() => {
     peer.destroy()
@@ -786,7 +786,7 @@ test('adaptive ephemerality', async ({ is, ok, pass, resolves, rejects, tearDown
     Error('No close nodes responded'),
     'expected no nodes found'
   )
-  const t = adapt._adaptiveTimeout
+  const t = adapt._adaptiveTimeout.timeout
   ok(t._idleTimeout >= 1.2e+6) // >= 20 mins
   ok(t._idleTimeout <= 1.8e+6) // <= 30 mins
   const { persistent } = adapt
@@ -846,7 +846,7 @@ test('adaptive ephemerality - emits warning on dht joining error', async ({ is, 
     Error('No close nodes responded'),
     'expected no nodes found'
   )
-  const t = adapt._adaptiveTimeout
+  const t = adapt._adaptiveTimeout.timeout
   is(adapt.ephemeral, true)
   const warning = once(adapt, 'warning')
   resolves(warning, 'warning emitted')
@@ -863,7 +863,7 @@ test('adaptive ephemerality - emits warning on dht joining error', async ({ is, 
   adapt.holepunchable = () => true
   // force the timeout to resolve:
   t._onTimeout()
-  clearTimeout(t)
+  adapt._adaptiveTimeout.close()
   const [err] = await warning
   is(err.message, 'Unable to dynamically become non-ephemeral: test')
   is(adapt.ephemeral, true)
@@ -893,4 +893,3 @@ test('adaptive ephemerality - timeout clears on destroy', async ({ is, pass, tea
   adapt.destroy()
   await until.done()
 })
-*/
