@@ -272,10 +272,10 @@ Emitted when a lookup is received.
 
 ## CLI
 
-There is a CLI available as well.
+You can start a DHT node in the command line, using the [@hyperswarm/cli](https://github.com/hyperswarm/cli) package:
 
 ```sh
-npm install -g @hyperswarm/dht
+npm install -g @hyperswarm/cli
 hyperswarm-dht # runs a DHT node
 ```
 
