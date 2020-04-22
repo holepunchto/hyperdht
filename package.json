@@ -21,9 +21,6 @@
     "standard": "^13.1.0",
     "tap": "^14.5.0"
   },
-  "bin": {
-    "hyperswarm-dht": "./bin.js"
-  },
   "scripts": {
     "test": "tap --nyc-arg=--exclude=messages.js  -R classic test/*.test.js && standard --fix",
     "cov": "tap --nyc-arg=--exclude messages.js -R classic --100 --coverage-report=html test/*.test.js",
