@@ -60,7 +60,7 @@ Options include:
 }
 ```
 
-*Note:* The default bootstrap servers are publicly served on behalf of the commons. To run a fully private DHT, start two or more dht nodes with an empty bootstrap array (`dht({bootstrap:[]})`) and then use the addresses of those nodes as the `bootrstrap` option in all other dht nodes.
+*Note:* The default bootstrap servers are publicly served on behalf of the commons. To run a fully private DHT, start two or more dht nodes with an empty bootstrap array (`dht({bootstrap:[]})`) and then use the addresses of those nodes as the `bootstrap` option in all other dht nodes.
 
 #### `node.holepunch(peer, [callback])`
 
@@ -178,7 +178,7 @@ Utility method for creating a random or hashed salt value.
 
 If called with a string the string will be hashed, to a generic hash of `size` length.
 
-If called without any inputs, or with a number, random butes of `size` length will be generated.
+If called without any inputs, or with a number, random bytes of `size` length will be generated.
 
 The `salt` can optionally be passed in `mutable.put` and `mutable.get` options.
 Salt values can be used as a sort of secondary UID, allowing multiple values to be stored under the same public key. Min `size` is 16 bytes, max `size` is 64 bytes.
@@ -247,7 +247,7 @@ Nodes. The stream instance also has the following stat counters
 
 * `inflight` - how many requests are currently active/ongoing
 * `responses` - how many responses have been received
-* `errors` - how many errors occured (locally)
+* `errors` - how many errors occurred (locally)
 * `updates` - how many updates were made
 
 #### `node.on('listening')`
