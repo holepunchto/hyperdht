@@ -231,12 +231,6 @@ Options:
 
 When successful, the second argument passed to `callback` is an object containing the resolved `value` with additional meta data (`...info`): `signature`, `seq` and `salt`.
 
-#### `node.immutable.get(key) => stream`
-
-Fetch all matching mutable values from the DHT.
-
-Any values found are emitted in a `data` event where the data object takes the form: `{id, value, signature, seq, salt}`. The `id` is the ID of the responding Node.
-
 #### Put / Get Stream Interface
 
 All mutable and immutable Put / Get methods return a stream.
