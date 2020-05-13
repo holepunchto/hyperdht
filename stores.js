@@ -3,7 +3,7 @@ const assert = require('assert')
 const {
   crypto_generichash: hash,
   crypto_sign_verify_detached: verify
-} = require('sodium-universal')
+} = require('sodium-native')
 const { PassThrough } = require('stream')
 const finished = require('end-of-stream')
 const {
