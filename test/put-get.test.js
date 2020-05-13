@@ -4,7 +4,7 @@ const { randomBytes } = require('crypto')
 const {
   crypto_sign_BYTES: signSize,
   crypto_sign_verify_detached: verify
-} = require('sodium-universal')
+} = require('sodium-native')
 const { once, promisifyMethod, whenifyMethod, done, when } = require('nonsynchronous')
 const dht = require('../')
 const { dhtBootstrap } = require('./util')
