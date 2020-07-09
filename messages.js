@@ -54,14 +54,6 @@ function definePeersInput () {
       var len = encodings.bool.encodingLength(obj.unannounce)
       length += 1 + len
     }
-    if (defined(obj.length)) {
-      var len = encodings.varint.encodingLength(obj.length)
-      length += 1 + len
-    }
-    if (defined(obj.includeLength)) {
-      var len = encodings.bool.encodingLength(obj.includeLength)
-      length += 1 + len
-    }
     return length
   }
 
@@ -84,16 +76,6 @@ function definePeersInput () {
       encodings.bool.encode(obj.unannounce, buf, offset)
       offset += encodings.bool.encode.bytes
     }
-    if (defined(obj.length)) {
-      buf[offset++] = 32
-      encodings.varint.encode(obj.length, buf, offset)
-      offset += encodings.varint.encode.bytes
-    }
-    if (defined(obj.includeLength)) {
-      buf[offset++] = 40
-      encodings.bool.encode(obj.includeLength, buf, offset)
-      offset += encodings.bool.encode.bytes
-    }
     encode.bytes = offset - oldOffset
     return buf
   }
@@ -106,9 +88,7 @@ function definePeersInput () {
     var obj = {
       port: 0,
       localAddress: null,
-      unannounce: false,
-      length: 0,
-      includeLength: false
+      unannounce: false
     }
     while (true) {
       if (end <= offset) {
@@ -129,14 +109,6 @@ function definePeersInput () {
         break
         case 3:
         obj.unannounce = encodings.bool.decode(buf, offset)
-        offset += encodings.bool.decode.bytes
-        break
-        case 4:
-        obj.length = encodings.varint.decode(buf, offset)
-        offset += encodings.varint.decode.bytes
-        break
-        case 5:
-        obj.includeLength = encodings.bool.decode(buf, offset)
         offset += encodings.bool.decode.bytes
         break
         default:
@@ -161,10 +133,6 @@ function definePeersOutput () {
       var len = encodings.bytes.encodingLength(obj.localPeers)
       length += 1 + len
     }
-    if (defined(obj.peersWithLength)) {
-      var len = encodings.bytes.encodingLength(obj.peersWithLength)
-      length += 1 + len
-    }
     return length
   }
 
@@ -182,11 +150,6 @@ function definePeersOutput () {
       encodings.bytes.encode(obj.localPeers, buf, offset)
       offset += encodings.bytes.encode.bytes
     }
-    if (defined(obj.peersWithLength)) {
-      buf[offset++] = 26
-      encodings.bytes.encode(obj.peersWithLength, buf, offset)
-      offset += encodings.bytes.encode.bytes
-    }
     encode.bytes = offset - oldOffset
     return buf
   }
@@ -198,8 +161,7 @@ function definePeersOutput () {
     var oldOffset = offset
     var obj = {
       peers: null,
-      localPeers: null,
-      peersWithLength: null
+      localPeers: null
     }
     while (true) {
       if (end <= offset) {
@@ -216,10 +178,6 @@ function definePeersOutput () {
         break
         case 2:
         obj.localPeers = encodings.bytes.decode(buf, offset)
-        offset += encodings.bytes.decode.bytes
-        break
-        case 3:
-        obj.peersWithLength = encodings.bytes.decode(buf, offset)
         offset += encodings.bytes.decode.bytes
         break
         default:

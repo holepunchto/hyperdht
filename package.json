@@ -11,8 +11,7 @@
     "hashlru": "^2.3.0",
     "protocol-buffers-encodings": "^1.1.0",
     "record-cache": "^1.1.0",
-    "sodium-native": "^3.1.1",
-    "uint64be": "^2.0.2"
+    "sodium-native": "^3.1.1"
   },
   "devDependencies": {
     "get-port": "^5.0.0",

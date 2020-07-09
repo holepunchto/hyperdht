@@ -88,9 +88,7 @@ Options include:
   localAddress: {
     host: '192.168.100.100',
     port: 20000
-  },
-  // Optionally include the announced data length for each peer.
-  includeLength: false
+  }
 }
 ```
 
@@ -126,11 +124,7 @@ Options include:
   localAddress: {
     host: '192.168.100.100',
     port: 20000
-  },
-  // Optionally include the announced data length of each peer in the response
-  includeLength: false,
-  // Optionally announce your local data length as well.
-  length: 0
+  }
 }
 ```
 

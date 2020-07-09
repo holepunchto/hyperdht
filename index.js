@@ -2,7 +2,7 @@
 const { DHT } = require('dht-rpc')
 const recordCache = require('record-cache')
 const { PeersInput, PeersOutput } = require('./messages')
-const { ipv4, ipv4WithLength, local } = require('./peers')
+const { ipv4, local } = require('./peers')
 const LRU = require('hashlru')
 const { ImmutableStore, MutableStore } = require('./stores')
 const guardTimeout = require('guard-timeout').create({ lagMs: 60 * 1000 })
@@ -87,8 +87,7 @@ class HyperDHT extends DHT {
 
     const query = {
       port: opts.port,
-      localAddress: local.encode(opts.localAddress),
-      includeLength: opts.includeLength || opts.length || typeof opts.length === 'number'
+      localAddress: local.encode(opts.localAddress)
     }
 
     return this.query('peers', key, query, cb).map(mapPeers.bind(null, query.localAddress))
@@ -98,12 +97,9 @@ class HyperDHT extends DHT {
     if (typeof opts === 'function') return this.announce(key, null, opts)
     if (!opts) opts = {}
 
-    const length = typeof opts.length === 'function' ? opts.length(key) : opts.length
     const ann = {
       port: opts.port,
-      localAddress: local.encode(opts.localAddress),
-      length,
-      includeLength: opts.includeLength || typeof length === 'number'
+      localAddress: local.encode(opts.localAddress)
     }
 
     return this.queryAndUpdate('peers', key, ann, cb).map(mapPeers.bind(null, ann.localAddress))
@@ -126,13 +122,12 @@ class HyperDHT extends DHT {
     const value = query.value
     const from = {
       port: value.port || query.node.port,
-      host: query.node.host,
-      length: value.length
+      host: query.node.host
     }
     if (!(from.port > 0 && from.port < 65536)) return cb(new Error('Invalid port'))
 
     const localRecord = value.localAddress
-    const remoteRecord = ipv4WithLength.encode(from)
+    const remoteRecord = ipv4.encode(from)
 
     const remoteCache = query.target.toString('hex')
     const localCache = localRecord &&
@@ -142,35 +137,27 @@ class HyperDHT extends DHT {
 
     if (query.type === DHT.QUERY) {
       const local = localCache ? filter(this._peers.get(localCache, 32), localSuffix) : []
-      const remote = filter(this._peers.get(remoteCache, 50 - 2 * local.length), remoteRecord)
-      const includeLength = value.includeLength
+      const remote = filter(this._peers.get(remoteCache, 128 - local.length), remoteRecord)
+
       this.emit('lookup', query.target, from)
 
       return cb(null, {
-        peersWithLength: (remote.length && includeLength) ? Buffer.concat(remote) : null,
-        peers: (remote.length && !includeLength) ? Buffer.concat(trunc(remote)) : null,
+        peers: remote.length ? Buffer.concat(remote) : null,
         localPeers: local.length ? Buffer.concat(local) : null
       })
     }
     if (value.unannounce) {
-      this._peers.remove(remoteCache, remoteRecord.slice(0, 6))
+      this._peers.remove(remoteCache, remoteRecord)
       if (localRecord) this._peers.remove(localCache, localSuffix)
       this.emit('unannounce', query.target, from)
     } else {
-      this._peers.add(remoteCache, remoteRecord.slice(0, 6), remoteRecord)
+      this._peers.add(remoteCache, remoteRecord, remoteRecord)
       if (localRecord) this._peers.add(localCache, localSuffix)
       this.emit('announce', query.target, from)
     }
 
     cb(null, null)
   }
-}
-
-function trunc (list) {
-  for (let i = 0; i < list.length; i++) {
-    list[i] = list[i].slice(0, 6)
-  }
-  return list
 }
 
 function filter (list, item) {
@@ -186,12 +173,12 @@ function filter (list, item) {
 
 function mapPeers (prefix, data) {
   const v = data.value
-  if (!v || (!v.peers && !v.localPeers && !v.peersWithLength)) return null
+  if (!v || (!v.peers && !v.localPeers)) return null
   try {
     return {
       node: data.node,
       to: data.to,
-      peers: v.peersWithLength ? ipv4WithLength.decodeAll(v.peersWithLength) : ipv4.decodeAll(v.peers),
+      peers: ipv4.decodeAll(v.peers),
       localPeers: prefix && local.decodeAll(prefix, v.localPeers)
     }
   } catch (err) {
