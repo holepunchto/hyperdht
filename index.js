@@ -115,7 +115,7 @@ class HyperDHT extends DHT {
       unannounce: true
     }
 
-    this.update('peers', key, ann, cb).map(mapPeers.bind(null, ann.localAddress))
+    return this.update('peers', key, ann, cb).map(mapPeers.bind(null, ann.localAddress))
   }
 
   _onpeers (query, cb) {
