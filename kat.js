@@ -4,11 +4,16 @@ const cenc = require('compact-encoding')
 const dgram = require('dgram')
 const Timer = require('./timer')
 const KATSessionStore = require('./kat-session-store')
+const Holepuncher = require('./holepuncher')
 const messages = require('./messages')
 const NoiseState = require('./noise')
 
 const KAT_SESSION = Buffer.from('kat_session\n')
 const KAT_HOLEPUNCH = Buffer.from('kat_holepunch\n')
+
+const BAD_ADDR = new Error('Relay and remote peer does not agree on their public address')
+const NOT_HOLEPUNCHABLE = new Error('Both networks are not holepunchable')
+const TIMEOUT = new Error('Holepunch attempt timed out')
 
 class KeepAliveTimer extends Timer {
   constructor (dht, target, addr) {
@@ -80,22 +85,21 @@ class KATSession {
     }
 
     const addr = this.dht.remoteAddress()
-    const socket = dgram.createSocket('udp4')
     const signal = Buffer.allocUnsafe(32)
+    const holepunch = new Holepuncher(addr, function (rawSocket) {
+      console.log('got raw socket on the server')
+    })
+
+    holepunch.setRemoteNetwork(payload)
+    const localPayload = holepunch.bind()
 
     // reset auth token
     sodium.randombytes_buf(relayAuth)
-
-    const localPayload = {
-      firewall: addr.type,
-      address: { host: addr.host, port: 0 },
-      localAddresses: [],
-      relayAuth
-    }
+    localPayload.relayAuth = relayAuth
 
     const hs = {
       noise,
-      socket,
+      holepunch,
       payload,
       localPayload,
       signal
@@ -106,18 +110,19 @@ class KATSession {
     const noisePayload = noise.send(hs.localPayload)
     sodium.crypto_generichash_batch(signal, [KAT_HOLEPUNCH, relayAuth], noise.handshakeHash)
 
-    req.reply(cenc.encode(messages.katConnect, { noise: noisePayload, relayAuth }), { token: false, closerNodes: false, socket: hs.socket })
+    req.reply(cenc.encode(messages.katConnect, { noise: noisePayload, relayAuth }), { token: false, closerNodes: false, socket: hs.holepunch.socket })
   }
 
-  onholepunch (req) {
+  async onholepunch (req) {
     for (const hs of this._incomingHandshakes) {
       if (hs.signal.equals(req.value)) {
-        console.log('server ready to holepunch', hs.payload, hs.localPayload)
+        await hs.holepunch.holepunch()
         break
       }
     }
-
+console.log('reply?')
     req.reply(null, { token: false, closerNodes: false })
+    console.log('after ereply')
   }
 
   destroy () {
@@ -285,7 +290,7 @@ module.exports = class KAT {
     } catch {
       return
     }
-
+console.log('reply to holepunch')
     req.reply(null, { token: false, closerNodes: false })
   }
 
@@ -344,28 +349,24 @@ module.exports = class KAT {
     const target = hash(publicKey)
     const noise = new NoiseState(noiseKeyPair, remoteNoisePublicKey)
 
-    // TODO: wait for the firewall heurtistic to populate first
-    // which is much faster than waiting for full bootstrap
+    // await this.dht.sampledNAT() <-- FIXME
     await this.dht.ready()
 
     const addr = this.dht.remoteAddress()
-
-    const socket = dgram.createSocket('udp4')
+    const holepunch = new Holepuncher(addr)
     const onmessage = this.dht.onmessage.bind(this.dht)
+
+    const localPayload = holepunch.bind()
+    const socket = holepunch.socket
 
     // forward incoming messages to the dht
     socket.on('message', onmessage)
-
-    const localPayload = {
-      firewall: addr.type,
-      address: { host: addr.host, port: 0 },
-      localAddresses: [],
-      relayAuth: Buffer.allocUnsafe(32)
-    }
+    localPayload.relayAuth = Buffer.allocUnsafe(32)
 
     sodium.randombytes_buf(localPayload.relayAuth)
 
     const value = cenc.encode(messages.katConnect, { noise: noise.send(localPayload), relayAuth: localPayload.relayAuth })
+    let error = null
 
     for await (const data of this.dht.query(target, 'kat_connect', value, { socket })) {
       if (!data.value) continue
@@ -379,31 +380,54 @@ module.exports = class KAT {
 
       const payload = noise.recv(m.noise, false)
       if (!payload) continue
-
       if (!payload.address.port) payload.address.port = m.relayPort
-
-      if (payload.address.port !== m.relayPort) {
-        throw new Error('Relay and remote peer does not agree on their public address')
-      }
 
       const relayAuth = Buffer.allocUnsafe(32)
       sodium.crypto_generichash(relayAuth, cenc.encode(messages.peerIPv4, payload.address), payload.relayAuth)
+      holepunch.setRemoteNetwork(payload)
 
-      if (!relayAuth.equals(m.relayAuth)) {
-        throw new Error('Relay and remote peer does not agree on their public address')
+      if (!relayAuth.equals(m.relayAuth) || payload.address.port !== m.relayPort) {
+        error = BAD_ADDR
+        break
+      }
+
+      if (!holepunch.holepunchable) {
+        error = NOT_HOLEPUNCHABLE
+        break
       }
 
       sodium.crypto_generichash_batch(relayAuth, [KAT_HOLEPUNCH, payload.relayAuth], noise.handshakeHash)
 
-      await this.dht.request(target, 'kat_holepunch', relayAuth, data.from, { socket, token: data.token })
+      await holepunch.openSessions()
+console.log('sending')
+      try {
+        await this.dht.request(target, 'kat_holepunch', relayAuth, data.from, { socket, token: data.token })
+      } catch {
+        console.log('here?')
+        break
+      }
 
       socket.removeListener('message', onmessage)
+console.log('prep')
+      await holepunch.holepunch()
+
+      const rawSocket = await holepunch.connected()
+console.log('got rawSocket?')
+      if (!rawSocket) {
+        error = TIMEOUT
+        break
+      }
 
       console.log('-->', localPayload, payload, socket.address())
       return
     }
 
+    socket.removeListener('message', onmessage)
+    holepunch.destroy()
     noise.destroy()
+
+    if (!error) error = new Error('Could not connect to peer')
+    throw error
   }
 
   lookup (publicKey, opts) {
