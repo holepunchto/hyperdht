@@ -10,7 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "compact-encoding": "^2.1.0",
-    "dht-rpc": "^5.0.0-beta10",
+    "dht-rpc": "beta",
     "noise-protocol": "^3.0.1",
     "noise-secret-stream": "^2.0.2",
     "sodium-universal": "^3.0.4",
