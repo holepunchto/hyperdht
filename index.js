@@ -288,10 +288,11 @@ module.exports = class HyperDHT extends DHT {
     return s
   }
 
-  static keyPair () {
+  static keyPair (seed) {
     const publicKey = Buffer.alloc(32)
     const secretKey = Buffer.alloc(64)
-    sodium.crypto_sign_keypair(publicKey, secretKey)
+    if (seed) sodium.crypto_sign_seed_keypair(publicKey, secretKey, seed)
+    else sodium.crypto_sign_keypair(publicKey, secretKey)
     return { publicKey, secretKey }
   }
 
@@ -342,7 +343,7 @@ class KATSession {
     for (const hs of this._incomingHandshakes) {
       if (hs.noise.request.equals(m.noise)) {
         const value = cenc.encode(messages.connect, { noise: hs.noise.response, relayAuth: hs.localPayload.relayAuth })
-        req.reply(value, { token: false, closerNodes: false, socket: hs.socket })
+        req.reply(value, { token: false, closerNodes: false, socket: hs.holepunch.socket })
         return
       }
     }
