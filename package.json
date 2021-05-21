@@ -9,6 +9,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "noise-protocol": "^3.0.1"
+    "compact-encoding": "^2.1.0",
+    "dht-rpc": "^5.0.0-beta10",
+    "noise-protocol": "^3.0.1",
+    "noise-secret-stream": "^2.0.2",
+    "sodium-universal": "^3.0.4",
+    "utp-native": "^2.4.0"
   }
 }
