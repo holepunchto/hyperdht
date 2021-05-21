@@ -203,8 +203,7 @@ module.exports = class HyperDHT extends DHT {
     const target = hash(publicKey)
     const noise = new NoiseState(noiseKeyPair, remoteNoisePublicKey)
 
-    // await this.dht.sampledNAT() <-- FIXME
-    await this.ready()
+    await this.sampledNAT()
 
     const addr = this.remoteAddress()
     const holepunch = new Holepuncher(addr)
