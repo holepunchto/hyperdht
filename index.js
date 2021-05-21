@@ -9,6 +9,12 @@ const Holepuncher = require('./lib/holepuncher')
 const messages = require('./lib/messages')
 const NoiseState = require('./lib/noise')
 
+const BOOTSTRAP_NODES = [
+  { host: 'testnet1.hyperdht.org', port: 49736 },
+  { host: 'testnet2.hyperdht.org', port: 49736 },
+  { host: 'testnet3.hyperdht.org', port: 49736 }
+]
+
 const ANNOUNCE_SELF = Buffer.from('hyperswarm_announce_self\n')
 const HOLEPUNCH = Buffer.from('hyperswarm_holepunch\n')
 
@@ -18,7 +24,7 @@ const TIMEOUT = new Error('Holepunch attempt timed out')
 
 module.exports = class HyperDHT extends DHT {
   constructor (opts) {
-    super(opts)
+    super({ bootstrap: BOOTSTRAP_NODES, ...opts })
 
     this.sessionStore = null
     this.clientSessions = new Set()
@@ -441,6 +447,7 @@ class KATSession {
         await this._queryClosestGateways()
       } catch {
         await this._sleep(5000)
+        continue
       }
 
       this._keepAlives = []
