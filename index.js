@@ -1,10 +1,10 @@
+const { EventEmitter } = require('events')
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
 const cenc = require('compact-encoding')
 const NoiseSecretStream = require('noise-secret-stream')
-const dgram = require('dgram')
 const Timer = require('./lib/timer')
-const KATSessionStore = require('./lib/kat-session-store')
+const Cache = require('xache')
 const Holepuncher = require('./lib/holepuncher')
 const messages = require('./lib/messages')
 const NoiseState = require('./lib/noise')
@@ -14,6 +14,9 @@ const BOOTSTRAP_NODES = [
   { host: 'testnet2.hyperdht.org', port: 49736 },
   { host: 'testnet3.hyperdht.org', port: 49736 }
 ]
+
+const SERVER_TIMEOUT = 20000
+const CLIENT_TIMEOUT = 25000
 
 const ANNOUNCE_SELF = Buffer.from('hyperswarm_announce_self\n')
 const HOLEPUNCH = Buffer.from('hyperswarm_holepunch\n')
@@ -26,15 +29,21 @@ module.exports = class HyperDHT extends DHT {
   constructor (opts) {
     super({ bootstrap: BOOTSTRAP_NODES, ...opts })
 
-    this.sessionStore = null
-    this.clientSessions = new Set()
+    this.cache = null
+    this.defaultClientKeyPair = opts.keyPair || HyperDHT.keyPair(opts.seed)
+    this.servers = new Set()
 
     this.on('request', this._ondhtrequest)
     this.on('persistent', this._ondhtpersistent)
   }
 
+  destroy () {
+    if (this.cache !== null) this.cache.destroy()
+    super.destroy()
+  }
+
   _ondhtpersistent () {
-    this.sessionStore = new KATSessionStore(7000)
+    this.cache = new Cache({ maxSize: 65536, maxAge: 45 * 60 * 1000 })
   }
 
   _ondhtrequest (req) {
@@ -42,7 +51,6 @@ module.exports = class HyperDHT extends DHT {
       case 'lookup': return this._onlookup(req)
       case 'announce': return this._onannounce(req)
       case 'announce_self': return this._onannounceself(req)
-      case 'keep_alive': return this._onkeepalive(req)
       case 'connect': return this._onconnect(req)
       case 'relay_connect': return this._onrelayconnect(req)
       case 'holepunch': return this._onholepunch(req)
@@ -50,18 +58,15 @@ module.exports = class HyperDHT extends DHT {
     }
 
     /*
+      mutable_get
+      mutable_put
+      immutable_get
+      immutable_put
 
-    mutable_get
-    mutable_put
-    immutable_get
-    immutable_put
-
-    lookup
-    announce
-    announce_self / session
-    keep_alive <-- badly named
-
-
+      lookup
+      announce
+      announce_self / session
+      keep_alive <-- badly named
     */
 
     req.error(DHT.UNKNOWN_COMMAND)
@@ -79,9 +84,9 @@ module.exports = class HyperDHT extends DHT {
   async _onconnect (req) {
     if (!req.target) return
 
-    const s = this.sessionStore && this.sessionStore.get(req.target)
+    const s = this._getAnnounceSelf(req.target)
 
-    if (!s || !req.value || !req.target) {
+    if (!s || !req.value) {
       req.reply(null, { token: false })
       return
     }
@@ -108,12 +113,11 @@ module.exports = class HyperDHT extends DHT {
       return
     }
 
-
     req.reply(value, { token: true, closerNodes: false })
   }
 
   _onrelayconnect (req) {
-    for (const s of this.clientSessions) {
+    for (const s of this.servers) {
       if (s.target.equals(req.target)) { // found session
         s.onconnect(req)
         return
@@ -126,7 +130,7 @@ module.exports = class HyperDHT extends DHT {
   async _onholepunch (req) {
     if (!req.target) return
 
-    const s = this.sessionStore && this.sessionStore.get(req.target)
+    const s = this._getAnnounceSelf(req.target)
 
     if (!s || !req.value || !req.token) {
       req.reply(null, { token: false })
@@ -141,13 +145,13 @@ module.exports = class HyperDHT extends DHT {
       return
     }
 
-    req.reply(null, { token: false, closerNodes: false })
+    req.reply(res.value, { token: false, closerNodes: false })
   }
 
   _onrelayholepunch (req) {
     if (!req.target || !req.value) return
 
-    for (const s of this.clientSessions) {
+    for (const s of this.servers) {
       if (s.target.equals(req.target)) {
         s.onholepunch(req)
         return
@@ -174,7 +178,7 @@ module.exports = class HyperDHT extends DHT {
       return
     }
 
-    this.sessionStore.set(hash(m.publicKey), {
+    this._setAnnounceSelf(hash(m.publicKey), {
       expires: Date.now() + 45 * 60 * 1000,
       address: req.from
     })
@@ -182,21 +186,23 @@ module.exports = class HyperDHT extends DHT {
     req.reply(null, { token: false })
   }
 
-  _onkeepalive (req) {
-    if (!req.value || req.value.byteLength !== 32) return
-    const s = this.sessionStore.get(req.value)
-    if (!s || Date.now() > s.expires || req.from.port !== s.address.port || req.from.host !== s.address.host) return
-    this.sessionStore.set(req.value, s)
-    req.reply(null, { token: false })
+  _setAnnounceSelf (target, data) {
+    this.cache.set('announce_self/' + target.toString('hex'), data)
+  }
+
+  _getAnnounceSelf (target) {
+    const s = this.cache && this.cache.get('announce_self/' + target.toString('hex'))
+    if (!s || s.expires < Date.now()) return null
+    return s
   }
 
   connect (publicKey, keyPair) {
     return NoiseSecretStream.async(this.connectRaw(publicKey, keyPair))
   }
 
-  async connectRaw (publicKey, keyPair) {
+  async connectRaw (publicKey, keyPair = this.defaultClientKeyPair) {
     const remoteNoisePublicKey = Buffer.alloc(32)
-    const noiseKeyPair = signKeyPairToNoise(keyPair)
+    const noiseKeyPair = NoiseState.ed25519toCurve25519(keyPair)
 
     sodium.crypto_sign_ed25519_pk_to_curve25519(remoteNoisePublicKey, publicKey)
 
@@ -211,6 +217,7 @@ module.exports = class HyperDHT extends DHT {
 
     const localPayload = holepunch.bind()
     const socket = holepunch.socket
+    const timeout = setTimeout(ontimeout, CLIENT_TIMEOUT)
 
     // forward incoming messages to the dht
     socket.on('message', onmessage)
@@ -220,9 +227,11 @@ module.exports = class HyperDHT extends DHT {
     sodium.randombytes_buf(localPayload.relayAuth)
 
     const value = cenc.encode(messages.connect, { noise: noise.send(localPayload), relayAuth: localPayload.relayAuth })
+    const query = this.query(target, 'connect', value, { socket })
+
     let error = null
 
-    for await (const data of this.query(target, 'connect', value, { socket })) {
+    for await (const data of query) {
       if (!data.value) continue
 
       let m = null
@@ -270,16 +279,24 @@ module.exports = class HyperDHT extends DHT {
         break
       }
 
+      clearTimeout(timeout)
       // [isInitiator, rawSocket, noise]
       return [true, rawSocket, noise]
     }
 
+    clearTimeout(timeout)
     socket.removeListener('message', onmessage)
     holepunch.destroy()
     noise.destroy()
 
     if (!error) error = new Error('Could not connect to peer')
     throw error
+
+    function ontimeout () {
+      if (!error) error = TIMEOUT
+      query.destroy()
+      holepunch.destroy()
+    }
   }
 
   lookup (publicKey, opts) {
@@ -287,9 +304,10 @@ module.exports = class HyperDHT extends DHT {
     return this.query(target, 'lookup', null, opts)
   }
 
-  listen (keyPair, onconnection) {
-    const s = new KATSession(this, keyPair, onconnection)
-    this.clientSessions.add(s)
+  createServer (opts) {
+    if (typeof opts === 'function') opts = { onconnection: opts }
+    const s = new KATServer(this, opts)
+    this.servers.add(s)
     return s
   }
 
@@ -300,12 +318,12 @@ module.exports = class HyperDHT extends DHT {
     else sodium.crypto_sign_keypair(publicKey, secretKey)
     return { publicKey, secretKey }
   }
-
 }
 
 class KeepAliveTimer extends Timer {
   constructor (dht, target, addr) {
     super(3000, null, false)
+
     this.target = target
     this.addr = addr
     this.dht = dht
@@ -314,30 +332,47 @@ class KeepAliveTimer extends Timer {
 
   update () {
     if (Date.now() > this.expires) return this.stop()
-    return this.dht.request(null, 'keep_alive', this.target, this.addr)
+    return this.dht.ping(this.addr)
   }
 }
 
-class KATSession {
-  constructor (dht, keyPair, onconnection) {
-    this.target = hash(keyPair.publicKey)
-    this.keyPair = keyPair
-    this.noiseKeyPair = signKeyPairToNoise(keyPair)
+class KATServer extends EventEmitter {
+  constructor (dht, opts = {}) {
+    super()
+
+    this.target = null
+    this.keyPair = null
+    this.noiseKeyPair = null
     this.dht = dht
-    this.nodes = null
+    this.closestNodes = null
     this.gateways = null
     this.destroyed = false
-    this.onconnection = onconnection || noop
+    this.onauthenticate = opts.onauthentiate || allowAll
+    if (opts.onconnection) this.on('connection', opts.onconnection)
 
     this._keepAlives = null
     this._incomingHandshakes = new Set()
-    this._sessions = dht.clientSessions
-    this._started = null
+    this._servers = dht.servers
+    this._listening = null
     this._resolveUpdatedOnce = null
     this._updatedOnce = new Promise((resolve) => { this._resolveUpdatedOnce = resolve })
+    this._interval = setTimeout(this.gc.bind(this), 5000)
+
+    this._updatedOnce.then(() => {
+      if (!this.destroyed) this.emit('listening')
+    })
   }
 
-  onconnect (req) {
+  gc () {
+    const now = Date.now()
+    for (const hs of this._incomingHandshakes) {
+      if (hs.added + SERVER_TIMEOUT < now) continue
+      hs.holepunch.destroy()
+      this._incomingHandshakes.delete(hs)
+    }
+  }
+
+  async onconnect (req) {
     let m = null
     try {
       m = cenc.decode(messages.connectRelay, req.value)
@@ -373,22 +408,20 @@ class KATSession {
       return
     }
 
+    let authenticated = false
+
+    try {
+      authenticated = !!(await this.onauthenticate(noise.remoteNoisePublicKey, payload))
+    } catch {}
+
+    if (this.destroyed || !authenticated) {
+      noise.destroy()
+      return
+    }
+
     const addr = this.dht.remoteAddress()
     const signal = Buffer.allocUnsafe(32)
     const holepunch = new Holepuncher(addr)
-
-    holepunch.connected().then((rawSocket) => {
-      if (!rawSocket) return
-
-      if (this.onconnection === noop) {
-        rawSocket.on('error', noop)
-        rawSocket.destroy()
-        return
-      }
-
-      const socket = new NoiseSecretStream(false, rawSocket, noise)
-      this.onconnection(socket)
-    })
 
     holepunch.setRemoteNetwork(payload)
     const localPayload = holepunch.bind()
@@ -398,6 +431,7 @@ class KATSession {
     localPayload.relayAuth = relayAuth
 
     const hs = {
+      added: Date.now(),
       noise,
       holepunch,
       payload,
@@ -406,6 +440,18 @@ class KATSession {
     }
 
     this._incomingHandshakes.add(hs)
+    holepunch.connected().then((rawSocket) => {
+      this._incomingHandshakes.delete(hs)
+      if (!rawSocket) return
+
+      const socket = new NoiseSecretStream(false, rawSocket, noise)
+
+      if (!this.emit('connection', socket)) {
+        socket.on('error', noop)
+        socket.destroy()
+        return
+      }
+    })
 
     const noisePayload = noise.send(hs.localPayload)
     sodium.crypto_generichash_batch(signal, [HOLEPUNCH, relayAuth], noise.handshakeHash)
@@ -424,19 +470,42 @@ class KATSession {
     req.reply(null, { token: false, closerNodes: false })
   }
 
-  destroy () {
-    this._sessions.delete(this)
+  close () {
+    clearInterval(this._interval)
+
+    if (this._activeQuery) this._activeQuery.destroy()
+    if (this._keepAlives) {
+      for (const keepAlive of this._keepAlives) keepAlive.stop()
+    }
+    this._keepAlives = null
+    this._servers.delete(this)
     this.destroyed = true
+
+    return this._listening ? this._listening : Promise.resolve()
   }
 
-  start () {
-    if (this._started) return this._started
-    this._started = this._updateGateways()
-    return this._started
+  address () {
+    if (!this.keyPair) {
+      throw new Error('Server is not listening')
+    }
+
+    return {
+      family: 'KATv1',
+      address: this.dht.remoteAddress().host,
+      publicKey: this.keyPair.publicKey
+    }
   }
 
-  flush () {
-    if (!this._started) this.start()
+  listen (keyPair) {
+    if (this.keyPair) {
+      throw new Error('Server is already listening on a keyPair')
+    }
+
+    this.target = hash(keyPair.publicKey)
+    this.keyPair = keyPair
+    this.noiseKeyPair = NoiseState.ed25519toCurve25519(keyPair)
+
+    if (!this._listening) this._listening = this._updateGateways()
     return this._updatedOnce
   }
 
@@ -448,6 +517,8 @@ class KATSession {
         await this._sleep(5000)
         continue
       }
+
+      if (this.destroyed) break
 
       this._keepAlives = []
       const running = []
@@ -464,10 +535,13 @@ class KATSession {
   }
 
   async _queryClosestGateways () {
-    const q = this.dht.query(this.target, 'lookup', null, { nodes: this.nodes })
+    const q = this._activeQuery = this.dht.query(this.target, 'lookup', null, { nodes: this.closestNodes })
     await q.finished()
 
-    this.nodes = q.closest
+    if (q === this._activeQuery) this._activeQuery = null
+    if (this.destroyed) return this._resolveUpdatedOnce(false)
+
+    this.closestNodes = q.closest
 
     const promises = []
 
@@ -506,14 +580,6 @@ class KATSession {
   }
 }
 
-
-function signKeyPairToNoise (keyPair) {
-  const noiseKeys = { publicKey: Buffer.alloc(32), secretKey: Buffer.alloc(32) }
-  sodium.crypto_sign_ed25519_pk_to_curve25519(noiseKeys.publicKey, keyPair.publicKey)
-  sodium.crypto_sign_ed25519_sk_to_curve25519(noiseKeys.secretKey, keyPair.secretKey)
-  return noiseKeys
-}
-
 function hash (data) {
   const out = Buffer.allocUnsafe(32)
   sodium.crypto_generichash(out, data)
@@ -521,3 +587,7 @@ function hash (data) {
 }
 
 function noop () {}
+
+function allowAll () {
+  return true
+}
