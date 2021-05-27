@@ -1,19 +1,24 @@
 {
-  "name": "dht3",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@hyperswarm/dht",
+  "version": "5.0.0-beta1",
+  "description": "The DHT powering the HyperSwarm stack",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "compact-encoding": "^2.1.0",
     "dht-rpc": "beta",
     "noise-protocol": "^3.0.1",
     "noise-secret-stream": "^2.0.2",
     "sodium-universal": "^3.0.4",
-    "utp-native": "^2.4.0"
-  }
+    "utp-native": "^2.4.0",
+    "xache": "^1.0.0"
+  },
+  "devDependencies": {
+    "standard": "^16.0.3",
+    "tape": "^5.2.2"
+  },
+  "scripts": {
+    "test": "standard && tape test.js"
+  },
+  "author": "Mathias Buus (@mafintosh)",
+  "license": "MIT"
 }
