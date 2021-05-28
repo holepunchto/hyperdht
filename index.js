@@ -36,7 +36,7 @@ module.exports = class HyperDHT extends DHT {
 
     this.forwards = null
     this.records = null
-    this.defaultClientKeyPair = opts.keyPair || HyperDHT.keyPair(opts.seed)
+    this.defaultKeyPair = opts.keyPair || HyperDHT.keyPair(opts.seed)
     this.servers = new Set()
 
     this.on('request', this._ondhtrequest)
@@ -205,13 +205,13 @@ module.exports = class HyperDHT extends DHT {
     req.reply(null, { token: false, closerNodes: false })
   }
 
-  connect (publicKey, keyPair) {
-    return NoiseSecretStream.async(this.connectRaw(publicKey, keyPair))
+  connect (publicKey, opts) {
+    return NoiseSecretStream.async(this.connectRaw(publicKey, opts))
   }
 
-  async connectRaw (publicKey, keyPair = this.defaultClientKeyPair) {
+  async connectRaw (publicKey, opts = {}) {
     const remoteNoisePublicKey = Buffer.alloc(32)
-    const noiseKeyPair = NoiseState.ed25519toCurve25519(keyPair)
+    const noiseKeyPair = NoiseState.ed25519toCurve25519(opts.keyPair || (opts.secretKey ? opts : this.defaultKeyPair))
 
     sodium.crypto_sign_ed25519_pk_to_curve25519(remoteNoisePublicKey, publicKey)
 
@@ -236,29 +236,21 @@ module.exports = class HyperDHT extends DHT {
     sodium.randombytes_buf(localPayload.relayAuth)
 
     const value = cenc.encode(messages.connect, { noise: noise.send(localPayload), relayAuth: localPayload.relayAuth })
-    const query = this.query(target, 'connect', value, { socket })
+    const query = this.query(target, 'connect', value, { socket, nodes: opts.nodes, map: mapConnect })
 
     let error = null
 
-    for await (const data of query) {
-      if (!data.value) continue
+    for await (const { from, token, connect } of query) {
+      const payload = noise.recv(connect.noise, false)
 
-      let m = null
-      try {
-        m = cenc.decode(messages.connectRelay, data.value)
-      } catch {
-        continue
-      }
-
-      const payload = noise.recv(m.noise, false)
       if (!payload) continue
-      if (!payload.address.port) payload.address.port = m.relayPort
+      if (!payload.address.port) payload.address.port = connect.relayPort
 
       const relayAuth = Buffer.allocUnsafe(32)
       sodium.crypto_generichash(relayAuth, cenc.encode(messages.peerIPv4, payload.address), payload.relayAuth)
       holepunch.setRemoteNetwork(payload)
 
-      if (!relayAuth.equals(m.relayAuth) || payload.address.port !== m.relayPort) {
+      if (!relayAuth.equals(connect.relayAuth) || payload.address.port !== connect.relayPort) {
         error = BAD_ADDR
         break
       }
@@ -273,7 +265,7 @@ module.exports = class HyperDHT extends DHT {
       await holepunch.openSessions()
 
       try {
-        await this.request(target, 'holepunch', relayAuth, data.from, { socket, token: data.token })
+        await this.request(target, 'holepunch', relayAuth, from, { socket, token })
       } catch {
         break
       }
@@ -377,7 +369,7 @@ class KATServer extends EventEmitter {
     this.noiseKeyPair = null
     this.dht = dht
     this.closestNodes = null
-    this.gateways = null
+    this.nodes = null
     this.destroyed = false
     this.onauthenticate = opts.onauthentiate || allowAll
     if (opts.onconnection) this.on('connection', opts.onconnection)
@@ -527,7 +519,7 @@ class KATServer extends EventEmitter {
     }
   }
 
-  listen (keyPair) {
+  listen (keyPair = this.dht.defaultKeyPair) {
     if (this.keyPair) {
       throw new Error('Server is already listening on a keyPair')
     }
@@ -536,11 +528,11 @@ class KATServer extends EventEmitter {
     this.keyPair = keyPair
     this.noiseKeyPair = NoiseState.ed25519toCurve25519(keyPair)
 
-    if (!this._listening) this._listening = this._updateGateways()
+    if (!this._listening) this._listening = this._updateNodes()
     return this._updatedOnce
   }
 
-  async _updateGateways () {
+  async _updateNodes () {
     while (!this.destroyed) {
       try {
         await this._queryClosestGateways()
@@ -554,8 +546,8 @@ class KATServer extends EventEmitter {
       this._keepAlives = []
       const running = []
 
-      for (const g of this.gateways) {
-        const k = new KeepAliveTimer(this.dht, this.target, g)
+      for (const node of this.nodes) {
+        const k = new KeepAliveTimer(this.dht, this.target, node)
         this._keepAlives.push(k)
         k.start()
         running.push(k.running)
@@ -576,31 +568,31 @@ class KATServer extends EventEmitter {
 
     const promises = []
 
-    for (const gateway of q.closest.slice(0, 3)) {
+    for (const node of q.closest.slice(0, 3)) {
       const m = {
         timestamp: Date.now(),
         publicKey: this.keyPair.publicKey,
-        nodes: [{ host: gateway.host, port: gateway.port }],
+        nodes: [{ host: node.host, port: node.port }],
         origin: true,
         signature: Buffer.allocUnsafe(64)
       }
 
-      sodium.crypto_sign_detached(m.signature, announceSignable(this.target, m, gateway.to), this.keyPair.secretKey)
-      promises.push(this.dht.request(this.target, 'announce', cenc.encode(messages.announce, m), gateway))
+      sodium.crypto_sign_detached(m.signature, announceSignable(this.target, m, node.to), this.keyPair.secretKey)
+      promises.push(this.dht.request(this.target, 'announce', cenc.encode(messages.announce, m), node))
     }
 
-    const gateways = []
+    const nodes = []
     for (const p of promises) {
       try {
-        gateways.push((await p).from)
+        nodes.push((await p).from)
       } catch {
         continue
       }
     }
 
-    if (!gateways.length) throw new Error('All gateway requests failed')
+    if (!nodes.length) throw new Error('All gateway requests failed')
 
-    this.gateways = gateways
+    this.nodes = nodes
     this._resolveUpdatedOnce(true)
   }
 
@@ -632,6 +624,20 @@ function mapLookup (node) {
       from: node.from,
       to: node.to,
       peers: cenc.decode(messages.lookup, node.value)
+    }
+  } catch {
+    return null
+  }
+}
+
+function mapConnect (node) {
+  if (!node.value) return null
+
+  try {
+    return {
+      from: node.from,
+      token: node.token,
+      connect: cenc.decode(messages.connectRelay, node.value)
     }
   } catch {
     return null
