@@ -25,7 +25,7 @@ const NOT_HOLEPUNCHABLE = new Error('Both networks are not holepunchable')
 const TIMEOUT = new Error('Holepunch attempt timed out')
 
 module.exports = class HyperDHT extends DHT {
-  constructor (opts) {
+  constructor (opts = {}) {
     super({ bootstrap: BOOTSTRAP_NODES, ...opts })
 
     this.persistent = null
