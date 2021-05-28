@@ -5,6 +5,7 @@ const cenc = require('compact-encoding')
 const NoiseSecretStream = require('noise-secret-stream')
 const Timer = require('./lib/timer')
 const Cache = require('xache')
+const RecordCache = require('record-cache')
 const Holepuncher = require('./lib/holepuncher')
 const messages = require('./lib/messages')
 const NoiseState = require('./lib/noise')
@@ -15,21 +16,26 @@ const BOOTSTRAP_NODES = [
   { host: 'testnet3.hyperdht.org', port: 49736 }
 ]
 
+const SIGNATURE_TIMEOUT = 5 * 60 * 1000
 const SERVER_TIMEOUT = 20000
 const CLIENT_TIMEOUT = 25000
 
-const ANNOUNCE_SELF = Buffer.from('hyperswarm_announce_self\n')
-const HOLEPUNCH = Buffer.from('hyperswarm_holepunch\n')
+const TMP = Buffer.allocUnsafe(32)
+const NS_ANNOUNCE = hash(Buffer.from('hyperswarm_announce'))
+const NS_HOLEPUNCH = hash(Buffer.from('hyperswarm_holepunch'))
 
 const BAD_ADDR = new Error('Relay and remote peer does not agree on their public address')
 const NOT_HOLEPUNCHABLE = new Error('Both networks are not holepunchable')
 const TIMEOUT = new Error('Holepunch attempt timed out')
 
+const rawArray = cenc.array(cenc.raw)
+
 module.exports = class HyperDHT extends DHT {
   constructor (opts) {
     super({ bootstrap: BOOTSTRAP_NODES, ...opts })
 
-    this.cache = null
+    this.forwards = null
+    this.records = null
     this.defaultClientKeyPair = opts.keyPair || HyperDHT.keyPair(opts.seed)
     this.servers = new Set()
 
@@ -38,19 +44,23 @@ module.exports = class HyperDHT extends DHT {
   }
 
   destroy () {
-    if (this.cache !== null) this.cache.destroy()
+    if (this.forwards !== null) this.forwards.destroy()
+    if (this.records !== null) this.records.destroy()
     super.destroy()
   }
 
   _ondhtpersistent () {
-    this.cache = new Cache({ maxSize: 65536, maxAge: 45 * 60 * 1000 })
+    const maxSize = 65536
+    const maxAge = 45 * 60 * 1000
+
+    this.forwards = new Cache({ maxSize, maxAge })
+    this.records = new RecordCache({ maxSize, maxAge })
   }
 
   _ondhtrequest (req) {
     switch (req.command) {
       case 'lookup': return this._onlookup(req)
       case 'announce': return this._onannounce(req)
-      case 'announce_self': return this._onannounceself(req)
       case 'connect': return this._onconnect(req)
       case 'relay_connect': return this._onrelayconnect(req)
       case 'holepunch': return this._onholepunch(req)
@@ -58,33 +68,67 @@ module.exports = class HyperDHT extends DHT {
     }
 
     /*
-      mutable_get
-      mutable_put
-      immutable_get
-      immutable_put
-
-      lookup
-      announce
-      announce_self / session
-      keep_alive <-- badly named
+      missing:
+        mutable_get
+        mutable_put
+        immutable_get
+        immutable_put
     */
 
     req.error(DHT.UNKNOWN_COMMAND)
   }
 
   _onlookup (req) {
-    console.log('onlookup')
-    req.reply(null)
+    if (!req.target || !this.records) return req.reply(null)
+    const records = this.records.get(req.target.toString('hex'), 20)
+    if (!records.length) return req.reply(null)
+    req.reply(cenc.encode(rawArray, records))
+  }
+
+  _isSelf (node) {
+    DHT.id(node, TMP)
+    return this.id.equals(TMP)
   }
 
   _onannounce (req) {
-    console.log('onann')
+    if (!req.target || !req.token || !req.value || !this.id) return
+
+    let m = null
+
+    try {
+      m = cenc.decode(messages.announce, req.value)
+    } catch {
+      return
+    }
+
+    const now = Date.now()
+    if (now > m.timestamp + SIGNATURE_TIMEOUT || now < m.timestamp - SIGNATURE_TIMEOUT) {
+      return
+    }
+
+    if (!sodium.crypto_sign_verify_detached(m.signature, announceSignable(req.target, m, m.origin ? req.from : null), m.publicKey)) {
+      return
+    }
+
+    if (m.nodes.length > 3) m.nodes = m.nodes.slice(0, 3)
+
+    sodium.crypto_generichash(TMP, m.publicKey)
+    const announceSelf = TMP.equals(req.target)
+
+    for (let i = 0; i < m.nodes.length; i++) {
+      if (announceSelf && this._isSelf(m.nodes[i])) this.forwards.set(req.target.toString('hex'), req.from)
+    }
+
+    const record = cenc.encode(messages.record, m)
+
+    this.records.add(req.target.toString('hex'), record)
+    req.reply(null, { token: false, closerNodes: false })
   }
 
   async _onconnect (req) {
     if (!req.target) return
 
-    const s = this._getAnnounceSelf(req.target)
+    const s = this.forwards && this.forwards.get(req.target.toString('hex'))
 
     if (!s || !req.value) {
       req.reply(null, { token: false })
@@ -103,9 +147,9 @@ module.exports = class HyperDHT extends DHT {
     }
 
     try {
-      const res = await this.request(req.target, 'relay_connect', value, s.address, { retry: false })
+      const res = await this.request(req.target, 'relay_connect', value, s, { retry: false })
       const m = cenc.decode(messages.connect, res.value)
-      const relay = { host: s.address.host, port: res.from.port }
+      const relay = { host: s.host, port: res.from.port }
 
       sodium.crypto_generichash(m.relayAuth, cenc.encode(messages.peerIPv4, relay), m.relayAuth)
       value = cenc.encode(messages.connectRelay, { noise: m.noise, relayPort: relay.port, relayAuth: m.relayAuth })
@@ -130,7 +174,7 @@ module.exports = class HyperDHT extends DHT {
   async _onholepunch (req) {
     if (!req.target) return
 
-    const s = this._getAnnounceSelf(req.target)
+    const s = this.forwards && this.forwards.get(req.target.toString('hex'))
 
     if (!s || !req.value || !req.token) {
       req.reply(null, { token: false })
@@ -140,7 +184,7 @@ module.exports = class HyperDHT extends DHT {
     let res = null
 
     try {
-      res = await this.request(req.target, 'relay_holepunch', req.value, s.address, { retry: false })
+      res = await this.request(req.target, 'relay_holepunch', req.value, s, { retry: false })
     } catch {
       return
     }
@@ -159,41 +203,6 @@ module.exports = class HyperDHT extends DHT {
     }
 
     req.reply(null, { token: false, closerNodes: false })
-  }
-
-  _onannounceself (req) {
-    if (!this.id || !req.value || !req.token) return
-
-    let m = null
-    try {
-      m = cenc.decode(messages.announceSelf, req.value)
-    } catch {
-      return
-    }
-
-    const out = Buffer.allocUnsafe(32)
-    sodium.crypto_generichash_batch(out, [ANNOUNCE_SELF, this.id, req.token])
-
-    if (!sodium.crypto_sign_verify_detached(m.signature, out, m.publicKey)) {
-      return
-    }
-
-    this._setAnnounceSelf(hash(m.publicKey), {
-      expires: Date.now() + 45 * 60 * 1000,
-      address: req.from
-    })
-
-    req.reply(null, { token: false })
-  }
-
-  _setAnnounceSelf (target, data) {
-    this.cache.set('announce_self/' + target.toString('hex'), data)
-  }
-
-  _getAnnounceSelf (target) {
-    const s = this.cache && this.cache.get('announce_self/' + target.toString('hex'))
-    if (!s || s.expires < Date.now()) return null
-    return s
   }
 
   connect (publicKey, keyPair) {
@@ -259,7 +268,7 @@ module.exports = class HyperDHT extends DHT {
         break
       }
 
-      sodium.crypto_generichash_batch(relayAuth, [HOLEPUNCH, payload.relayAuth], noise.handshakeHash)
+      sodium.crypto_generichash_batch(relayAuth, [noise.handshakeHash, payload.relayAuth], NS_HOLEPUNCH)
 
       await holepunch.openSessions()
 
@@ -299,9 +308,32 @@ module.exports = class HyperDHT extends DHT {
     }
   }
 
-  lookup (publicKey, opts) {
-    const target = hash(publicKey)
+  lookup (target, opts = {}) {
+    opts = { ...opts, map: mapLookup }
     return this.query(target, 'lookup', null, opts)
+  }
+
+  announce (target, keyPair, nodes = [], opts = {}) {
+    let value = null
+    opts = { ...opts, map: mapLookup, commit }
+    return this.query(target, 'lookup', null, opts)
+
+    function commit (node, dht) {
+      if (value === null) { // make it just in time so the timestamp is up to date
+        const m = {
+          timestamp: Date.now(),
+          publicKey: keyPair.publicKey,
+          nodes,
+          origin: false,
+          signature: Buffer.allocUnsafe(64)
+        }
+
+        sodium.crypto_sign_detached(m.signature, announceSignable(target, m, null), keyPair.secretKey)
+        value = cenc.encode(messages.announce, m)
+      }
+
+      return dht.request(target, 'announce', value, node)
+    }
   }
 
   createServer (opts) {
@@ -446,15 +478,14 @@ class KATServer extends EventEmitter {
 
       const socket = new NoiseSecretStream(false, rawSocket, noise)
 
-      if (!this.emit('connection', socket)) {
-        socket.on('error', noop)
-        socket.destroy()
-        return
-      }
+      if (this.emit('connection', socket)) return
+
+      socket.on('error', noop)
+      socket.destroy()
     })
 
     const noisePayload = noise.send(hs.localPayload)
-    sodium.crypto_generichash_batch(signal, [HOLEPUNCH, relayAuth], noise.handshakeHash)
+    sodium.crypto_generichash_batch(signal, [noise.handshakeHash, relayAuth], NS_HOLEPUNCH)
 
     req.reply(cenc.encode(messages.connect, { noise: noisePayload, relayAuth }), { token: false, closerNodes: false, socket: hs.holepunch.socket })
   }
@@ -547,15 +578,15 @@ class KATServer extends EventEmitter {
 
     for (const gateway of q.closest.slice(0, 3)) {
       const m = {
+        timestamp: Date.now(),
         publicKey: this.keyPair.publicKey,
+        nodes: [{ host: gateway.host, port: gateway.port }],
+        origin: true,
         signature: Buffer.allocUnsafe(64)
       }
 
-      const out = Buffer.allocUnsafe(32)
-      sodium.crypto_generichash_batch(out, [ANNOUNCE_SELF, gateway.id, gateway.token])
-      sodium.crypto_sign_detached(m.signature, out, this.keyPair.secretKey)
-
-      promises.push(this.dht.request(null, 'announce_self', cenc.encode(messages.announceSelf, m), gateway))
+      sodium.crypto_sign_detached(m.signature, announceSignable(this.target, m, gateway.to), this.keyPair.secretKey)
+      promises.push(this.dht.request(this.target, 'announce', cenc.encode(messages.announce, m), gateway))
     }
 
     const gateways = []
@@ -590,4 +621,32 @@ function noop () {}
 
 function allowAll () {
   return true
+}
+
+function mapLookup (node) {
+  if (!node.value) return null
+
+  try {
+    return {
+      id: node.id,
+      from: node.from,
+      to: node.to,
+      peers: cenc.decode(messages.lookup, node.value)
+    }
+  } catch {
+    return null
+  }
+}
+
+function announceSignable (target, ann, origin) {
+  const state = { start: 0, end: 0, buffer: Buffer.allocUnsafe(64) }
+
+  cenc.fixed32.encode(state, target)
+  cenc.uint.encode(state, ann.timestamp)
+  messages.peerIPv4Array.encode(state, ann.nodes)
+  if (origin) messages.peerIPv4.encode(state, origin)
+
+  const out = state.buffer.subarray(0, 32)
+  sodium.crypto_generichash(out, state.buffer.subarray(0, state.start), NS_ANNOUNCE)
+  return out
 }
