@@ -300,7 +300,7 @@ class KeepAliveTimer extends Timer {
     this.target = target
     this.addr = addr
     this.dht = dht
-    this.expires = Date.now() + 30 * 60 * 1000
+    this.expires = Date.now() + 10 * 60 * 1000
   }
 
   update () {
@@ -321,7 +321,6 @@ class KATServer extends EventEmitter {
     this.nodes = null
     this.destroyed = false
     this.onauthenticate = opts.onauthentiate || allowAll
-    if (opts.onconnection) this.on('connection', opts.onconnection)
 
     this._keepAlives = null
     this._incomingHandshakes = new Set()
@@ -334,6 +333,8 @@ class KATServer extends EventEmitter {
     this._updatedOnce.then(() => {
       if (!this.destroyed) this.emit('listening')
     })
+
+    if (opts.onconnection) this.on('connection', opts.onconnection)
   }
 
   gc () {
