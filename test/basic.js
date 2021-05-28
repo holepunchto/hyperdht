@@ -39,6 +39,43 @@ test('listen and connect', async function (bootstrap, t) {
   destroy(nodes)
 })
 
+test('listen and connect multiple times', async function (bootstrap, t) {
+  const nodes = await swarm(bootstrap, 10)
+  const keyPair = HyperDHT.keyPair()
+
+  const server = nodes[0].createServer(function (connection) {
+    t.pass('server got connection')
+
+    connection.on('data', function (data) {
+      t.pass('server received data')
+      connection.write(Buffer.concat([Buffer.from('echo: '), data]))
+    })
+
+    connection.on('end', function () {
+      connection.end()
+    })
+  })
+
+  await server.listen(keyPair)
+
+  t.pass('listening')
+
+  for (let i = 0; i < 5; i++) {
+    const connection = nodes[nodes.length - 1].connect(keyPair.publicKey)
+
+    connection.write(Buffer.from('hello'))
+
+    const data = await new Promise((resolve) => connection.once('data', resolve))
+    t.same(data, Buffer.from('echo: hello'), 'echoed data')
+
+    connection.end()
+  }
+
+  await server.close()
+
+  destroy(nodes)
+})
+
 test('announce and unannounce', async function (bootstrap, t) {
   const nodes = await swarm(bootstrap, 10)
   const keyPair = HyperDHT.keyPair()
