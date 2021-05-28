@@ -16,12 +16,13 @@ const BOOTSTRAP_NODES = [
   { host: 'testnet3.hyperdht.org', port: 49736 }
 ]
 
-const SIGNATURE_TIMEOUT = 5 * 60 * 1000
+const SIGNATURE_TIMEOUT = 1 * 60 * 1000
 const SERVER_TIMEOUT = 20000
 const CLIENT_TIMEOUT = 25000
 
 const TMP = Buffer.allocUnsafe(32)
 const NS_ANNOUNCE = hash(Buffer.from('hyperswarm_announce'))
+const NS_UNANNOUNCE = hash(Buffer.from('hyperswarm_unannounce'))
 const NS_HOLEPUNCH = hash(Buffer.from('hyperswarm_holepunch'))
 
 const BAD_ADDR = new Error('Relay and remote peer does not agree on their public address')
@@ -51,7 +52,7 @@ module.exports = class HyperDHT extends DHT {
 
   _ondhtpersistent () {
     const maxSize = 65536
-    const maxAge = 45 * 60 * 1000
+    const maxAge = 20 * 60 * 1000
 
     this.forwards = new Cache({ maxSize, maxAge })
     this.records = new RecordCache({ maxSize, maxAge })
@@ -61,6 +62,7 @@ module.exports = class HyperDHT extends DHT {
     switch (req.command) {
       case 'lookup': return this._onlookup(req)
       case 'announce': return this._onannounce(req)
+      case 'unannounce': return this._onunannounce(req)
       case 'connect': return this._onconnect(req)
       case 'relay_connect': return this._onrelayconnect(req)
       case 'holepunch': return this._onholepunch(req)
@@ -80,9 +82,14 @@ module.exports = class HyperDHT extends DHT {
 
   _onlookup (req) {
     if (!req.target || !this.records) return req.reply(null)
-    const records = this.records.get(req.target.toString('hex'), 20)
-    if (!records.length) return req.reply(null)
-    req.reply(cenc.encode(rawArray, records))
+
+    const k = req.target.toString('hex')
+    const records = this.records.get(k, 20)
+    const fwd = this.forwards.get(k)
+
+    if (fwd && records.length < 20) records.push(fwd.record)
+
+    req.reply(records.length ? cenc.encode(rawArray, records) : null)
   }
 
   _isSelf (node) {
@@ -102,35 +109,79 @@ module.exports = class HyperDHT extends DHT {
     }
 
     const now = Date.now()
+
     if (now > m.timestamp + SIGNATURE_TIMEOUT || now < m.timestamp - SIGNATURE_TIMEOUT) {
       return
     }
 
-    if (!sodium.crypto_sign_verify_detached(m.signature, announceSignable(req.target, m, m.origin ? req.from : null), m.publicKey)) {
+    const signable = m.origin
+      ? annSignable(req.target, m, req.from, req.to)
+      : annSignable(req.target, m, null, null)
+
+    if (!sodium.crypto_sign_verify_detached(m.signature, signable, m.publicKey)) {
       return
     }
 
     if (m.nodes.length > 3) m.nodes = m.nodes.slice(0, 3)
 
     sodium.crypto_generichash(TMP, m.publicKey)
-    const announceSelf = TMP.equals(req.target)
 
-    for (let i = 0; i < m.nodes.length; i++) {
-      if (announceSelf && this._isSelf(m.nodes[i])) this.forwards.set(req.target.toString('hex'), req.from)
-    }
-
+    const k = req.target.toString('hex')
+    const announceSelf = m.origin && TMP.equals(req.target)
     const record = cenc.encode(messages.record, m)
 
-    this.records.add(req.target.toString('hex'), record)
+    if (announceSelf) {
+      this.forwards.set(k, { from: req.from, record })
+      this.records.remove(k, m.publicKey)
+    } else {
+      this.records.add(k, m.publicKey, record)
+    }
+
+    req.reply(null, { token: false, closerNodes: false })
+  }
+
+  _onunannounce (req) {
+    if (!req.target || !req.token || !req.value || !this.id) return
+
+    let m = null
+
+    try {
+      m = cenc.decode(messages.unannounce, req.value)
+    } catch {
+      return
+    }
+
+    const now = Date.now()
+
+    if (now > m.timestamp + SIGNATURE_TIMEOUT || now < m.timestamp - SIGNATURE_TIMEOUT) {
+      return
+    }
+
+    const signable = m.origin
+      ? unannSignable(req.target, m, req.from, req.to)
+      : unannSignable(req.target, m, null, null)
+
+    if (!sodium.crypto_sign_verify_detached(m.signature, signable, m.publicKey)) {
+      return
+    }
+
+    sodium.crypto_generichash(TMP, m.publicKey)
+
+    const k = req.target.toString('hex')
+    const announceSelf = m.origin && TMP.equals(req.target)
+
+    if (announceSelf) this.forwards.delete(k)
+    this.records.remove(k, m.publicKey)
+
     req.reply(null, { token: false, closerNodes: false })
   }
 
   async _onconnect (req) {
     if (!req.target) return
 
-    const s = this.forwards && this.forwards.get(req.target.toString('hex'))
+    const fwd = this.forwards && this.forwards.get(req.target.toString('hex'))
 
-    if (!s || !req.value) {
+    if (!fwd || !req.value) {
       req.reply(null, { token: false })
       return
     }
@@ -147,9 +198,9 @@ module.exports = class HyperDHT extends DHT {
     }
 
     try {
-      const res = await this.request(req.target, 'relay_connect', value, s, { retry: false })
+      const res = await this.request(req.target, 'relay_connect', value, fwd.from, { retry: false })
       const m = cenc.decode(messages.connect, res.value)
-      const relay = { host: s.host, port: res.from.port }
+      const relay = { host: fwd.from.host, port: res.from.port }
 
       sodium.crypto_generichash(m.relayAuth, cenc.encode(messages.peerIPv4, relay), m.relayAuth)
       value = cenc.encode(messages.connectRelay, { noise: m.noise, relayPort: relay.port, relayAuth: m.relayAuth })
@@ -174,9 +225,9 @@ module.exports = class HyperDHT extends DHT {
   async _onholepunch (req) {
     if (!req.target) return
 
-    const s = this.forwards && this.forwards.get(req.target.toString('hex'))
+    const fwd = this.forwards && this.forwards.get(req.target.toString('hex'))
 
-    if (!s || !req.value || !req.token) {
+    if (!fwd || !req.value || !req.token) {
       req.reply(null, { token: false })
       return
     }
@@ -184,7 +235,7 @@ module.exports = class HyperDHT extends DHT {
     let res = null
 
     try {
-      res = await this.request(req.target, 'relay_holepunch', req.value, s, { retry: false })
+      res = await this.request(req.target, 'relay_holepunch', req.value, fwd.from, { retry: false })
     } catch {
       return
     }
@@ -305,12 +356,76 @@ module.exports = class HyperDHT extends DHT {
     return this.query(target, 'lookup', null, opts)
   }
 
-  announce (target, keyPair, nodes = [], opts = {}) {
-    let value = null
-    opts = { ...opts, map: mapLookup, commit }
+  lookupAndUnannounce (target, keyPair, opts = {}) {
+    const unannounces = []
+    const dht = this
+    const userCommit = opts.commit || noop
+
+    if (this.records) { // unlink self
+      sodium.crypto_generichash(TMP, keyPair.publicKey)
+
+      const k = target.toString('hex')
+
+      if (TMP.equals(target)) this.forwards.delete(k)
+      this.records.remove(k, keyPair.publicKey)
+    }
+
+    opts = { ...opts, map, commit }
     return this.query(target, 'lookup', null, opts)
 
-    function commit (node, dht) {
+    async function commit (reply, dht, query) {
+      while (unannounces.length) {
+        try {
+          await unannounces.pop()
+        } catch {
+          continue
+        }
+      }
+
+      return userCommit(reply, dht, query)
+    }
+
+    function map (reply) {
+      const data = mapLookup(reply)
+
+      if (!data || !data.token) return data
+
+      let found = data.peers.length >= 20
+      for (let i = 0; !found && i < data.peers.length; i++) {
+        found = data.peers[i].publicKey.equals(keyPair.publicKey)
+      }
+
+      if (!found) return data
+
+      const m = {
+        timestamp: Date.now(),
+        publicKey: keyPair.publicKey,
+        origin: true,
+        signature: Buffer.allocUnsafe(64)
+      }
+
+      sodium.crypto_sign_detached(m.signature, unannSignable(target, m, data.to, data.from), keyPair.secretKey)
+
+      const value = cenc.encode(messages.unannounce, m)
+      unannounces.push(dht.request(target, 'unannounce', value, data.from, { token: data.token }))
+
+      return data
+    }
+  }
+
+  unannounce (target, keyPair, opts = {}) {
+    return this.lookupAndUnannounce(target, keyPair, opts).finished()
+  }
+
+  announce (target, keyPair, nodes = [], opts = {}) {
+    let value = null
+    opts = { ...opts, commit }
+
+    return opts.clear
+      ? this.lookupAndUnannounce(target, keyPair, opts)
+      : this.lookup(target, opts)
+
+    function commit (reply, dht) {
       if (value === null) { // make it just in time so the timestamp is up to date
         const m = {
           timestamp: Date.now(),
@@ -320,11 +435,11 @@ module.exports = class HyperDHT extends DHT {
           signature: Buffer.allocUnsafe(64)
         }
 
-        sodium.crypto_sign_detached(m.signature, announceSignable(target, m, null), keyPair.secretKey)
+        sodium.crypto_sign_detached(m.signature, annSignable(target, m, null, null), keyPair.secretKey)
         value = cenc.encode(messages.announce, m)
       }
 
-      return dht.request(target, 'announce', value, node)
+      return dht.request(target, 'announce', value, reply.from, { token: reply.token })
     }
   }
 
@@ -564,21 +679,21 @@ class KATServer extends EventEmitter {
     if (q === this._activeQuery) this._activeQuery = null
     if (this.destroyed) return this._resolveUpdatedOnce(false)
 
-    this.closestNodes = q.closest
+    this.closestNodes = q.closestNodes
 
     const promises = []
 
-    for (const node of q.closest.slice(0, 3)) {
+    for (const reply of q.closestReplies.slice(0, 3)) {
       const m = {
         timestamp: Date.now(),
         publicKey: this.keyPair.publicKey,
-        nodes: [{ host: node.host, port: node.port }],
+        nodes: [reply.from],
         origin: true,
         signature: Buffer.allocUnsafe(64)
       }
 
-      sodium.crypto_sign_detached(m.signature, announceSignable(this.target, m, node.to), this.keyPair.secretKey)
-      promises.push(this.dht.request(this.target, 'announce', cenc.encode(messages.announce, m), node))
+      sodium.crypto_sign_detached(m.signature, annSignable(this.target, m, reply.to, reply.from), this.keyPair.secretKey)
+      promises.push(this.dht.request(this.target, 'announce', cenc.encode(messages.announce, m), reply.from, { token: reply.token }))
     }
 
     const nodes = []
@@ -621,6 +736,7 @@ function mapLookup (node) {
   try {
     return {
       id: node.id,
+      token: node.token,
       from: node.from,
       to: node.to,
       peers: cenc.decode(messages.lookup, node.value)
@@ -644,15 +760,35 @@ function mapConnect (node) {
   }
 }
 
-function announceSignable (target, ann, origin) {
-  const state = { start: 0, end: 0, buffer: Buffer.allocUnsafe(64) }
+function annSignable (target, ann, from, to) {
+  const state = { start: 0, end: 0, buffer: Buffer.allocUnsafe(96) }
 
   cenc.fixed32.encode(state, target)
   cenc.uint.encode(state, ann.timestamp)
   messages.peerIPv4Array.encode(state, ann.nodes)
-  if (origin) messages.peerIPv4.encode(state, origin)
+
+  if (from) {
+    messages.peerIPv4.encode(state, from)
+    messages.peerIPv4.encode(state, to)
+  }
 
   const out = state.buffer.subarray(0, 32)
   sodium.crypto_generichash(out, state.buffer.subarray(0, state.start), NS_ANNOUNCE)
+  return out
+}
+
+function unannSignable (target, unann, from, to) {
+  const state = { start: 0, end: 0, buffer: Buffer.allocUnsafe(96) }
+
+  cenc.fixed32.encode(state, target)
+  cenc.uint.encode(state, unann.timestamp)
+
+  if (from) {
+    messages.peerIPv4.encode(state, from)
+    messages.peerIPv4.encode(state, to)
+  }
+
+  const out = state.buffer.subarray(0, 32)
+  sodium.crypto_generichash(out, state.buffer.subarray(0, state.start), NS_UNANNOUNCE)
   return out
 }
