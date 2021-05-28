@@ -8,6 +8,7 @@
     "dht-rpc": "beta",
     "noise-protocol": "^3.0.1",
     "noise-secret-stream": "^2.0.2",
+    "record-cache": "^1.1.1",
     "sodium-universal": "^3.0.4",
     "utp-native": "^2.4.0",
     "xache": "^1.0.0"
@@ -17,7 +18,7 @@
     "tape": "^5.2.2"
   },
   "scripts": {
-    "test": "standard && tape test.js"
+    "test": "standard && tape test/*.js"
   },
   "author": "Mathias Buus (@mafintosh)",
   "license": "MIT"

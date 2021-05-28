@@ -36,6 +36,5 @@ async function test (name, fn) {
     await fn(bootstrap, t)
 
     destroy(bootstrappers)
-    console.log('all done')
   })
 }
