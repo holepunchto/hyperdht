@@ -157,7 +157,7 @@ module.exports = class HyperDHT extends DHT {
       await holepunch.openSessions()
 
       try {
-        await this.request(target, 'holepunch', relayAuth, from, { socket, token })
+        await Promise.race([this.request(target, 'holepunch', relayAuth, from, { socket, token }), holepunch.connected])
       } catch {
         break
       }
@@ -165,7 +165,7 @@ module.exports = class HyperDHT extends DHT {
       socket.removeListener('message', onmessage)
 
       await holepunch.holepunch()
-      const rawSocket = await holepunch.connected()
+      const rawSocket = await holepunch.connected
 
       if (!rawSocket) {
         error = TIMEOUT
@@ -414,7 +414,7 @@ class KATServer extends EventEmitter {
     }
 
     this._incomingHandshakes.add(hs)
-    holepunch.connected().then((rawSocket) => {
+    holepunch.connected.then((rawSocket) => {
       this._incomingHandshakes.delete(hs)
       if (!rawSocket) return
 
