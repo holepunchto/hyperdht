@@ -340,7 +340,7 @@ class KATServer extends EventEmitter {
   gc () {
     const now = Date.now()
     for (const hs of this._incomingHandshakes) {
-      if (hs.added + SERVER_TIMEOUT < now) continue
+      if (now < hs.added + SERVER_TIMEOUT) continue
       hs.holepunch.destroy()
       this._incomingHandshakes.delete(hs)
     }
