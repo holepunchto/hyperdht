@@ -1,11 +1,11 @@
 {
   "name": "@hyperswarm/dht",
-  "version": "5.0.0-beta2",
+  "version": "5.0.0-beta3",
   "description": "The DHT powering the HyperSwarm stack",
   "main": "index.js",
   "dependencies": {
     "compact-encoding": "^2.1.0",
-    "dht-rpc": "beta",
+    "dht-rpc": "next",
     "noise-protocol": "^3.0.1",
     "noise-secret-stream": "^2.0.2",
     "record-cache": "^1.1.1",
