@@ -5,7 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "compact-encoding": "^2.1.0",
-    "dht-rpc": "beta",
+    "dht-rpc": "next",
     "noise-protocol": "^3.0.1",
     "noise-secret-stream": "^2.0.2",
     "record-cache": "^1.1.1",
