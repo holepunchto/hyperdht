@@ -3,6 +3,7 @@ const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
 const cenc = require('compact-encoding')
 const NoiseSecretStream = require('noise-secret-stream')
+const { VALUE_MAX_SIZE, Hypersign } = require('@hyperswarm/hypersign')
 const Timer = require('./lib/timer')
 const Holepuncher = require('./lib/holepuncher')
 const messages = require('./lib/messages')
@@ -17,12 +18,15 @@ const BOOTSTRAP_NODES = [
 
 const SERVER_TIMEOUT = 20000
 const CLIENT_TIMEOUT = 25000
+const PUT_VALUE_MAX_SIZE = VALUE_MAX_SIZE
 
 const NS_HOLEPUNCH = hash(Buffer.from('hyperswarm_holepunch'))
 
 const BAD_ADDR = new Error('Relay and remote peer does not agree on their public address')
 const NOT_HOLEPUNCHABLE = new Error('Both networks are not holepunchable')
 const TIMEOUT = new Error('Holepunch attempt timed out')
+
+const hypersign = new Hypersign()
 
 module.exports = class HyperDHT extends DHT {
   constructor (opts = {}) {
@@ -60,15 +64,11 @@ module.exports = class HyperDHT extends DHT {
       case 'unannounce': return this.persistent.onunannounce(req)
       case 'connect': return this.persistent.onconnect(req)
       case 'holepunch': return this.persistent.onholepunch(req)
+      case 'immutable_get': return this.persistent.onget(req, { mutable: false })
+      case 'immutable_put': return this.persistent.onput(req, { mutable: false })
+      case 'mutable_get': return this.persistent.onget(req, { mutable: true })
+      case 'mutable_put': return this.persistent.onput(req, { mutable: true })
     }
-
-    /*
-      missing:
-        mutable_get
-        mutable_put
-        immutable_get
-        immutable_put
-    */
 
     req.error(DHT.UNKNOWN_COMMAND)
   }
@@ -183,12 +183,75 @@ module.exports = class HyperDHT extends DHT {
     noise.destroy()
 
     if (!error) error = new Error('Could not connect to peer')
+
     throw error
 
     function ontimeout () {
       if (!error) error = TIMEOUT
       query.destroy()
       holepunch.destroy()
+    }
+  }
+
+  async immutableGet (key) {
+    if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
+    const value = this.persistent ? this.persistent.immutables.get(key.toString('hex')) : null
+    const local = !!value
+    if (local) {
+      const { id, token, from, to, peers } = this
+      return { value, id, token, from, to, peers, local }
+    }
+    const query = this.query(key, 'immutable_get', null, { map: mapImmutable })
+    const { value: result } = await query[Symbol.asyncIterator]().next()
+    query.destroy()
+    return result
+  }
+
+  async immutablePut (value) {
+    if (Buffer.isBuffer(value) === false) throw new Error('value must be a buffer')
+    if (value.length > PUT_VALUE_MAX_SIZE) {
+      throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
+    }
+    const key = Buffer.alloc(32)
+    sodium.crypto_generichash(key, value)
+    if (this.persistent) this.persistent.immutables.set(key.toString('hex'), value)
+    const query = this.query(key, 'immutable_put', value, { map: mapImmutable, commit: true })
+    await query.finished()
+    // return query // TODO, should we return query, or anything at all?
+  }
+
+  async mutableGet (key, { salt, seq = 0, latest = true } = {}) {
+    if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
+    if (typeof seq !== 'number') throw new Error('seq should be a number')
+    if (salt) {
+      if (Buffer.isBuffer(salt) === false) throw new Error('salt must be a buffer')
+      if (salt.length > 64) throw new Error('salt size must be no greater than 64 bytes')
+    }
+    const request = cenc.encode(messages.immutable, { salt, seq })
+    const query = this.query(key, 'mutable_get', request, { map: mapMutable })
+    const userSeq = seq
+    let topSeq = seq
+    let result = null
+    for await (const node of query) {
+      if (!node.value) continue
+      const { value, signature, seq: storedSeq } = cenc.decode(messages.immutable, node.value)
+      const msg = hypersign.signable(value, { salt, seq: storedSeq })
+      if (storedSeq >= userSeq && hypersign.verify(signature, msg, key)) {
+        if (latest === false) return { id: node.id, value, signature, seq: storedSeq, salt }
+        if (storedSeq > topSeq) {
+          topSeq = storedSeq
+          result = { id: node.id, value, signature, seq: storedSeq, salt }
+        }
+      }
+    }
+    return result
+  }
+
+  async mutablePut (key, value) {
+    if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
+    if (Buffer.isBuffer(value) === false) throw new Error('value must be a buffer')
+    if (value.length > PUT_VALUE_MAX_SIZE) {
+      throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     }
   }
 
@@ -567,6 +630,30 @@ function noop () {}
 
 function allowAll () {
   return true
+}
+
+function mapImmutable (node) {
+  const query = this
+  return {
+    id: node.id,
+    value: node.value,
+    token: node.token,
+    from: node.from,
+    to: node.to,
+    peers: query.dht.peers
+  }
+}
+
+function mapMutable (node) {
+  const query = this
+  return {
+    id: node.id,
+    value: node.value,
+    token: node.token,
+    from: node.from,
+    to: node.to,
+    peers: query.dht.peers
+  }
 }
 
 function mapLookup (node) {
