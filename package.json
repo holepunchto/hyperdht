@@ -23,5 +23,18 @@
     "lint": "standard"
   },
   "author": "Mathias Buus (@mafintosh)",
-  "license": "MIT"
+  "license": "MIT",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hyperswarm/dht.git"
+  },
+  "keywords": [],
+  "bugs": {
+    "url": "https://github.com/hyperswarm/dht/issues"
+  },
+  "homepage": "https://github.com/hyperswarm/dht#readme"
 }
