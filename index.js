@@ -195,16 +195,10 @@ module.exports = class HyperDHT extends DHT {
 
   async immutableGet (key) {
     if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
-    const value = this.persistent ? this.persistent.immutables.get(key.toString('hex')) : null
-    const local = !!value
-    if (local) {
-      const { id, token, from, to, peers } = this
-      return { value, id, token, from, to, peers, local }
-    }
     const query = this.query(key, 'immutable_get', null, { map: mapImmutable })
-    const { value: result } = await query[Symbol.asyncIterator]().next()
+    const { value } = await query[Symbol.asyncIterator]().next()
     query.destroy()
-    return result
+    return value
   }
 
   async immutablePut (value) {
@@ -214,7 +208,6 @@ module.exports = class HyperDHT extends DHT {
     }
     const key = Buffer.alloc(32)
     sodium.crypto_generichash(key, value)
-    if (this.persistent) this.persistent.immutables.set(key.toString('hex'), value)
     const query = this.query(key, 'immutable_put', value, { map: mapImmutable, commit: true })
     await query.finished()
     // return query // TODO, should we return query, or anything at all?
