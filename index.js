@@ -228,7 +228,7 @@ module.exports = class HyperDHT extends DHT {
     for await (const node of query) {
       const { value: item, id, ...meta } = node
       if (!item) continue
-      const { value, signature, seq: storedSeq } = cenc.decode(messages.immutable, item)
+      const { value, signature, seq: storedSeq } = cenc.decode(messages.mutable, item)
       const msg = hypersign.signable(value, { salt, seq: storedSeq })
       if (storedSeq >= userSeq && hypersign.verify(signature, msg, key)) {
         if (latest === false) return { id, value, signature, seq: storedSeq, salt, ...meta }
@@ -627,26 +627,22 @@ function allowAll () {
 }
 
 function mapImmutable (node) {
-  const query = this
   return {
     id: node.id,
     value: node.value,
     token: node.token,
     from: node.from,
-    to: node.to,
-    peers: query.dht.peers
+    to: node.to
   }
 }
 
 function mapMutable (node) {
-  const query = this
   return {
     id: node.id,
     value: node.value,
     token: node.token,
     from: node.from,
-    to: node.to,
-    peers: query.dht.peers
+    to: node.to
   }
 }
 
