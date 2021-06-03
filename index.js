@@ -233,14 +233,15 @@ module.exports = class HyperDHT extends DHT {
     let topSeq = seq
     let result = null
     for await (const node of query) {
-      if (!node.value) continue
-      const { value, signature, seq: storedSeq } = cenc.decode(messages.immutable, node.value)
+      const { value: item, id, ...meta } = node
+      if (!item) continue
+      const { value, signature, seq: storedSeq } = cenc.decode(messages.immutable, item)
       const msg = hypersign.signable(value, { salt, seq: storedSeq })
       if (storedSeq >= userSeq && hypersign.verify(signature, msg, key)) {
-        if (latest === false) return { id: node.id, value, signature, seq: storedSeq, salt }
+        if (latest === false) return { id, value, signature, seq: storedSeq, salt, ...meta }
         if (storedSeq > topSeq) {
           topSeq = storedSeq
-          result = { id: node.id, value, signature, seq: storedSeq, salt }
+          result = { id, value, signature, seq: storedSeq, salt, ...meta }
         }
       }
     }
