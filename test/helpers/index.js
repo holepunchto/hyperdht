@@ -1,13 +1,24 @@
 const tape = require('tape')
 const HyperDHT = require('../../')
 
-module.exports = { test, swarm, destroy }
+module.exports = { test, swarm, destroy, defer }
+test.only = (name, fn) => test(name, fn, true)
 
 function destroy (...nodes) {
   for (const node of nodes) {
     if (Array.isArray(node)) destroy(...node)
     else node.destroy()
   }
+}
+
+function defer () {
+  const res = { promise: null, resolve: null, reject: null, then: null }
+  res.promise = new Promise((resolve, reject) => {
+    res.resolve = resolve
+    res.reject = reject
+  })
+  res.then = res.promise.then.bind(res.promise)
+  return res
 }
 
 async function swarm (bootstrap, n = 32) {
@@ -20,8 +31,11 @@ async function swarm (bootstrap, n = 32) {
   return nodes
 }
 
-async function test (name, fn) {
-  tape(name, async function (t) {
+async function test (name, fn, only = false) {
+  if (only) tape.only(name, run)
+  else tape(name, run)
+
+  async function run (t) {
     const bootstrappers = []
     while (bootstrappers.length < 3) {
       bootstrappers.push(new HyperDHT({ ephemeral: true, bootstrap: [] }))
@@ -36,5 +50,5 @@ async function test (name, fn) {
     await fn(bootstrap, t)
 
     destroy(bootstrappers)
-  })
+  }
 }

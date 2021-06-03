@@ -1,4 +1,4 @@
-const { test, swarm, destroy } = require('./helpers')
+const { test, swarm, defer, destroy } = require('./helpers')
 const HyperDHT = require('../')
 
 test('listen and connect', async function (bootstrap, t) {
@@ -122,5 +122,41 @@ test('clearing announce', async function (bootstrap, t) {
     t.same(node.peers[0], { publicKey: keyPair.publicKey, nodes: [b] })
   }
 
+  destroy(nodes)
+})
+
+test('sets public key / remote public key', async function (bootstrap, t) {
+  const nodes = await swarm(bootstrap, 10)
+  const serverAssert = defer()
+  const clientAssert = defer()
+
+  const serverKeyPair = HyperDHT.keyPair()
+  const clientKeyPair = HyperDHT.keyPair()
+
+  const server = nodes[0].createServer(function (connection) {
+    t.same(connection.publicKey, serverKeyPair.publicKey, 'server public key is server public key')
+    t.same(connection.remotePublicKey, clientKeyPair.publicKey, 'server remote public key is client public key')
+
+    connection.end()
+    serverAssert.resolve()
+  })
+
+  await server.listen(serverKeyPair)
+
+  const connection = nodes[1].connect(serverKeyPair.publicKey, clientKeyPair)
+
+  connection.on('open', function () {
+    t.same(connection.publicKey, clientKeyPair.publicKey, 'client public key is client public key')
+    t.same(connection.remotePublicKey, serverKeyPair.publicKey, 'client remote public key is server public key')
+
+    clientAssert.resolve()
+  })
+
+  connection.on('end', () => connection.end())
+
+  await serverAssert
+  await clientAssert
+
+  server.close()
   destroy(nodes)
 })

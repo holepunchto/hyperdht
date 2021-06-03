@@ -38,6 +38,8 @@ module.exports = class HyperDHT extends DHT {
 
   destroy () {
     if (this.persistent !== null) this.persistent.destroy()
+    this.persistent = null
+    for (const server of this.servers) server.close()
     super.destroy()
   }
 
@@ -103,7 +105,8 @@ module.exports = class HyperDHT extends DHT {
 
   async connectRaw (publicKey, opts = {}) {
     const remoteNoisePublicKey = Buffer.alloc(32)
-    const noiseKeyPair = NoiseState.ed25519toCurve25519(opts.keyPair || (opts.secretKey ? opts : this.defaultKeyPair))
+    const localKeyPair = opts.keyPair || (opts.secretKey ? opts : this.defaultKeyPair)
+    const noiseKeyPair = NoiseState.ed25519toCurve25519(localKeyPair)
 
     sodium.crypto_sign_ed25519_pk_to_curve25519(remoteNoisePublicKey, publicKey)
 
@@ -123,6 +126,7 @@ module.exports = class HyperDHT extends DHT {
     // forward incoming messages to the dht
     socket.on('message', onmessage)
 
+    localPayload.publicKey = localKeyPair.publicKey
     localPayload.relayAuth = Buffer.allocUnsafe(32)
 
     sodium.randombytes_buf(localPayload.relayAuth)
@@ -174,7 +178,18 @@ module.exports = class HyperDHT extends DHT {
 
       clearTimeout(timeout)
       // [isInitiator, rawSocket, noise]
-      return [true, rawSocket, noise]
+
+      const opts = {
+        handshake: {
+          tx: noise.tx,
+          rx: noise.rx,
+          handshakeHash: noise.handshakeHash,
+          publicKey: localKeyPair.publicKey,
+          remotePublicKey: publicKey
+        }
+      }
+
+      return [true, rawSocket, opts]
     }
 
     clearTimeout(timeout)
@@ -364,6 +379,14 @@ class KATServer extends EventEmitter {
 
     const noise = new NoiseState(this.noiseKeyPair, null)
     const payload = noise.recv(m.noise)
+    const remotePublicKey = payload.publicKey
+    const relayAuth = Buffer.allocUnsafe(32)
+
+    if (!remotePublicKey) return
+
+    // we can just use the relayauth buffer here instead of allocing a new one
+    sodium.crypto_sign_ed25519_pk_to_curve25519(relayAuth, remotePublicKey)
+    if (!relayAuth.equals(noise.remotePublicKey)) return
 
     if (!payload) return
 
@@ -371,8 +394,6 @@ class KATServer extends EventEmitter {
 
     // if the remote peer do not agree on the relay port (in case of explicit ports) - drop message
     if (payload.address.port !== m.relayPort) return
-
-    const relayAuth = Buffer.allocUnsafe(32)
 
     sodium.crypto_generichash(relayAuth, cenc.encode(messages.peerIPv4, payload.address), payload.relayAuth)
 
@@ -400,6 +421,10 @@ class KATServer extends EventEmitter {
     holepunch.setRemoteNetwork(payload)
     const localPayload = holepunch.bind()
 
+    // since we are doing IK they other side already knows our noise key
+    // send back the ed key, that corresponds to that for good messure like the client does
+    localPayload.publicKey = this.keyPair.publicKey
+
     // reset auth token
     sodium.randombytes_buf(relayAuth)
     localPayload.relayAuth = relayAuth
@@ -418,7 +443,17 @@ class KATServer extends EventEmitter {
       this._incomingHandshakes.delete(hs)
       if (!rawSocket) return
 
-      const socket = new NoiseSecretStream(false, rawSocket, noise)
+      const opts = {
+        handshake: {
+          tx: noise.tx,
+          rx: noise.rx,
+          handshakeHash: noise.handshakeHash,
+          publicKey: this.keyPair.publicKey,
+          remotePublicKey: payload.publicKey
+        }
+      }
+
+      const socket = new NoiseSecretStream(false, rawSocket, opts)
 
       if (this.emit('connection', socket)) return
 
