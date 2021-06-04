@@ -196,9 +196,13 @@ module.exports = class HyperDHT extends DHT {
   async immutableGet (key) {
     if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
     const query = this.query(key, 'immutable_get', null, { map: mapImmutable })
-    const { value } = await query[Symbol.asyncIterator]().next()
-    query.destroy()
-    return value
+    const check = Buffer.allocUnsafe(32)
+    for await (const node of query) {
+      const { value } = node
+      sodium.crypto_generichash(check, value)
+      if (check.equals(key)) return node
+    }
+    throw Error('not found')
   }
 
   async immutablePut (value) {
@@ -206,11 +210,16 @@ module.exports = class HyperDHT extends DHT {
     if (value.length > PUT_VALUE_MAX_SIZE) {
       throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     }
-    const key = Buffer.alloc(32)
+    const key = Buffer.allocUnsafe(32)
     sodium.crypto_generichash(key, value)
-    const query = this.query(key, 'immutable_put', value, { map: mapImmutable, commit: true })
+    const query = this.query(key, 'immutable_get', null, {
+      map: mapImmutable,
+      commit (node, dht) {
+        return dht.request(key, 'immutable_put', value, node.from, { map: mapImmutable, token: node.token })
+      }
+    })
     await query.finished()
-    // return query // TODO, should we return query, or anything at all?
+    return { key }
   }
 
   async mutableGet (key, { salt, seq = 0, latest = true } = {}) {
@@ -241,12 +250,26 @@ module.exports = class HyperDHT extends DHT {
     return result
   }
 
-  async mutablePut (key, value) {
+  async mutablePut (key, value, opts = {}) {
     if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
     if (Buffer.isBuffer(value) === false) throw new Error('value must be a buffer')
     if (value.length > PUT_VALUE_MAX_SIZE) {
       throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     }
+    const { seq = 0, salt, keypair, signature = hypersign.sign(value, opts) } = opts
+    if (typeof seq !== 'number') throw new Error('seq should be a number')
+    if (opts.signature) {
+      if (!keypair) throw new Error('keypair is required')
+      const { secretKey, publicKey } = keypair
+      if (Buffer.isBuffer(publicKey) === false) throw new Error('keypair.publicKey is required')
+      if (secretKey) throw new Error('only opts.signature OR opts.keypair.secretKey should be supplied')
+    }
+    const msg = cenc.encode(messages.mutable, {
+      value, signature, seq, salt
+    })
+    const query = this.query(keypair.publicKey, 'immutable_put', msg, { map: mapMutable, commit: true })
+    await query.finished()
+    return { key, signature, seq, salt }
   }
 
   lookup (target, opts = {}) {
@@ -627,6 +650,7 @@ function allowAll () {
 }
 
 function mapImmutable (node) {
+  if (!node.value) return null
   return {
     id: node.id,
     value: node.value,
@@ -637,6 +661,7 @@ function mapImmutable (node) {
 }
 
 function mapMutable (node) {
+  if (!node.value) return null
   return {
     id: node.id,
     value: node.value,
