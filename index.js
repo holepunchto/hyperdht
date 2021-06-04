@@ -222,26 +222,27 @@ module.exports = class HyperDHT extends DHT {
     return { key }
   }
 
-  async mutableGet (key, { salt, seq = 0, latest = true } = {}) {
+  async mutableGet (key, { salt = null, seq = 0, latest = true } = {}) {
     if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
     if (typeof seq !== 'number') throw new Error('seq should be a number')
     if (salt) {
       if (Buffer.isBuffer(salt) === false) throw new Error('salt must be a buffer')
       if (salt.length > 64) throw new Error('salt size must be no greater than 64 bytes')
     }
-    const request = cenc.encode(messages.immutable, { salt, seq })
+
+    const request = cenc.encode(messages.mutableReq, { salt, seq })
+    
     const query = this.query(key, 'mutable_get', request, { map: mapMutable })
     const userSeq = seq
     let topSeq = seq
     let result = null
     for await (const node of query) {
       const { value: item, id, ...meta } = node
-      if (!item) continue
-      const { value, signature, seq: storedSeq } = cenc.decode(messages.mutable, item)
+      const { value, signature, seq: storedSeq } = cenc.decode(messages.mutableRes, item)
       const msg = hypersign.signable(value, { salt, seq: storedSeq })
-      if (storedSeq >= userSeq && hypersign.verify(signature, msg, key)) {
+      if (storedSeq >= userSeq && sodium.crypto_sign_verify_detached(signature, msg, key)) {
         if (latest === false) return { id, value, signature, seq: storedSeq, salt, ...meta }
-        if (storedSeq > topSeq) {
+        if (storedSeq >= topSeq) {
           topSeq = storedSeq
           result = { id, value, signature, seq: storedSeq, salt, ...meta }
         }
@@ -250,24 +251,29 @@ module.exports = class HyperDHT extends DHT {
     return result
   }
 
-  async mutablePut (key, value, opts = {}) {
-    if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
+  async mutablePut (value, opts = {}) {
     if (Buffer.isBuffer(value) === false) throw new Error('value must be a buffer')
     if (value.length > PUT_VALUE_MAX_SIZE) {
       throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     }
-    const { seq = 0, salt, keypair, signature = hypersign.sign(value, opts) } = opts
+    const { seq = 0, salt = null, keyPair, signature = hypersign.sign(value, {...opts, keypair: keyPair}) } = opts
     if (typeof seq !== 'number') throw new Error('seq should be a number')
     if (opts.signature) {
-      if (!keypair) throw new Error('keypair is required')
-      const { secretKey, publicKey } = keypair
-      if (Buffer.isBuffer(publicKey) === false) throw new Error('keypair.publicKey is required')
-      if (secretKey) throw new Error('only opts.signature OR opts.keypair.secretKey should be supplied')
+      if (!keyPair) throw new Error('keyPair is required')
+      const { secretKey, publicKey } = keyPair
+      if (Buffer.isBuffer(publicKey) === false) throw new Error('keyPair.publicKey is required')
+      if (secretKey) throw new Error('only opts.signature OR opts.keyPair.secretKey should be supplied')
     }
-    const msg = cenc.encode(messages.mutable, {
+    const { publicKey: key } = keyPair
+    const msg = cenc.encode(messages.mutableRes, {
       value, signature, seq, salt
     })
-    const query = this.query(keypair.publicKey, 'immutable_put', msg, { map: mapMutable, commit: true })
+    const query = this.query(key, 'mutable_get', null, {
+      map: mapMutable,
+      commit (node, dht) {
+        return dht.request(key, 'mutable_put', msg, node.from, { map: mapMutable, token: node.token })
+      }
+    })
     await query.finished()
     return { key, signature, seq, salt }
   }
