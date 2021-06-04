@@ -2,26 +2,26 @@
 const HyperDHT = require('../')
 const { test, swarm, destroy } = require('./helpers')
 
-test('immutable put - get', async (bootstrap, { is }) => {
-  const nodes = await swarm(bootstrap, 100)
+// test('immutable put - get', async (bootstrap, { is }) => {
+//   const nodes = await swarm(bootstrap, 100)
 
-  const { key } = await nodes[0].immutablePut(Buffer.from('testing'))
+//   const { key } = await nodes[0].immutablePut(Buffer.from('testing'))
 
-  const { id, value, token, from, to } = await nodes[30].immutableGet(key)
+//   const { id, value, token, from, to } = await nodes[30].immutableGet(key)
 
-  is(id.length, 32)
-  is(Buffer.isBuffer(value), true)
-  is(value.toString(), 'testing')
-  is(token.length, 32)
-  is(typeof from, 'object')
-  is(typeof from.host, 'string')
-  is(typeof from.port, 'number')
-  is(typeof to, 'object')
-  is(typeof to.host, 'string')
-  is(typeof to.port, 'number')
+//   is(id.length, 32)
+//   is(Buffer.isBuffer(value), true)
+//   is(value.toString(), 'testing')
+//   is(token.length, 32)
+//   is(typeof from, 'object')
+//   is(typeof from.host, 'string')
+//   is(typeof from.port, 'number')
+//   is(typeof to, 'object')
+//   is(typeof to.host, 'string')
+//   is(typeof to.port, 'number')
 
-  destroy(nodes)
-})
+//   destroy(nodes)
+// })
 
 test('mutable put - get', async (bootstrap, { is }) => {
   const nodes = await swarm(bootstrap, 10)
@@ -31,8 +31,7 @@ test('mutable put - get', async (bootstrap, { is }) => {
   is(put.signature.length, 64)
   is(put.seq, 0)
   is(put.salt, null)
-
-  const { id, value, signature, seq, salt, token, from, to } = (await nodes[3].mutableGet(put.key))
+  const { id, value, signature, seq, salt, token, from, to } = await nodes[3].mutableGet(put.key)
 
   is(seq, 0)
   is(salt, null)

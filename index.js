@@ -231,16 +231,16 @@ module.exports = class HyperDHT extends DHT {
     }
 
     const request = cenc.encode(messages.mutableReq, { salt, seq })
-    
+
     const query = this.query(key, 'mutable_get', request, { map: mapMutable })
     const userSeq = seq
     let topSeq = seq
     let result = null
     for await (const node of query) {
       const { value: item, id, ...meta } = node
-      const { value, signature, seq: storedSeq } = cenc.decode(messages.mutableRes, item)
+      const { value, signature, seq: storedSeq, publicKey } = cenc.decode(messages.mutableRes, item)
       const msg = hypersign.signable(value, { salt, seq: storedSeq })
-      if (storedSeq >= userSeq && sodium.crypto_sign_verify_detached(signature, msg, key)) {
+      if (storedSeq >= userSeq && sodium.crypto_sign_verify_detached(signature, msg, publicKey)) {
         if (latest === false) return { id, value, signature, seq: storedSeq, salt, ...meta }
         if (storedSeq >= topSeq) {
           topSeq = storedSeq
@@ -256,7 +256,7 @@ module.exports = class HyperDHT extends DHT {
     if (value.length > PUT_VALUE_MAX_SIZE) {
       throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     }
-    const { seq = 0, salt = null, keyPair, signature = hypersign.sign(value, {...opts, keypair: keyPair}) } = opts
+    const { seq = 0, salt = null, keyPair, signature = hypersign.sign(value, { ...opts, keypair: keyPair }) } = opts
     if (typeof seq !== 'number') throw new Error('seq should be a number')
     if (opts.signature) {
       if (!keyPair) throw new Error('keyPair is required')
@@ -264,9 +264,11 @@ module.exports = class HyperDHT extends DHT {
       if (Buffer.isBuffer(publicKey) === false) throw new Error('keyPair.publicKey is required')
       if (secretKey) throw new Error('only opts.signature OR opts.keyPair.secretKey should be supplied')
     }
-    const { publicKey: key } = keyPair
+    const { publicKey } = keyPair
+    const key = Buffer.allocUnsafe(32)
+    sodium.crypto_generichash(key, publicKey)
     const msg = cenc.encode(messages.mutableRes, {
-      value, signature, seq, salt
+      value, signature, seq, salt, publicKey
     })
     const query = this.query(key, 'mutable_get', null, {
       map: mapMutable,
