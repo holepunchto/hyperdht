@@ -7,7 +7,7 @@
     "compact-encoding": "^2.1.0",
     "dht-rpc": "next",
     "noise-protocol": "^3.0.1",
-    "noise-secret-stream": "^2.0.2",
+    "noise-secret-stream": "^3.0.1",
     "record-cache": "^1.1.1",
     "sodium-universal": "^3.0.4",
     "utp-native": "^2.4.0",

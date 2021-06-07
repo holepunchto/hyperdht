@@ -100,7 +100,15 @@ module.exports = class HyperDHT extends DHT {
   }
 
   connect (publicKey, opts) {
-    return NoiseSecretStream.async(this.connectRaw(publicKey, opts))
+    // TODO: rework this so connectRaw starts the stream instead (and rename connectRaw)
+    // not public api so not semver
+
+    const s = new NoiseSecretStream(true, null, { autoStart: false })
+
+    this.connectRaw(publicKey, opts)
+      .then(([rawSocket, opts]) => { s.start(rawSocket, opts) }, (err) => s.destroy(err))
+
+    return s
   }
 
   async connectRaw (publicKey, opts = {}) {
@@ -189,7 +197,7 @@ module.exports = class HyperDHT extends DHT {
         }
       }
 
-      return [true, rawSocket, opts]
+      return [rawSocket, opts]
     }
 
     clearTimeout(timeout)
