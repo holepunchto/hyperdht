@@ -30,7 +30,7 @@ test('mutable put - get', async (bootstrap, { is }) => {
   const put = await nodes[30].mutablePut(Buffer.from('testing'), { keyPair })
   is(put.signature.length, 64)
   is(put.seq, 0)
-  const { id, value, signature, seq, token, from, to } = await nodes[3].mutableGet(put.key)
+  const { id, value, signature, seq, token, from, to } = await nodes[3].mutableGet(keyPair.publicKey)
 
   is(seq, 0)
   is(id.length, 32)

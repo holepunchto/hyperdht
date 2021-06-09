@@ -193,9 +193,12 @@ module.exports = class HyperDHT extends DHT {
     }
   }
 
-  async immutableGet (key) {
+  async immutableGet (key, opts = {}) {
     if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
-    const query = this.query(key, 'immutable_get', null, { map: mapImmutable })
+    const query = this.query(key, 'immutable_get', null, {
+      closestNodes: opts.closestNodes,
+      map: mapImmutable
+    })
     const check = Buffer.allocUnsafe(32)
     for await (const node of query) {
       const { value } = node
@@ -213,10 +216,10 @@ module.exports = class HyperDHT extends DHT {
     const key = Buffer.allocUnsafe(32)
     sodium.crypto_generichash(key, value)
     const query = this.query(key, 'immutable_get', null, {
+      closestNodes: opts.closestNodes,
       map: mapImmutable,
       commit (node, dht) {
         return dht.request(key, 'immutable_put', value, node.from, {
-          ...opts,
           token: node.token
         })
       }
@@ -225,11 +228,14 @@ module.exports = class HyperDHT extends DHT {
     return { key, closestNodes: query.closestNodes }
   }
 
-  async mutableGet (key, { seq = 0, latest = true } = {}) {
+  async mutableGet (key, { seq = 0, latest = true, closestNodes } = {}) {
     if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
     if (typeof seq !== 'number') throw new Error('seq should be a number')
 
-    const query = this.query(key, 'mutable_get', cenc.encode(cenc.uint, seq), { map: mapMutable })
+    const query = this.query(key, 'mutable_get', cenc.encode(cenc.uint, seq), {
+      closestNodes,
+      map: mapMutable
+    })
     const userSeq = seq
     let topSeq = seq
     let result = null
@@ -270,12 +276,13 @@ module.exports = class HyperDHT extends DHT {
     })
     const query = this.query(key, 'mutable_get', cenc.encode(cenc.uint, seq), {
       map: mapMutable,
+      closestNodes: opts.closestNodes,
       commit (node, dht) {
-        return dht.request(key, 'mutable_put', msg, node.from, { map: mapMutable, token: node.token })
+        return dht.request(key, 'mutable_put', msg, node.from, { token: node.token })
       }
     })
     await query.finished()
-    return { key, signature, seq }
+    return { signature, seq }
   }
 
   lookup (target, opts = {}) {
