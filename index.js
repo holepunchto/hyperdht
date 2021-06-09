@@ -205,7 +205,7 @@ module.exports = class HyperDHT extends DHT {
     throw Error('not found')
   }
 
-  async immutablePut (value) {
+  async immutablePut (value, opts = {}) {
     if (Buffer.isBuffer(value) === false) throw new Error('value must be a buffer')
     if (value.length > PUT_VALUE_MAX_SIZE) {
       throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
@@ -215,36 +215,33 @@ module.exports = class HyperDHT extends DHT {
     const query = this.query(key, 'immutable_get', null, {
       map: mapImmutable,
       commit (node, dht) {
-        return dht.request(key, 'immutable_put', value, node.from, { map: mapImmutable, token: node.token })
+        return dht.request(key, 'immutable_put', value, node.from, {
+          ...opts,
+          token: node.token
+        })
       }
     })
     await query.finished()
-    return { key }
+    return { key, closestNodes: query.closestNodes }
   }
 
-  async mutableGet (key, { salt = null, seq = 0, latest = true } = {}) {
+  async mutableGet (key, { seq = 0, latest = true } = {}) {
     if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
     if (typeof seq !== 'number') throw new Error('seq should be a number')
-    if (salt) {
-      if (Buffer.isBuffer(salt) === false) throw new Error('salt must be a buffer')
-      if (salt.length > 64) throw new Error('salt size must be no greater than 64 bytes')
-    }
 
-    const request = cenc.encode(messages.mutableReq, { salt, seq })
-
-    const query = this.query(key, 'mutable_get', request, { map: mapMutable })
+    const query = this.query(key, 'mutable_get', cenc.encode(cenc.uint, seq), { map: mapMutable })
     const userSeq = seq
     let topSeq = seq
     let result = null
     for await (const node of query) {
-      const { value: item, id, ...meta } = node
-      const { value, signature, seq: storedSeq, publicKey } = cenc.decode(messages.mutableRes, item)
-      const msg = hypersign.signable(value, { salt, seq: storedSeq })
+      const { id, value, signature, seq: storedSeq, publicKey, ...meta } = node
+
+      const msg = hypersign.signable(value, { seq: storedSeq })
       if (storedSeq >= userSeq && sodium.crypto_sign_verify_detached(signature, msg, publicKey)) {
-        if (latest === false) return { id, value, signature, seq: storedSeq, salt, ...meta }
+        if (latest === false) return { id, value, signature, seq: storedSeq, ...meta }
         if (storedSeq >= topSeq) {
           topSeq = storedSeq
-          result = { id, value, signature, seq: storedSeq, salt, ...meta }
+          result = { id, value, signature, seq: storedSeq, ...meta }
         }
       }
     }
@@ -256,7 +253,7 @@ module.exports = class HyperDHT extends DHT {
     if (value.length > PUT_VALUE_MAX_SIZE) {
       throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     }
-    const { seq = 0, salt = null, keyPair, signature = hypersign.sign(value, { ...opts, keypair: keyPair }) } = opts
+    const { seq = 0, keyPair, signature = hypersign.sign(value, { ...opts, keypair: keyPair }) } = opts
     if (typeof seq !== 'number') throw new Error('seq should be a number')
     if (opts.signature) {
       if (!keyPair) throw new Error('keyPair is required')
@@ -267,17 +264,18 @@ module.exports = class HyperDHT extends DHT {
     const { publicKey } = keyPair
     const key = Buffer.allocUnsafe(32)
     sodium.crypto_generichash(key, publicKey)
-    const msg = cenc.encode(messages.mutableRes, {
-      value, signature, seq, salt, publicKey
+
+    const msg = cenc.encode(messages.mutable, {
+      value, signature, seq, publicKey
     })
-    const query = this.query(key, 'mutable_get', null, {
+    const query = this.query(key, 'mutable_get', cenc.encode(cenc.uint, seq), {
       map: mapMutable,
       commit (node, dht) {
         return dht.request(key, 'mutable_put', msg, node.from, { map: mapMutable, token: node.token })
       }
     })
     await query.finished()
-    return { key, signature, seq, salt }
+    return { key, signature, seq }
   }
 
   lookup (target, opts = {}) {
@@ -670,12 +668,22 @@ function mapImmutable (node) {
 
 function mapMutable (node) {
   if (!node.value) return null
-  return {
-    id: node.id,
-    value: node.value,
-    token: node.token,
-    from: node.from,
-    to: node.to
+  try {
+    const { value, signature, seq, publicKey } = cenc.decode(messages.mutable, node.value)
+
+    return {
+      id: node.id,
+      value,
+      signature,
+      seq,
+      publicKey,
+      payload: node.value,
+      token: node.token,
+      from: node.from,
+      to: node.to
+    }
+  } catch {
+    return null
   }
 }
 
