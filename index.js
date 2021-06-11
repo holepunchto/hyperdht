@@ -486,18 +486,30 @@ class KATServer extends EventEmitter {
     const remotePublicKey = payload.publicKey
     const relayAuth = Buffer.allocUnsafe(32)
 
-    if (!remotePublicKey) return
+    if (!remotePublicKey) {
+      noise.destroy()
+      return
+    }
 
     // we can just use the relayauth buffer here instead of allocing a new one
     sodium.crypto_sign_ed25519_pk_to_curve25519(relayAuth, remotePublicKey)
-    if (!relayAuth.equals(noise.remotePublicKey)) return
+    if (!relayAuth.equals(noise.remotePublicKey)) {
+      noise.destroy()
+      return
+    }
 
-    if (!payload) return
+    if (!payload) {
+      noise.destroy()
+      return
+    }
 
     if (!payload.address.port) payload.address.port = m.relayPort
 
     // if the remote peer do not agree on the relay port (in case of explicit ports) - drop message
-    if (payload.address.port !== m.relayPort) return
+    if (payload.address.port !== m.relayPort) {
+      noise.destroy()
+      return
+    }
 
     sodium.crypto_generichash(relayAuth, cenc.encode(messages.peerIPv4, payload.address), payload.relayAuth)
 
@@ -524,6 +536,11 @@ class KATServer extends EventEmitter {
 
     holepunch.setRemoteNetwork(payload)
     const localPayload = holepunch.bind()
+
+    if (!localPayload) {
+      noise.destroy()
+      return // TODO: reply back with an error instead? (we are out of resources)
+    }
 
     // since we are doing IK they other side already knows our noise key
     // send back the ed key, that corresponds to that for good messure like the client does
