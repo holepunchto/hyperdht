@@ -228,7 +228,7 @@ module.exports = class HyperDHT extends DHT {
     return { key, closestNodes: query.closestNodes }
   }
 
-  async mutableGet (key, { seq = 0, latest = true, closestNodes } = {}) {
+  async mutableGet (key, { seq = 0, latest = true, closestNodes = [] } = {}) {
     if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
     if (typeof seq !== 'number') throw new Error('seq should be a number')
 
@@ -259,7 +259,7 @@ module.exports = class HyperDHT extends DHT {
     if (value.length > PUT_VALUE_MAX_SIZE) {
       throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     }
-    const { seq = 0, keyPair, signature = hypersign.sign(value, { ...opts, keypair: keyPair }) } = opts
+    const { seq = 0, keyPair, signature = hypersign.sign(value, { ...opts, keypair: keyPair }), closestNodes = [] } = opts
     if (typeof seq !== 'number') throw new Error('seq should be a number')
     if (opts.signature) {
       if (!keyPair) throw new Error('keyPair is required')
@@ -276,7 +276,7 @@ module.exports = class HyperDHT extends DHT {
     })
     const query = this.query(key, 'mutable_get', cenc.encode(cenc.uint, seq), {
       map: mapMutable,
-      closestNodes: opts.closestNodes,
+      closestNodes,
       commit (node, dht) {
         return dht.request(key, 'mutable_put', msg, node.from, { token: node.token })
       }
