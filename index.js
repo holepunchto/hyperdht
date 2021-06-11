@@ -8,6 +8,7 @@ const Holepuncher = require('./lib/holepuncher')
 const messages = require('./lib/messages')
 const NoiseState = require('./lib/noise')
 const PersistentNode = require('./lib/persistent')
+const { NS_HOLEPUNCH, NS_MUTABLE_PUT } = require('./lib/ns')
 
 const BOOTSTRAP_NODES = [
   { host: 'testnet1.hyperdht.org', port: 49736 },
@@ -18,7 +19,9 @@ const BOOTSTRAP_NODES = [
 const SERVER_TIMEOUT = 20000
 const CLIENT_TIMEOUT = 25000
 
-const NS_HOLEPUNCH = hash(Buffer.from('hyperswarm_holepunch'))
+// PUT_VALUE_MAX_SIZE + packet overhead (i.e. the key etc.)
+// should be less than the network MTU, normally 1400 bytes
+const PUT_VALUE_MAX_SIZE = 1000
 
 const BAD_ADDR = new Error('Relay and remote peer does not agree on their public address')
 const NOT_HOLEPUNCHABLE = new Error('Both networks are not holepunchable')
@@ -62,15 +65,11 @@ module.exports = class HyperDHT extends DHT {
       case 'unannounce': return this.persistent.onunannounce(req)
       case 'connect': return this.persistent.onconnect(req)
       case 'holepunch': return this.persistent.onholepunch(req)
+      case 'immutable_get': return this.persistent.onimmutableget(req)
+      case 'immutable_put': return this.persistent.onimmutableput(req)
+      case 'mutable_get': return this.persistent.onmutableget(req)
+      case 'mutable_put': return this.persistent.onmutableput(req)
     }
-
-    /*
-      missing:
-        mutable_get
-        mutable_put
-        immutable_get
-        immutable_put
-    */
 
     req.error(DHT.UNKNOWN_COMMAND)
   }
@@ -206,6 +205,7 @@ module.exports = class HyperDHT extends DHT {
     noise.destroy()
 
     if (!error) error = new Error('Could not connect to peer')
+
     throw error
 
     function ontimeout () {
@@ -213,6 +213,102 @@ module.exports = class HyperDHT extends DHT {
       query.destroy()
       holepunch.destroy()
     }
+  }
+
+  async immutableGet (key, opts = {}) {
+    if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
+    const query = this.query(key, 'immutable_get', null, {
+      closestNodes: opts.closestNodes,
+      map: mapImmutable
+    })
+    const check = Buffer.allocUnsafe(32)
+    for await (const node of query) {
+      const { value } = node
+      sodium.crypto_generichash(check, value)
+      if (check.equals(key)) return node
+    }
+    throw Error('not found')
+  }
+
+  async immutablePut (value, opts = {}) {
+    if (Buffer.isBuffer(value) === false) throw new Error('value must be a buffer')
+    if (value.length > PUT_VALUE_MAX_SIZE) {
+      throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
+    }
+    const key = Buffer.allocUnsafe(32)
+    sodium.crypto_generichash(key, value)
+    const query = this.query(key, 'immutable_get', null, {
+      closestNodes: opts.closestNodes,
+      map: mapImmutable,
+      commit (node, dht) {
+        return dht.request(key, 'immutable_put', value, node.from, {
+          token: node.token
+        })
+      }
+    })
+    await query.finished()
+    return { key, closestNodes: query.closestNodes }
+  }
+
+  async mutableGet (key, { seq = 0, latest = true, closestNodes = [] } = {}) {
+    if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
+    if (typeof seq !== 'number') throw new Error('seq should be a number')
+    const hash = Buffer.alloc(32)
+    sodium.crypto_generichash(hash, key)
+    const query = this.query(hash, 'mutable_get', cenc.encode(cenc.uint, seq), {
+      closestNodes,
+      map: mapMutable
+    })
+    const userSeq = seq
+    let topSeq = seq
+    let result = null
+    for await (const node of query) {
+      const { id, value, signature, seq: storedSeq, publicKey, ...meta } = node
+      const signable = Buffer.allocUnsafe(32)
+      sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq: storedSeq }), NS_MUTABLE_PUT)
+      if (storedSeq >= userSeq && sodium.crypto_sign_verify_detached(signature, signable, publicKey)) {
+        if (latest === false) return { id, value, signature, seq: storedSeq, ...meta }
+        if (storedSeq >= topSeq) {
+          topSeq = storedSeq
+          result = { id, value, signature, seq: storedSeq, ...meta }
+        }
+      }
+    }
+    return result
+  }
+
+  async mutablePut (value, opts = {}) {
+    if (Buffer.isBuffer(value) === false) throw new Error('value must be a buffer')
+    if (value.length > PUT_VALUE_MAX_SIZE) {
+      throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
+    }
+
+    const { seq = 0, keyPair, closestNodes = [] } = opts
+    if (typeof seq !== 'number') throw new Error('seq should be a number')
+    if (!keyPair) throw new Error('keyPair is required')
+    const { secretKey, publicKey } = keyPair
+    if (Buffer.isBuffer(publicKey) === false) throw new Error('keyPair.publicKey is required')
+    if (Buffer.isBuffer(secretKey) === false) throw new Error('keyPair.secretKey is required')
+
+    const hash = Buffer.allocUnsafe(32)
+    sodium.crypto_generichash(hash, publicKey)
+    const signable = Buffer.allocUnsafe(32)
+    sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq }), NS_MUTABLE_PUT)
+    const signature = Buffer.allocUnsafe(sodium.crypto_sign_BYTES)
+    sodium.crypto_sign_detached(signature, signable, secretKey)
+
+    const msg = cenc.encode(messages.mutable, {
+      value, signature, seq, publicKey
+    })
+    const query = this.query(hash, 'mutable_get', cenc.encode(cenc.uint, seq), {
+      map: mapMutable,
+      closestNodes,
+      commit (node, dht) {
+        return dht.request(hash, 'mutable_put', msg, node.from, { token: node.token })
+      }
+    })
+    await query.finished()
+    return { signature, seq }
   }
 
   lookup (target, opts = {}) {
@@ -612,9 +708,39 @@ function allowAll () {
   return true
 }
 
+function mapImmutable (node) {
+  if (!node.value) return null
+  return {
+    id: node.id,
+    value: node.value,
+    token: node.token,
+    from: node.from,
+    to: node.to
+  }
+}
+
+function mapMutable (node) {
+  if (!node.value) return null
+  try {
+    const { value, signature, seq, publicKey } = cenc.decode(messages.mutable, node.value)
+    return {
+      id: node.id,
+      value,
+      signature,
+      seq,
+      publicKey,
+      payload: node.value,
+      token: node.token,
+      from: node.from,
+      to: node.to
+    }
+  } catch {
+    return null
+  }
+}
+
 function mapLookup (node) {
   if (!node.value) return null
-
   try {
     return {
       id: node.id,
