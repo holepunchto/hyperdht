@@ -8,11 +8,7 @@ const Holepuncher = require('./lib/holepuncher')
 const messages = require('./lib/messages')
 const NoiseState = require('./lib/noise')
 const PersistentNode = require('./lib/persistent')
-const {
-  hash, noop, allowAll, mapImmutable,
-  mapMutable, mapLookup, mapConnect,
-  NS_HOLEPUNCH, NS_SIGNATURE
-} = require('./lib/utilities')
+const { NS_HOLEPUNCH, NS_MUTABLE_PUT } = require('./lib/ns')
 
 const BOOTSTRAP_NODES = [
   { host: 'testnet1.hyperdht.org', port: 49736 },
@@ -67,10 +63,10 @@ module.exports = class HyperDHT extends DHT {
       case 'unannounce': return this.persistent.onunannounce(req)
       case 'connect': return this.persistent.onconnect(req)
       case 'holepunch': return this.persistent.onholepunch(req)
-      case 'immutable_get': return this.persistent.onget(req, { mutable: false })
-      case 'immutable_put': return this.persistent.onput(req, { mutable: false })
-      case 'mutable_get': return this.persistent.onget(req, { mutable: true })
-      case 'mutable_put': return this.persistent.onput(req, { mutable: true })
+      case 'immutable_get': return this.persistent.onimmutableget(req)
+      case 'immutable_put': return this.persistent.onimmutableput(req)
+      case 'mutable_get': return this.persistent.onmutableget(req)
+      case 'mutable_put': return this.persistent.onmutableput(req)
     }
 
     req.error(DHT.UNKNOWN_COMMAND)
@@ -246,7 +242,7 @@ module.exports = class HyperDHT extends DHT {
     for await (const node of query) {
       const { id, value, signature, seq: storedSeq, publicKey, ...meta } = node
       const signable = Buffer.allocUnsafe(32)
-      sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq: storedSeq }), NS_SIGNATURE)
+      sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq: storedSeq }), NS_MUTABLE_PUT)
       if (storedSeq >= userSeq && sodium.crypto_sign_verify_detached(signature, signable, publicKey)) {
         if (latest === false) return { id, value, signature, seq: storedSeq, ...meta }
         if (storedSeq >= topSeq) {
@@ -274,7 +270,7 @@ module.exports = class HyperDHT extends DHT {
     const hash = Buffer.allocUnsafe(32)
     sodium.crypto_generichash(hash, publicKey)
     const signable = Buffer.allocUnsafe(32)
-    sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq }), NS_SIGNATURE)
+    sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq }), NS_MUTABLE_PUT)
     const signature = Buffer.allocUnsafe(sodium.crypto_sign_BYTES)
     sodium.crypto_sign_detached(signature, signable, secretKey)
 
@@ -654,5 +650,77 @@ class KATServer extends EventEmitter {
     return new Promise((resolve) => {
       setTimeout(resolve, ms)
     })
+  }
+}
+
+function hash (data) {
+  const out = Buffer.allocUnsafe(32)
+  sodium.crypto_generichash(out, data)
+  return out
+}
+
+function noop () {}
+
+function allowAll () {
+  return true
+}
+
+function mapImmutable (node) {
+  if (!node.value) return null
+  return {
+    id: node.id,
+    value: node.value,
+    token: node.token,
+    from: node.from,
+    to: node.to
+  }
+}
+
+function mapMutable (node) {
+  if (!node.value) return null
+  try {
+    const { value, signature, seq, publicKey } = cenc.decode(messages.mutable, node.value)
+    return {
+      id: node.id,
+      value,
+      signature,
+      seq,
+      publicKey,
+      payload: node.value,
+      token: node.token,
+      from: node.from,
+      to: node.to
+    }
+  } catch {
+    return null
+  }
+}
+
+function mapLookup (node) {
+  if (!node.value) return null
+  try {
+    return {
+      id: node.id,
+      token: node.token,
+      from: node.from,
+      to: node.to,
+      peers: cenc.decode(messages.lookup, node.value)
+    }
+  } catch {
+    return null
+  }
+}
+
+function mapConnect (node) {
+  if (!node.value) return null
+
+  try {
+    return {
+      from: node.from,
+      token: node.token,
+      connect: cenc.decode(messages.connectRelay, node.value)
+    }
+  } catch {
+    return null
   }
 }
