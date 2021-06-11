@@ -3,12 +3,16 @@ const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
 const cenc = require('compact-encoding')
 const NoiseSecretStream = require('noise-secret-stream')
-const { VALUE_MAX_SIZE, Hypersign } = require('@hyperswarm/hypersign')
 const Timer = require('./lib/timer')
 const Holepuncher = require('./lib/holepuncher')
 const messages = require('./lib/messages')
 const NoiseState = require('./lib/noise')
 const PersistentNode = require('./lib/persistent')
+const {
+  hash, noop, allowAll, mapImmutable,
+  mapMutable, mapLookup, mapConnect,
+  NS_HOLEPUNCH, NS_SIGNATURE
+} = require('./lib/utilities')
 
 const BOOTSTRAP_NODES = [
   { host: 'testnet1.hyperdht.org', port: 49736 },
@@ -18,15 +22,14 @@ const BOOTSTRAP_NODES = [
 
 const SERVER_TIMEOUT = 20000
 const CLIENT_TIMEOUT = 25000
-const PUT_VALUE_MAX_SIZE = VALUE_MAX_SIZE
 
-const NS_HOLEPUNCH = hash(Buffer.from('hyperswarm_holepunch'))
+// PUT_VALUE_MAX_SIZE + packet overhead (i.e. the key etc.)
+// should be less than the network MTU, normally 1400 bytes
+const PUT_VALUE_MAX_SIZE = 1000
 
 const BAD_ADDR = new Error('Relay and remote peer does not agree on their public address')
 const NOT_HOLEPUNCHABLE = new Error('Both networks are not holepunchable')
 const TIMEOUT = new Error('Holepunch attempt timed out')
-
-const hypersign = new Hypersign()
 
 module.exports = class HyperDHT extends DHT {
   constructor (opts = {}) {
@@ -231,8 +234,9 @@ module.exports = class HyperDHT extends DHT {
   async mutableGet (key, { seq = 0, latest = true, closestNodes = [] } = {}) {
     if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
     if (typeof seq !== 'number') throw new Error('seq should be a number')
-
-    const query = this.query(key, 'mutable_get', cenc.encode(cenc.uint, seq), {
+    const hash = Buffer.alloc(32)
+    sodium.crypto_generichash(hash, key)
+    const query = this.query(hash, 'mutable_get', cenc.encode(cenc.uint, seq), {
       closestNodes,
       map: mapMutable
     })
@@ -241,9 +245,9 @@ module.exports = class HyperDHT extends DHT {
     let result = null
     for await (const node of query) {
       const { id, value, signature, seq: storedSeq, publicKey, ...meta } = node
-
-      const msg = hypersign.signable(value, { seq: storedSeq })
-      if (storedSeq >= userSeq && sodium.crypto_sign_verify_detached(signature, msg, publicKey)) {
+      const signable = Buffer.allocUnsafe(32)
+      sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq: storedSeq }), NS_SIGNATURE)
+      if (storedSeq >= userSeq && sodium.crypto_sign_verify_detached(signature, signable, publicKey)) {
         if (latest === false) return { id, value, signature, seq: storedSeq, ...meta }
         if (storedSeq >= topSeq) {
           topSeq = storedSeq
@@ -259,26 +263,29 @@ module.exports = class HyperDHT extends DHT {
     if (value.length > PUT_VALUE_MAX_SIZE) {
       throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     }
-    const { seq = 0, keyPair, signature = hypersign.sign(value, { ...opts, keypair: keyPair }), closestNodes = [] } = opts
+
+    const { seq = 0, keyPair, closestNodes = [] } = opts
     if (typeof seq !== 'number') throw new Error('seq should be a number')
-    if (opts.signature) {
-      if (!keyPair) throw new Error('keyPair is required')
-      const { secretKey, publicKey } = keyPair
-      if (Buffer.isBuffer(publicKey) === false) throw new Error('keyPair.publicKey is required')
-      if (secretKey) throw new Error('only opts.signature OR opts.keyPair.secretKey should be supplied')
-    }
-    const { publicKey } = keyPair
-    const key = Buffer.allocUnsafe(32)
-    sodium.crypto_generichash(key, publicKey)
+    if (!keyPair) throw new Error('keyPair is required')
+    const { secretKey, publicKey } = keyPair
+    if (Buffer.isBuffer(publicKey) === false) throw new Error('keyPair.publicKey is required')
+    if (Buffer.isBuffer(secretKey) === false) throw new Error('keyPair.secretKey is required')
+
+    const hash = Buffer.allocUnsafe(32)
+    sodium.crypto_generichash(hash, publicKey)
+    const signable = Buffer.allocUnsafe(32)
+    sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq }), NS_SIGNATURE)
+    const signature = Buffer.allocUnsafe(sodium.crypto_sign_BYTES)
+    sodium.crypto_sign_detached(signature, signable, secretKey)
 
     const msg = cenc.encode(messages.mutable, {
       value, signature, seq, publicKey
     })
-    const query = this.query(key, 'mutable_get', cenc.encode(cenc.uint, seq), {
+    const query = this.query(hash, 'mutable_get', cenc.encode(cenc.uint, seq), {
       map: mapMutable,
       closestNodes,
       commit (node, dht) {
-        return dht.request(key, 'mutable_put', msg, node.from, { token: node.token })
+        return dht.request(hash, 'mutable_put', msg, node.from, { token: node.token })
       }
     })
     await query.finished()
@@ -647,79 +654,5 @@ class KATServer extends EventEmitter {
     return new Promise((resolve) => {
       setTimeout(resolve, ms)
     })
-  }
-}
-
-function hash (data) {
-  const out = Buffer.allocUnsafe(32)
-  sodium.crypto_generichash(out, data)
-  return out
-}
-
-function noop () {}
-
-function allowAll () {
-  return true
-}
-
-function mapImmutable (node) {
-  if (!node.value) return null
-  return {
-    id: node.id,
-    value: node.value,
-    token: node.token,
-    from: node.from,
-    to: node.to
-  }
-}
-
-function mapMutable (node) {
-  if (!node.value) return null
-  try {
-    const { value, signature, seq, publicKey } = cenc.decode(messages.mutable, node.value)
-
-    return {
-      id: node.id,
-      value,
-      signature,
-      seq,
-      publicKey,
-      payload: node.value,
-      token: node.token,
-      from: node.from,
-      to: node.to
-    }
-  } catch {
-    return null
-  }
-}
-
-function mapLookup (node) {
-  if (!node.value) return null
-
-  try {
-    return {
-      id: node.id,
-      token: node.token,
-      from: node.from,
-      to: node.to,
-      peers: cenc.decode(messages.lookup, node.value)
-    }
-  } catch {
-    return null
-  }
-}
-
-function mapConnect (node) {
-  if (!node.value) return null
-
-  try {
-    return {
-      from: node.from,
-      token: node.token,
-      connect: cenc.decode(messages.connectRelay, node.value)
-    }
-  } catch {
-    return null
   }
 }
