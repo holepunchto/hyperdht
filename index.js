@@ -8,7 +8,7 @@ const Holepuncher = require('./lib/holepuncher')
 const messages = require('./lib/messages')
 const NoiseState = require('./lib/noise')
 const PersistentNode = require('./lib/persistent')
-const { NS_HOLEPUNCH, NS_MUTABLE } = require('./lib/ns')
+const { NS_HOLEPUNCH } = require('./lib/ns')
 
 const BOOTSTRAP_NODES = [
   { host: 'testnet1.hyperdht.org', port: 49736 },
@@ -264,9 +264,7 @@ module.exports = class HyperDHT extends DHT {
     let result = null
     for await (const node of query) {
       const { id, value, signature, seq: storedSeq, ...meta } = node
-      const signable = Buffer.allocUnsafe(32)
-      sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq: storedSeq }), NS_MUTABLE)
-      if (storedSeq >= userSeq && sodium.crypto_sign_verify_detached(signature, signable, publicKey)) {
+      if (storedSeq >= userSeq && PersistentNode.verifyMutable(signature, storedSeq, value, publicKey)) {
         if (latest === false) return { id, value, signature, seq: storedSeq, ...meta }
         if (storedSeq >= topSeq) {
           topSeq = storedSeq
@@ -292,10 +290,8 @@ module.exports = class HyperDHT extends DHT {
 
     const hash = Buffer.allocUnsafe(32)
     sodium.crypto_generichash(hash, publicKey)
-    const signable = Buffer.allocUnsafe(32)
-    sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq }), NS_MUTABLE)
-    const signature = Buffer.allocUnsafe(sodium.crypto_sign_BYTES)
-    sodium.crypto_sign_detached(signature, signable, secretKey)
+
+    const signature = PersistentNode.signMutable(seq, value, keyPair.secretKey)
 
     const msg = cenc.encode(messages.mutablePutRequest, {
       value, signature, seq, publicKey
