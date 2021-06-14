@@ -215,9 +215,9 @@ module.exports = class HyperDHT extends DHT {
     }
   }
 
-  async immutableGet (key, opts = {}) {
-    if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
-    const query = this.query(key, 'immutable_get', null, {
+  async immutableGet (hash, opts = {}) {
+    if (Buffer.isBuffer(hash) === false) throw new Error('hash must be a buffer')
+    const query = this.query(hash, 'immutable_get', null, {
       closestNodes: opts.closestNodes,
       map: mapImmutable
     })
@@ -225,9 +225,9 @@ module.exports = class HyperDHT extends DHT {
     for await (const node of query) {
       const { value } = node
       sodium.crypto_generichash(check, value)
-      if (check.equals(key)) return node
+      if (check.equals(hash)) return node
     }
-    throw Error('not found')
+    throw Error('Not found')
   }
 
   async immutablePut (value, opts = {}) {
@@ -235,26 +235,26 @@ module.exports = class HyperDHT extends DHT {
     if (value.length > PUT_VALUE_MAX_SIZE) {
       throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     }
-    const key = Buffer.allocUnsafe(32)
-    sodium.crypto_generichash(key, value)
-    const query = this.query(key, 'immutable_get', null, {
+    const hash = Buffer.allocUnsafe(32)
+    sodium.crypto_generichash(hash, value)
+    const query = this.query(hash, 'immutable_get', null, {
       closestNodes: opts.closestNodes,
       map: mapImmutable,
       commit (node, dht) {
-        return dht.request(key, 'immutable_put', value, node.from, {
+        return dht.request(hash, 'immutable_put', value, node.from, {
           token: node.token
         })
       }
     })
     await query.finished()
-    return { key, closestNodes: query.closestNodes }
+    return { hash, closestNodes: query.closestNodes }
   }
 
-  async mutableGet (key, { seq = 0, latest = true, closestNodes = [] } = {}) {
-    if (Buffer.isBuffer(key) === false) throw new Error('key must be a buffer')
+  async mutableGet (publicKey, { seq = 0, latest = true, closestNodes = [] } = {}) {
+    if (Buffer.isBuffer(publicKey) === false) throw new Error('publicKey must be a buffer')
     if (typeof seq !== 'number') throw new Error('seq should be a number')
     const hash = Buffer.alloc(32)
-    sodium.crypto_generichash(hash, key)
+    sodium.crypto_generichash(hash, publicKey)
     const query = this.query(hash, 'mutable_get', cenc.encode(cenc.uint, seq), {
       closestNodes,
       map: mapMutable
@@ -263,7 +263,7 @@ module.exports = class HyperDHT extends DHT {
     let topSeq = seq
     let result = null
     for await (const node of query) {
-      const { id, value, signature, seq: storedSeq, publicKey, ...meta } = node
+      const { id, value, signature, seq: storedSeq, ...meta } = node
       const signable = Buffer.allocUnsafe(32)
       sodium.crypto_generichash(signable, cenc.encode(messages.signable, { value, seq: storedSeq }), NS_MUTABLE)
       if (storedSeq >= userSeq && sodium.crypto_sign_verify_detached(signature, signable, publicKey)) {
@@ -274,18 +274,18 @@ module.exports = class HyperDHT extends DHT {
         }
       }
     }
+    if (!result) throw Error('Not found')
     return result
   }
 
-  async mutablePut (value, opts = {}) {
+  async mutablePut (keyPair, value, opts = {}) {
     if (Buffer.isBuffer(value) === false) throw new Error('value must be a buffer')
     if (value.length > PUT_VALUE_MAX_SIZE) {
       throw new Error(`Value size must be <= ${PUT_VALUE_MAX_SIZE}`)
     }
 
-    const { seq = 0, keyPair, closestNodes = [] } = opts
+    const { seq = 0, closestNodes = [] } = opts
     if (typeof seq !== 'number') throw new Error('seq should be a number')
-    if (!keyPair) throw new Error('keyPair is required')
     const { secretKey, publicKey } = keyPair
     if (Buffer.isBuffer(publicKey) === false) throw new Error('keyPair.publicKey is required')
     if (Buffer.isBuffer(secretKey) === false) throw new Error('keyPair.secretKey is required')
@@ -297,10 +297,11 @@ module.exports = class HyperDHT extends DHT {
     const signature = Buffer.allocUnsafe(sodium.crypto_sign_BYTES)
     sodium.crypto_sign_detached(signature, signable, secretKey)
 
-    const msg = cenc.encode(messages.mutable, {
+    const msg = cenc.encode(messages.mutablePutRequest, {
       value, signature, seq, publicKey
     })
-    const query = this.query(hash, 'mutable_get', cenc.encode(cenc.uint, seq), {
+    // use seq = 0, for the query part here, as we don't care about the actual values
+    const query = this.query(hash, 'mutable_get', cenc.encode(cenc.uint, 0), {
       map: mapMutable,
       closestNodes,
       commit (node, dht) {
@@ -739,14 +740,12 @@ function mapImmutable (node) {
 function mapMutable (node) {
   if (!node.value) return null
   try {
-    const { value, signature, seq, publicKey } = cenc.decode(messages.mutable, node.value)
+    const { value, signature, seq } = cenc.decode(messages.mutableGetResponse, node.value)
     return {
       id: node.id,
       value,
       signature,
       seq,
-      publicKey,
-      payload: node.value,
       token: node.token,
       from: node.from,
       to: node.to
