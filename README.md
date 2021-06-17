@@ -3,7 +3,7 @@
 The DHT powering the HyperSwarm network
 
 ```
-npm install @hyperswarm/dht
+npm install @hyperswarm/dht@next
 ```
 
 Built on top of [dht-rpc](https://github.com/mafintosh/dht-rpc).
