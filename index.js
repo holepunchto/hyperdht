@@ -436,7 +436,7 @@ class KATServer extends EventEmitter {
     this.closestNodes = null
     this.nodes = null
     this.destroyed = false
-    this.onauthenticate = opts.onauthentiate || allowAll
+    this.onauthenticate = opts.onauthenticate || allowAll
 
     this._keepAlives = null
     this._incomingHandshakes = new Set()
@@ -519,7 +519,7 @@ class KATServer extends EventEmitter {
     let authenticated = false
 
     try {
-      authenticated = !!(await this.onauthenticate(noise.remoteNoisePublicKey, payload))
+      authenticated = !!(await this.onauthenticate(noise.remotePublicKey, payload))
     } catch {}
 
     if (this.destroyed || !authenticated) {
