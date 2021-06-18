@@ -91,6 +91,12 @@ Returns an object with `{publicKey, secretKey}`. `publicKey` holds a public key 
 
 If you pass any options they are forwarded to dht-rpc.
 
+#### `await node.destroy()`
+
+Fully destroy this DHT node.
+
+## Creating P2P servers
+
 #### `const server = node.createServer([options], [onconnection])`
 
 Create a new server for accepting incoming encrypted P2P connections.
@@ -101,7 +107,7 @@ Options include:
 {
   firewall (remotePublicKey, remoteHandshakePayload) {
     // validate if you want a connection from remotePublicKey
-    // if not return false, else return true
+    // if you do return false, else return true
     // remoteHandshakePayload contains their ip and some more info
     return true
   }
@@ -150,6 +156,8 @@ Stop listening.
 
 Emitted when the server is fully closed.
 
+## Connecting to P2P servers
+
 #### `const encryptedConnection = node.connect(remotePublicKey, [options])`
 
 Connect to a remote server. Similar to `createServer` this performs UDP holepunching for P2P connectivity.
@@ -174,6 +182,8 @@ The public key of the remote peer.
 #### `encryptedConnection.publicKey`
 
 The connections public key.
+
+## Additional peer discovery
 
 #### `const stream = node.lookup(topic, [options])`
 
@@ -216,9 +226,7 @@ Unannounce a key-pair.
 
 If you pass any options they are forwarded to dht-rpc.
 
-#### `await node.destroy()`
-
-Fully destroy this DHT node.
+## Mutable/immutable records
 
 #### `{ hash, closestNodes } = await node.immutablePut(value, [options])`
 
