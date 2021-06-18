@@ -31,35 +31,51 @@ Then on one computer listen for connections
 // create a server to listen for secure connections
 const server = node.createServer()
 
-server.on('connection', function (noiseSocket) {
-  // noiseSocket is E2E between you and the other peer
-  // pipe it somewhere like any duplex stream
+start()
 
-  console.log('Remote public key', noiseSocket.remotePublicKey)
-  console.log('Local public key', noiseSocket.publicKey) // same as keyPair.publicKey
+async function start () {
+  server.on('connection', function (noiseSocket) {
+    // noiseSocket is E2E between you and the other peer
+    // pipe it somewhere like any duplex stream
 
-  process.stdin.pipe(noiseSocket).pipe(process.stdout)
-})
+    console.log('Remote public key', noiseSocket.remotePublicKey.toString('hex'))
+    console.log('Local public key', noiseSocket.publicKey.toString('hex')) // same as keyPair.publicKey
 
-// make a ed25519 keypair to listen on
-const keyPair = DHT.keyPair()
+    //process.stdin.pipe(noiseSocket).pipe(process.stdout) // pipe somewhere
 
-// this makes the server accept connections on this keypair
-await server.listen(keyPair)
+    // log received data:
+    noiseSocket.on('data',(data) => {
+      console.log('received data: ', data.toString())
+    })
+  })
+
+  // make a ed25519 keypair to listen on
+  const keyPair = DHT.keyPair()
+
+  // this makes the server accept connections on this keypair
+  await server.listen(keyPair)
+}
 ```
 
 Then on another connect to the computer using the public key of the key-pair it is listening on
 
 ``` js
-// publicKey here is keyPair.publicKey from above
-const noiseSocket = anotherNode.connect(publicKey)
+start()
 
-noiseSocket.on('open', function () {
-  // noiseSocket fully open with the other peer
-})
+async function start () {
+    // publicKey here is keyPair.publicKey from above
+    const noiseSocket = await anotherNode.connect(publicKey)
 
-// pipe it somewhere like any duplex stream
-process.stdin.pipe(noiseSocket).pipe(process.stdout)
+    noiseSocket.on('open', function () {
+      // noiseSocket fully open with the other peer
+      // send a test message:
+      noiseSocket.write(Buffer.from('test'))
+    })
+
+    // pipe it somewhere like any duplex stream
+    // process.stdin.pipe(noiseSocket).pipe(process.stdout) 
+
+}
 ```
 
 ## API
