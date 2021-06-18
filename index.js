@@ -39,11 +39,15 @@ module.exports = class HyperDHT extends DHT {
     this.on('persistent', this._ondhtpersistent)
   }
 
-  destroy () {
+  async destroy () {
     if (this.persistent !== null) this.persistent.destroy()
     this.persistent = null
-    for (const server of this.servers) server.close()
-    super.destroy()
+    const promises = []
+    for (const server of this.servers) {
+      promises.push(server.close())
+    }
+    await Promise.allSettled(promises)
+    return super.destroy()
   }
 
   _ondhtpersistent () {
@@ -395,8 +399,9 @@ module.exports = class HyperDHT extends DHT {
     }
   }
 
-  createServer (opts) {
-    if (typeof opts === 'function') opts = { onconnection: opts }
+  createServer (opts, onconnection) {
+    if (typeof opts === 'function') return this.createServer({}, opts)
+    if (typeof onconnection === 'function') opts = { ...opts, onconnection }
     return new KATServer(this, opts)
   }
 
@@ -436,7 +441,7 @@ class KATServer extends EventEmitter {
     this.closestNodes = null
     this.nodes = null
     this.destroyed = false
-    this.onauthenticate = opts.onauthenticate || allowAll
+    this.firewall = opts.firewall || allowAll
 
     this._keepAlives = null
     this._incomingHandshakes = new Set()
@@ -519,7 +524,7 @@ class KATServer extends EventEmitter {
     let authenticated = false
 
     try {
-      authenticated = !!(await this.onauthenticate(noise.remotePublicKey, payload))
+      authenticated = !!(await this.firewall(remotePublicKey, payload))
     } catch {}
 
     if (this.destroyed || !authenticated) {
@@ -605,9 +610,13 @@ class KATServer extends EventEmitter {
     }
     this._keepAlives = null
     this._servers.delete(this)
+
+    const done = this._listening ? this._listening : Promise.resolve()
+
+    if (!this.destroyed) done.then(() => this.emit('close'))
     this.destroyed = true
 
-    return this._listening ? this._listening : Promise.resolve()
+    return done
   }
 
   address () {
@@ -615,9 +624,10 @@ class KATServer extends EventEmitter {
       throw new Error('Server is not listening')
     }
 
+    const addr = this.dht.remoteAddress()
+
     return {
-      family: 'KATv1',
-      address: this.dht.remoteAddress().host,
+      ...addr,
       publicKey: this.keyPair.publicKey
     }
   }

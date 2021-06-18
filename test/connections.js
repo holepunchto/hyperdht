@@ -160,3 +160,57 @@ test('sets public key / remote public key', async function (bootstrap, t) {
   server.close()
   destroy(nodes)
 })
+
+test('user defined firewall', async function (bootstrap, t) {
+  t.plan(7)
+
+  const nodes = await swarm(bootstrap, 10)
+  const serverKeyPair = HyperDHT.keyPair()
+
+  let firewalled = false
+  let connected = false
+  let remotePayload
+  let remotePublicKey
+
+  const server = nodes[0].createServer({ firewall }, function (connection) {
+    connected = true
+    connection.end()
+  })
+
+  await server.listen(serverKeyPair)
+
+  const connection = nodes[1].connect(serverKeyPair.publicKey)
+
+  await new Promise((resolve) => {
+    connection.on('open', function () {
+      t.ok(firewalled)
+      t.same(remotePublicKey, nodes[1].defaultKeyPair.publicKey)
+      t.ok(remotePayload.address)
+      t.ok(remotePayload.localAddresses)
+      t.ok(remotePayload.firewall)
+    })
+
+    connection.resume()
+
+    connection.on('end', function () {
+      t.ok(connected)
+      connection.end()
+      resolve()
+    })
+  })
+
+  server.on('close', function () {
+    t.pass('server closed')
+  })
+
+  await server.close()
+  destroy(nodes)
+
+  function firewall (publicKey, payload) {
+    firewalled = true
+    remotePublicKey = publicKey
+    remotePayload = payload
+
+    return true
+  }
+})
