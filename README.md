@@ -74,7 +74,8 @@ Options include:
 {
   // Optionally overwrite the default bootstrap servers
   // Defaults to ['testnet1.hyperdht.org:49736', 'testnet2.hyperdht.org:49736', 'testnet3.hyperdht.org:49736']
-  bootstrap: ['host:port']
+  bootstrap: ['host:port'],
+  keyPair // set the default key pair to use for server.listen and connect
 }
 ```
 
@@ -89,6 +90,90 @@ Use this method to generate the required keypair for DHT operations.
 Returns an object with `{publicKey, secretKey}`. `publicKey` holds a public key buffer, `secretKey` holds a private key buffer.
 
 If you pass any options they are forwarded to dht-rpc.
+
+#### `const server = node.createServer([options], [onconnection])`
+
+Create a new server for accepting incoming encrypted P2P connections.
+
+Options include:
+
+```js
+{
+  firewall (remotePublicKey, remoteHandshakePayload) {
+    // validate if you want a connection from remotePublicKey
+    // if not return false, else return true
+    // remoteHandshakePayload contains their ip and some more info
+    return true
+  }
+}
+```
+
+You can run servers on normal home computers, as the DHT will UDP holepunch connections for you.
+
+#### `await server.listen(keyPair)`
+
+Make the server listen on a keyPair.
+To connect to this server use keyPair.publicKey as the connect address.
+
+#### `server.on('connection', encryptedConnection)`
+
+Emitted when a new encrypted connection has passed the firewall check.
+
+`encryptedConnection` is a [NoiseSecretStream](https://github.com/mafintosh/noise-secret-stream) instance.
+
+You can check who you are connected to using `encryptedConnection.remotePublicKey` and `encryptedConnection.handshakeHash` contains a unique hash representing this crypto session (same on both sides).
+
+#### `server.on('listening')`
+
+Emitted when the server is fully listening on a keyPair.
+
+#### `server.address()`
+
+Returns an object containing the address of the server:
+
+```js
+{
+  type, // NAT type (inferred by staticstics),
+  host, // external IP of the server,
+  port, // external port of the server if predictable,
+  publicKey // public key of the server
+}
+```
+
+You can also get this info from `node.remoteAddress()` minus the public key.
+
+#### `await server.close()`
+
+Stop listening.
+
+#### `server.on('close')`
+
+Emitted when the server is fully closed.
+
+#### `const encryptedConnection = node.connect(remotePublicKey, [options])`
+
+Connect to a remote server. Similar to `createServer` this performs UDP holepunching for P2P connectivity.
+
+Options include:
+
+```js
+{
+  nodes: [...], // optional array of close dht nodes to speed up connecting
+  keyPair // optional key pair to use when connection (defaults to node.defaultKeyPair)
+}
+```
+
+#### `encryptedConnection.on('open')`
+
+Emitted when the encrypted connection has been fully established with the server.
+
+#### `encryptedConnection.remotePublicKey`
+
+The public key of the remote peer.
+
+#### `encryptedConnection.publicKey`
+
+The connections public key.
 
 #### `const stream = node.lookup(topic, [options])`
 
