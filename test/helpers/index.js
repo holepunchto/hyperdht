@@ -43,7 +43,7 @@ async function test (name, fn, only = false) {
 
     const bootstrap = []
     for (const node of bootstrappers) {
-      await node.bind(0)
+      await node.ready()
       bootstrap.push({ host: '127.0.0.1', port: node.address().port })
     }
 
