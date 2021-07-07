@@ -116,6 +116,8 @@ module.exports = class HyperDHT extends DHT {
 
   async connectRaw (publicKey, opts = {}) {
     let error = null
+    let query
+    let holepunch
 
     const remoteNoisePublicKey = Buffer.alloc(32)
     const localKeyPair = opts.keyPair || (opts.secretKey ? opts : this.defaultKeyPair)
