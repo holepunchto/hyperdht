@@ -115,6 +115,8 @@ module.exports = class HyperDHT extends DHT {
   }
 
   async connectRaw (publicKey, opts = {}) {
+    let error = null
+
     const remoteNoisePublicKey = Buffer.alloc(32)
     const localKeyPair = opts.keyPair || (opts.secretKey ? opts : this.defaultKeyPair)
     const noiseKeyPair = NoiseState.ed25519toCurve25519(localKeyPair)
@@ -144,8 +146,6 @@ module.exports = class HyperDHT extends DHT {
 
     const value = cenc.encode(messages.connect, { noise: noise.send(localPayload), relayAuth: localPayload.relayAuth })
     const query = this.query(target, 'connect', value, { socket, nodes: opts.nodes, map: mapConnect })
-
-    let error = null
 
     for await (const { from, token, connect } of query) {
       const payload = noise.recv(connect.noise, false)
