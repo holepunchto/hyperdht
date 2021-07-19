@@ -702,7 +702,7 @@ class KATServer extends EventEmitter {
 
     for (const { status, value } of (await Promise.allSettled(promises))) {
       if (status !== 'fulfilled') continue
-      nodes.push(value)
+      nodes.push(value.from)
     }
 
     if (!nodes.length) throw new Error('All gateway requests failed')
