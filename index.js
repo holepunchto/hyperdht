@@ -216,8 +216,8 @@ module.exports = class HyperDHT extends DHT {
 
     function ontimeout () {
       if (!error) error = TIMEOUT
-      query.destroy()
-      holepunch.destroy()
+      if (query) query.destroy()
+      if (holepunch) holepunch.destroy()
     }
   }
 
