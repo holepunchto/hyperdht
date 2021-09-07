@@ -242,34 +242,56 @@ Unannounce a key-pair.
 
 If you pass any options they are forwarded to dht-rpc.
 
-## Mutable/immutable records
+## Mutable/immutable key-value records
+
+Mutable: The key is a public key that signs the data (value). The record can be updated by the signer.
+Immutable: The key to the data is the hash (BLAKE2b) of the data (value), i.e. it is self describing and can not be updated.
+
+The DHT can store values up to the capacity of a UDP packet (<900 bytes).
 
 #### `{ hash, closestNodes } = await node.immutablePut(value, [options])`
 
 Store an immutable value in the DHT. When successful, the hash of the value is returned.
-
-If you pass any options they are forwarded to dht-rpc.
+* `value` - A Buffer object (<900 bytes)
+* `hash` - The returned BLAKE2b hash (`sodium.crypto_generichash`) as a Buffer object.
+* `closestNodes` - An array containing the closest nodes in the format `{ id: <256 bit Buffer obj>, host: <string ip address>, port: <int port number>}`
+* `[options]` - OPTIONAL - options object forwarded to dht-rpc.
 
 #### `{ value, from, closestNodes } = await node.immutableGet(hash, [options])`
 
 Fetch an immutable value from the DHT. When successful, it returns the value corresponding to the hash.
 
-If you pass any options they are forwarded to dht-rpc.
+* `hash` - The returned BLAKE2b hash (`sodium.crypto_generichash`) as a Buffer object.
+* `value` - A Buffer object containing the stored value
+* `from` - The node that served the request.
+* `closestNodes` - An array containing the closest nodes in the format `{ id: <256 bit Buffer obj>, host: <string ip address>, port: <int port number>}`
+* `[options]` - OPTIONAL - options object forwarded to dht-rpc.
 
-#### `await { seq, closestNodes } = node.mutablePut(keyPair, value, [options])`
+#### `await { closestNodes, signature, seq } = node.mutablePut(keyPair, value, [options])`
 
 Store a mutable value in the DHT.
 
-If you pass any options they are forwarded to dht-rpc.
+* `keyPair` - The Ed25519 keyPair of the node storing the value, used to sign the data.
+* `value` - A Buffer object containing the stored value.
+* `[options]` - OPTIONAL - options object forwarded to dht-rpc.
+* `closestNodes` - An array containing the closest nodes in the format `{ id: <256 bit Buffer obj>, host: <string ip address>, port: <int port number>}`
+* `signature` - A buffer object of the Ed25519 signature of the value.
+* `seq` - Integer, the sequence number of the stored value.
 
 #### `await { seq, value, from, closestNodes } = node.mutableGet(publicKey, [options])`
 
 Fetch a mutable value from the DHT.
 
-Options:
+* `publicKey` - The Ed25519 publicKey of the node that stored the value, used to sign the data.
+* `[options]` - OPTIONAL - options object forwarded to dht-rpc. AND the following:
+    * `seq` - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
+    * `latest` - OPTIONAL - default `false`, a boolean indicating whether the query should try to find the highest seq before returning, or just the first verified value larger than `options.seq` it sees.
+* `seq` - Integer, the sequence number of the stored value.
+* `value` - A Buffer object containing the stored value.
+* `from` - The node that served the request.
+* `closestNodes` - An array containing the closest nodes in the format `{ id: <256 bit Buffer obj>, host: <string ip address>, port: <int port number>}`
 
-* `seq` - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
-* `latest` - OPTIONAL - default `false`, a boolean indicating whether the query should try to find the highest seq before returning, or just the first verified value larger than `options.seq` it sees.
+Options:
 
 Any additional options you pass are forwarded to dht-rpc.
 
