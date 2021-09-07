@@ -148,8 +148,6 @@ module.exports = class HyperDHT extends DHT {
 
     sodium.randombytes_buf(localPayload.relayAuth)
 
-
-
     for await (const { from, token, connect } of query) {
       const payload = noise.recv(connect.noise, false)
 
