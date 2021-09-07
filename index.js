@@ -138,7 +138,7 @@ module.exports = class HyperDHT extends DHT {
     const socket = holepunch.socket
 
     const value = cenc.encode(messages.connect, { noise: noise.send(localPayload), relayAuth: localPayload.relayAuth })
-    const query = this.query(target, 'connect', value, { socket, nodes: opts.nodes, map: mapConnect })
+    query = this.query(target, 'connect', value, { socket, nodes: opts.nodes, map: mapConnect })
 
     let error = null
 
