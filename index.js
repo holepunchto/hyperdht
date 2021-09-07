@@ -137,9 +137,6 @@ module.exports = class HyperDHT extends DHT {
     const localPayload = holepunch.bind()
     const socket = holepunch.socket
 
-    const value = cenc.encode(messages.connect, { noise: noise.send(localPayload), relayAuth: localPayload.relayAuth })
-    query = this.query(target, 'connect', value, { socket, nodes: opts.nodes, map: mapConnect })
-
     const timeout = setTimeout(ontimeout, CLIENT_TIMEOUT)
 
     // forward incoming messages to the dht
@@ -149,7 +146,6 @@ module.exports = class HyperDHT extends DHT {
     localPayload.relayAuth = Buffer.allocUnsafe(32)
 
     sodium.randombytes_buf(localPayload.relayAuth)
-
 
     const value = cenc.encode(messages.connect, { noise: noise.send(localPayload), relayAuth: localPayload.relayAuth })
     query = this.query(target, 'connect', value, { socket, nodes: opts.nodes, map: mapConnect })
