@@ -115,6 +115,10 @@ module.exports = class HyperDHT extends DHT {
   }
 
   async connectRaw (publicKey, opts = {}) {
+    let error = null
+    let query = null
+    let holepunch = null
+
     const remoteNoisePublicKey = Buffer.alloc(32)
     const localKeyPair = opts.keyPair || (opts.secretKey ? opts : this.defaultKeyPair)
     const noiseKeyPair = NoiseState.ed25519toCurve25519(localKeyPair)
@@ -127,7 +131,7 @@ module.exports = class HyperDHT extends DHT {
     await this.sampledNAT()
 
     const addr = this.remoteAddress()
-    const holepunch = new Holepuncher(addr)
+    holepunch = new Holepuncher(addr)
     const onmessage = this.onmessage.bind(this)
 
     const localPayload = holepunch.bind()
@@ -147,6 +151,10 @@ module.exports = class HyperDHT extends DHT {
     localPayload.relayAuth = Buffer.allocUnsafe(32)
 
     sodium.randombytes_buf(localPayload.relayAuth)
+
+
+    const value = cenc.encode(messages.connect, { noise: noise.send(localPayload), relayAuth: localPayload.relayAuth })
+    query = this.query(target, 'connect', value, { socket, nodes: opts.nodes, map: mapConnect })
 
     for await (const { from, token, connect } of query) {
       const payload = noise.recv(connect.noise, false)
@@ -215,8 +223,8 @@ module.exports = class HyperDHT extends DHT {
 
     function ontimeout () {
       if (!error) error = TIMEOUT
-      query.destroy()
-      holepunch.destroy()
+      if (query) query.destroy()
+      if (holepunch) holepunch.destroy()
     }
   }
 
@@ -700,12 +708,10 @@ class KATServer extends EventEmitter {
     }
 
     const nodes = []
-    for (const p of promises) {
-      try {
-        nodes.push((await p).from)
-      } catch {
-        continue
-      }
+
+    for (const { status, value } of (await Promise.allSettled(promises))) {
+      if (status !== 'fulfilled') continue
+      nodes.push(value.from)
     }
 
     if (!nodes.length) throw new Error('All gateway requests failed')
