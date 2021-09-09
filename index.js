@@ -311,7 +311,7 @@ module.exports = class HyperDHT extends DHT {
       }
     })
     await query.finished()
-    return { signature, seq }
+    return { closestNodes: query.closestNodes, signature, seq }
   }
 
   lookup (target, opts = {}) {
