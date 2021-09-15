@@ -1,11 +1,6 @@
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
-const { EventEmitter } = require('events')
-const c = require('compact-encoding')
 const HolepunchRouter = require('./lib/route')
-const messages = require('./lib/messages')
-const AddressSet = require('./lib/address-set')
-const Holepuncher = require('./lib/holepuncher')
 
 module.exports = class HyperDHT extends DHT {
   constructor (opts) {
@@ -98,10 +93,6 @@ module.exports = class HyperDHT extends DHT {
   }
 }
 
-function diffAddress (a, b) {
-  return a.host !== b.host || a.port !== b.port
-}
-
 function createKeyPair (seed) {
   const publicKey = Buffer.alloc(32)
   const secretKey = Buffer.alloc(64)
@@ -109,19 +100,3 @@ function createKeyPair (seed) {
   else sodium.crypto_sign_keypair(publicKey, secretKey)
   return { publicKey, secretKey }
 }
-
-function hash (data) {
-  const out = Buffer.allocUnsafe(32)
-  sodium.crypto_generichash(out, data)
-  return out
-}
-
-function decode (enc, buf) {
-  try {
-    return c.decode(enc, buf)
-  } catch {
-    return null
-  }
-}
-
-function noop () {}
