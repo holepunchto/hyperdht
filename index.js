@@ -1,12 +1,23 @@
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
 const HolepunchRouter = require('./lib/route')
+const Server = require('./lib/server')
+
+const BOOTSTRAP_NODES = [
+  { host: '88.99.3.86', port: 10001 }
+]
 
 module.exports = class HyperDHT extends DHT {
-  constructor (opts) {
-    super(opts)
+  constructor (opts = {}) {
+    super({ bootstrap: BOOTSTRAP_NODES, ...opts })
 
     this._router = new HolepunchRouter(this)
+  }
+
+  createServer (onconnection) {
+    const s = new Server(this)
+    if (onconnection) s.on('connection', onconnection)
+    return s
   }
 
   onrequest (req) {
