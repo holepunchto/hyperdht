@@ -23,6 +23,12 @@ await s.listen(serverKeyPair)
 
 console.log('Server is listening...')
 
+process.once('SIGINT', async function () {
+  console.log('Closing server...')
+  await s.close()
+  process.exit(0)
+})
+
 async function printInfo () {
   await node.ready()
 

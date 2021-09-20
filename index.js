@@ -22,8 +22,6 @@ module.exports = class HyperDHT extends DHT {
   }
 
   onrequest (req) {
-    console.log('onrequest', req.command)
-
     switch (req.command) {
       case 'lookup': {
         this._onlookup(req)
@@ -84,12 +82,13 @@ module.exports = class HyperDHT extends DHT {
     const existing = this._router.get(req.target)
     if (existing) {
       clearTimeout(existing.timeout)
+      this._router.delete(req.target)
     }
     req.reply(null)
   }
 
   _onannounce (req) {
-    if (!req.target) return
+    if (!req.target || !req.token) return
 
     const existing = this._router.get(req.target)
     if (existing) {
