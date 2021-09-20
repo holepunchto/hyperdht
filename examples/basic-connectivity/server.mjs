@@ -9,7 +9,12 @@ printInfo()
 // Obvs no security implied here!
 const serverKeyPair = DHT.keyPair(Buffer.alloc(32).fill('basic-connectivity-server'))
 
-const s = node.createServer(function (connection) {
+function firewall (pub) {
+  console.log('should firewall?', pub)
+  return false
+}
+
+const s = node.createServer({ firewall }, function (connection) {
   console.log('Server got new connection, ending it...')
   connection.end()
 })
