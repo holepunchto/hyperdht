@@ -14,8 +14,9 @@ module.exports = class HyperDHT extends DHT {
     this._router = new HolepunchRouter(this)
   }
 
-  createServer (onconnection) {
-    const s = new Server(this)
+  createServer (opts, onconnection) {
+    if (typeof opts === 'function') return this.createServer(null, opts)
+    const s = new Server(this, opts)
     if (onconnection) s.on('connection', onconnection)
     return s
   }
@@ -30,6 +31,10 @@ module.exports = class HyperDHT extends DHT {
       }
       case 'announce': {
         this._onannounce(req)
+        break
+      }
+      case 'unannounce': {
+        this._onunannounce(req)
         break
       }
       case 'find_peer': {
@@ -71,6 +76,15 @@ module.exports = class HyperDHT extends DHT {
     const a = this._router.get(req.target)
     console.log('onlookup', !!a)
 
+    req.reply(null)
+  }
+
+  _onunannounce (req) {
+    if (!req.target) return
+    const existing = this._router.get(req.target)
+    if (existing) {
+      clearTimeout(existing.timeout)
+    }
     req.reply(null)
   }
 
