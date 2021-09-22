@@ -10,7 +10,7 @@ printInfo()
 const serverKeyPair = DHT.keyPair(Buffer.alloc(32).fill('basic-connectivity-server'))
 
 function firewall (pub, remotePayload, addr) {
-  console.log('should firewall?', pub, remotePayload, addr)
+  console.log('Should firewall?', pub, remotePayload, addr)
   return false
 }
 

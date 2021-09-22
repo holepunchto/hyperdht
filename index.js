@@ -1,7 +1,9 @@
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
-const HolepunchRouter = require('./lib/route')
+const SocketPairer = require('./lib/socket-pairer')
+const Router = require('./lib/route')
 const Server = require('./lib/server')
+const { dual } = require('bind-easy')
 
 const BOOTSTRAP_NODES = [
   { host: '88.99.3.86', port: 10001 }
@@ -9,13 +11,23 @@ const BOOTSTRAP_NODES = [
 
 module.exports = class HyperDHT extends DHT {
   constructor (opts = {}) {
-    super({ bootstrap: BOOTSTRAP_NODES, ...opts })
+    super({ bootstrap: BOOTSTRAP_NODES, ...opts, bind })
 
-    this._router = new HolepunchRouter(this)
+    const self = this
+    const port = opts.port || opts.bind || 49737
+
+    this._router = new Router(this)
+    this._sockets = null
+
+    async function bind () {
+      const { server, socket } = await dual(port)
+      self._sockets = new SocketPairer(self, server)
+      return socket
+    }
   }
 
   createServer (opts, onconnection) {
-    if (typeof opts === 'function') return this.createServer(null, opts)
+    if (typeof opts === 'function') return this.createServer({}, opts)
     const s = new Server(this, opts)
     if (onconnection) s.on('connection', onconnection)
     return s
