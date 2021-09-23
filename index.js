@@ -3,6 +3,7 @@ const sodium = require('sodium-universal')
 const SocketPairer = require('./lib/socket-pairer')
 const Router = require('./lib/route')
 const Server = require('./lib/server')
+const connect = require('./lib/connect')
 const { dual } = require('bind-easy')
 
 const BOOTSTRAP_NODES = [
@@ -16,6 +17,8 @@ module.exports = class HyperDHT extends DHT {
     const self = this
     const port = opts.port || opts.bind || 49737
 
+    this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
+
     this._router = new Router(this)
     this._sockets = null
 
@@ -24,6 +27,10 @@ module.exports = class HyperDHT extends DHT {
       self._sockets = new SocketPairer(self, server)
       return socket
     }
+  }
+
+  connect (remotePublicKey, opts) {
+    return connect(this, remotePublicKey, opts)
   }
 
   createServer (opts, onconnection) {
