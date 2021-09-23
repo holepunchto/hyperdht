@@ -109,7 +109,8 @@ module.exports = class HyperDHT extends DHT {
 
     const c = {
       relay: req.from,
-      server: null,
+      onconnect: null,
+      onholepunch: null,
       timeout: null
     }
 
