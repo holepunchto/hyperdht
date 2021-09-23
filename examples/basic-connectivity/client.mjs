@@ -2,9 +2,13 @@ import DHT from '../../index.js'
 import Client from '../../lib/client.js'
 
 const node = new DHT({
+  quickFirewall: false,
   ephemeral: true // just setting this because this is a demo file
 })
 
+await node.ready()
+
+console.log('----------- ready -----------')
 printInfo()
 
 // Obvs no security implied here!
@@ -14,17 +18,15 @@ const clientKeyPair = DHT.keyPair(Buffer.alloc(32).fill('basic-connectivity-clie
 const c = new Client(node, serverKeyPair.publicKey, clientKeyPair, {
   holepunch (remoteNat, localNat, remoteAddress, localAddr) {
     console.log('going to bail punch!', { remoteNat, localNat, remoteAddress, localAddr })
-    return true
+    return false
   }
 })
 
-const result = await c.connect()
+const result = c.connect()
 
 result.on('open', function () {
-  console.log('opened')
+  console.log('Client connected!')
 })
-
-console.log('Client connected!')
 
 async function printInfo () {
   await node.ready()
