@@ -40,6 +40,11 @@ module.exports = class HyperDHT extends DHT {
     return s
   }
 
+  async destroy () {
+    await super.destroy()
+    if (this._sockets) await this._sockets.destroy()
+  }
+
   onrequest (req) {
     switch (req.command) {
       case 'lookup': {
@@ -91,7 +96,11 @@ module.exports = class HyperDHT extends DHT {
     if (!req.target) return
 
     const a = this._router.get(req.target)
-    console.log('onlookup', !!a)
+
+    if (a) {
+      req.reply(Buffer.from('ok'))
+      return
+    }
 
     req.reply(null)
   }

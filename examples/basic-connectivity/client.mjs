@@ -11,8 +11,8 @@ printInfo()
 const serverKeyPair = DHT.keyPair(Buffer.alloc(32).fill('basic-connectivity-server'))
 
 const encryptedSocket = node.connect(serverKeyPair.publicKey, {
-  holepunch (remoteNat, localNat, remoteAddress, localAddr) {
-    console.log('going to bail punch!', { remoteNat, localNat, remoteAddress, localAddr })
+  holepunch (remoteFirewall, localFirewall, remoteAddress, localAddress) {
+    console.log('going to bail punch!', { remoteFirewall, localFirewall, remoteAddress, localAddress })
     return false
   }
 })
