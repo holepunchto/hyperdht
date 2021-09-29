@@ -5,8 +5,9 @@ test('basic noise payload', function (t) {
   const state = { start: 0, end: 0, buffer: null }
 
   const c = {
+    version: 1,
     error: 0,
-    network: 0,
+    firewall: 0,
     protocols: 0,
     holepunch: null,
     addresses: null
@@ -32,8 +33,9 @@ test('noise payload with holepunch and addresses', function (t) {
   const state = { start: 0, end: 0, buffer: null }
 
   const c = {
+    version: 1,
     error: 0,
-    network: 2,
+    firewall: 2,
     protocols: 0,
     holepunch: {
       id: 10,
@@ -68,8 +70,9 @@ test('noise payload only addresses', function (t) {
   const state = { start: 0, end: 0, buffer: null }
 
   const c = {
+    version: 1,
     error: 0,
-    network: 2,
+    firewall: 2,
     protocols: 0,
     holepunch: null,
     addresses: [{
@@ -97,7 +100,7 @@ test('basic holepunch payload', function (t) {
 
   const h = {
     error: 0,
-    network: 0,
+    firewall: 0,
     punching: false,
     address: null,
     remoteAddress: null,
@@ -122,7 +125,7 @@ test('holepunch payload with flag and address', function (t) {
 
   const h = {
     error: 0,
-    network: 0,
+    firewall: 0,
     punching: true,
     address: {
       id: null,
@@ -151,7 +154,7 @@ test('holepunch payload with flag and remoteToken', function (t) {
 
   const h = {
     error: 0,
-    network: 0,
+    firewall: 0,
     punching: true,
     address: null,
     remoteAddress: null,

@@ -20,11 +20,6 @@
     "brittle": "^1.2.0",
     "standard": "^16.0.3"
   },
-  "standard": {
-    "ignore": [
-      "**/*.mjs"
-    ]
-  },
   "scripts": {
     "test": "standard && brittle test/*.js",
     "lint": "standard"
