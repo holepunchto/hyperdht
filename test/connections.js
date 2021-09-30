@@ -41,6 +41,60 @@ test('createServer + connect - once defaults', async function (t) {
   await server.close()
 })
 
+test('createServer + connect - exchange data', async function (t) {
+  const [a, b] = await swarm(t)
+  const lc = t.test('socket lifecycle')
+
+  lc.plan(5)
+
+  const server = a.createServer(function (socket) {
+    lc.pass('server side opened')
+
+    socket.on('data', function (data) {
+      socket.write(data)
+    })
+
+    socket.once('end', function () {
+      lc.pass('server side ended')
+      socket.end()
+    })
+  })
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey)
+  const blk = Buffer.alloc(4096)
+  const expected = 20 * 1024 * blk.byteLength
+
+  let sent = 0
+  let recv = 0
+
+  for (let i = 0; i < 10; i++) send()
+
+  function send () {
+    sent += blk.byteLength
+    socket.write(blk)
+  }
+
+  socket.on('data', function (data) {
+    recv += data.byteLength
+    if (recv === expected) {
+      lc.is(sent, expected, 'client sent all data')
+      lc.is(recv, expected, 'client received all data')
+      socket.end()
+    } else if (sent < expected) {
+      send()
+    }
+  })
+
+  socket.once('end', function () {
+    lc.pass('client side ended')
+  })
+
+  await lc
+  await server.close()
+})
+
 test('createServer + connect - force holepunch', async function (t) {
   const [boot] = await swarm(t)
 
