@@ -1,10 +1,11 @@
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
+const { dual } = require('bind-easy')
 const SocketPairer = require('./lib/socket-pairer')
 const Router = require('./lib/route')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { dual } = require('bind-easy')
+const { FIREWALL, PROTOCOL } = require('./lib/constants')
 
 const BOOTSTRAP_NODES = [
   { host: '88.99.3.86', port: 10001 }
@@ -27,6 +28,18 @@ module.exports = class HyperDHT extends DHT {
       self._sockets = new SocketPairer(self, server)
       return socket
     }
+  }
+
+  static get BOOTSTRAP () {
+    return BOOTSTRAP_NODES
+  }
+
+  static get FIREWALL () {
+    return FIREWALL
+  }
+
+  static get PROTOCOL () {
+    return PROTOCOL
   }
 
   connect (remotePublicKey, opts) {
