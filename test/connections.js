@@ -1,6 +1,5 @@
 const test = require('brittle')
 const { swarm } = require('./helpers')
-const { once } = require('events')
 const DHT = require('../')
 
 test('createServer + connect - once defaults', async function (t) {
@@ -55,7 +54,7 @@ test('createServer + connect - force holepunch', async function (t) {
   const lc = t.test('socket lifecycle')
   lc.plan(6)
 
-  const server = a.createServer(function (socket) {
+  const server = a.createServer({ shareLocalAddress: false }, function (socket) {
     lc.ok(!!socket.rawStream._utp, 'server is utp') // TODO: make this easier to detect!
     lc.pass('utp server side opened')
 
@@ -101,6 +100,7 @@ test('server choosing to abort holepunch', async function (t) {
   lc.plan(2)
 
   const server = a.createServer({
+    shareLocalAddress: false,
     holepunch () {
       lc.pass('server should trigger holepuncher hook')
       return false
@@ -141,7 +141,7 @@ test('client choosing to abort holepunch', async function (t) {
   const lc = t.test('socket lifecycle')
   lc.plan(2)
 
-  const server = a.createServer(function (socket) {
+  const server = a.createServer({ shareLocalAddress: false }, function (socket) {
     lc.fail('server should not make a connection')
   })
 

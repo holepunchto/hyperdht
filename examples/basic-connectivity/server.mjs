@@ -16,6 +16,7 @@ function firewall (pub, remotePayload, addr) {
 
 const s = node.createServer({ firewall }, function (connection) {
   console.log('Server got new connection, ending it...')
+  connection.write(Buffer.from('Hello world, how are you?'))
   connection.end()
 })
 
