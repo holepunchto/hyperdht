@@ -165,7 +165,9 @@ test('server choosing to abort holepunch', async function (t) {
 
   await server.listen()
 
-  const socket = b.connect(server.publicKey)
+  const socket = b.connect(server.publicKey, {
+    fastOpen: false
+  })
 
   socket.once('open', function () {
     lc.fail('client should not make a connection')
@@ -202,6 +204,7 @@ test('client choosing to abort holepunch', async function (t) {
   await server.listen()
 
   const socket = b.connect(server.publicKey, {
+    fastOpen: false,
     holepunch () {
       lc.pass('client is aborting')
       return false
