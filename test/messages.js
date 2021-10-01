@@ -101,8 +101,9 @@ test('basic holepunch payload', function (t) {
   const h = {
     error: 0,
     firewall: 0,
+    round: 0,
     punching: false,
-    address: null,
+    addresses: null,
     remoteAddress: null,
     token: null,
     remoteToken: null
@@ -120,18 +121,19 @@ test('basic holepunch payload', function (t) {
   t.alike(d, h)
 })
 
-test('holepunch payload with flag and address', function (t) {
+test('holepunch payload with flag and addresses', function (t) {
   const state = { start: 0, end: 0, buffer: null }
 
   const h = {
     error: 0,
     firewall: 0,
+    round: 1,
     punching: true,
-    address: {
+    addresses: [{
       id: null,
       host: '127.0.0.1',
       port: 10241
-    },
+    }],
     remoteAddress: null,
     token: null,
     remoteToken: null
@@ -155,8 +157,9 @@ test('holepunch payload with flag and remoteToken', function (t) {
   const h = {
     error: 0,
     firewall: 0,
+    round: 0,
     punching: true,
-    address: null,
+    addresses: null,
     remoteAddress: null,
     token: null,
     remoteToken: Buffer.alloc(32).fill('remote-token')
