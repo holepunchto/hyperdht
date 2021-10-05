@@ -95,6 +95,23 @@ test('noise payload only addresses', function (t) {
   t.alike(d, c)
 })
 
+test('noise payload newer version', function (t) {
+  // version 2 with some "version specific" data
+  const newer = Buffer.from([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+  const state = { start: 0, end: newer.byteLength, buffer: newer }
+
+  const d = m.noisePayload.decode(state)
+
+  t.alike(d, {
+    version: 2,
+    error: 0,
+    firewall: 0,
+    protocols: 0,
+    holepunch: null,
+    addresses: null
+  })
+})
+
 test('basic holepunch payload', function (t) {
   const state = { start: 0, end: 0, buffer: null }
 
@@ -175,4 +192,152 @@ test('holepunch payload with flag and remoteToken', function (t) {
   const d = m.holepunchPayload.decode(state)
 
   t.alike(d, h)
+})
+
+test('peer with no relays', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const peer = { publicKey: Buffer.alloc(32).fill('pk'), relayAddresses: [] }
+
+  m.peer.preencode(state, peer)
+  state.buffer = Buffer.allocUnsafe(state.end)
+  m.peer.encode(state, peer)
+
+  t.is(state.end, state.start, 'fully encoded')
+
+  state.start = 0
+  const d = m.peer.decode(state)
+
+  t.alike(d, peer)
+})
+
+test('peer with multiple relays', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const peer = {
+    publicKey: Buffer.alloc(32).fill('abc'),
+    relayAddresses: [{
+      id: null,
+      host: '127.0.0.1',
+      port: 4242
+    }, {
+      id: null,
+      host: '8.1.4.1',
+      port: 402
+    }]
+  }
+
+  m.peer.preencode(state, peer)
+  state.buffer = Buffer.allocUnsafe(state.end)
+  m.peer.encode(state, peer)
+
+  t.is(state.end, state.start, 'fully encoded')
+
+  state.start = 0
+  const d = m.peer.decode(state)
+
+  t.alike(d, peer)
+})
+
+test('lookup', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const peers = [{
+    publicKey: Buffer.alloc(32).fill('abc'),
+    relayAddresses: [{
+      id: null,
+      host: '127.0.0.1',
+      port: 4242
+    }, {
+      id: null,
+      host: '8.1.4.1',
+      port: 402
+    }]
+  }, {
+    publicKey: Buffer.alloc(32).fill('another'),
+    relayAddresses: []
+  }]
+
+  m.lookup.preencode(state, peers)
+  state.buffer = Buffer.allocUnsafe(state.end)
+  m.lookup.encode(state, peers)
+
+  t.is(state.end, state.start, 'fully encoded')
+
+  state.start = 0
+  const d = m.lookup.decode(state)
+
+  t.alike(d, peers)
+})
+
+test('announce', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const ann = {
+    peer: {
+      publicKey: Buffer.alloc(32).fill('abc'),
+      relayAddresses: []
+    },
+    refresh: null,
+    signature: null
+  }
+
+  m.announce.preencode(state, ann)
+  state.buffer = Buffer.allocUnsafe(state.end)
+  m.announce.encode(state, ann)
+
+  t.is(state.end, state.start, 'fully encoded')
+
+  state.start = 0
+  const d = m.announce.decode(state)
+
+  t.alike(d, ann)
+})
+
+test('announce with signature', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const ann = {
+    peer: {
+      publicKey: Buffer.alloc(32).fill('abc'),
+      relayAddresses: []
+    },
+    refresh: null,
+    signature: Buffer.alloc(64).fill('signature')
+  }
+
+  m.announce.preencode(state, ann)
+  state.buffer = Buffer.allocUnsafe(state.end)
+  m.announce.encode(state, ann)
+
+  t.is(state.end, state.start, 'fully encoded')
+
+  state.start = 0
+  const d = m.announce.decode(state)
+
+  t.alike(d, ann)
+})
+
+test('announce with refresh', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const ann = {
+    peer: {
+      publicKey: Buffer.alloc(32).fill('abc'),
+      relayAddresses: []
+    },
+    refresh: Buffer.alloc(32).fill('refresh'),
+    signature: null
+  }
+
+  m.announce.preencode(state, ann)
+  state.buffer = Buffer.allocUnsafe(state.end)
+  m.announce.encode(state, ann)
+
+  t.is(state.end, state.start, 'fully encoded')
+
+  state.start = 0
+  const d = m.announce.decode(state)
+
+  t.alike(d, ann)
 })
