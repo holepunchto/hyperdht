@@ -8,7 +8,6 @@
     "bogon": "^1.0.0",
     "compact-encoding": "^2.4.1",
     "dht-rpc": "github:mafintosh/dht-rpc#iterate-rc",
-    "nat-sampler": "^1.0.1",
     "noise-curve-ed": "^1.0.2",
     "noise-handshake": "^2.1.0",
     "noise-secret-stream": "^4.1.0",
