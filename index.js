@@ -165,6 +165,90 @@ module.exports = class HyperDHT extends DHT {
     }
   }
 
+  async immutableGet (target, opts = {}) {
+    opts = { ...opts, map: mapImmutable }
+
+    const query = this.query({ target, command: 'immutable_get', value: null }, opts)
+    const check = Buffer.allocUnsafe(32)
+
+    for await (const node of query) {
+      const { value } = node
+      sodium.crypto_generichash(check, value)
+      if (check.equals(target)) return node
+    }
+
+    throw Error('Not found')
+  }
+
+  async immutablePut (value, opts = {}) {
+    const target = Buffer.allocUnsafe(32)
+    sodium.crypto_generichash(target, value)
+
+    opts = {
+      ...opts,
+      map: mapImmutable,
+      commit (reply, dht) {
+        return dht.request({ token: reply.token, target, command: 'immutable_put', value }, reply.from)
+      }
+    }
+
+    const query = this.query({ target, command: 'immutable_get', value: null }, opts)
+    await query.finished()
+
+    return { hash: target, closestNodes: query.closestNodes }
+  }
+
+  async mutableGet (publicKey, opts = {}) {
+    opts = { ...opts, map: mapMutable }
+
+    const target = Buffer.alloc(32)
+    sodium.crypto_generichash(target, publicKey)
+
+    const userSeq = opts.seq || 0
+    const query = this.query({ target, command: 'mutable_get', value: c.encode(c.uint, userSeq) }, opts)
+    const latest = opts.latest !== false
+
+    let result = null
+
+    for await (const node of query) {
+      if (node.seq < userSeq || !Persistent.verifyMutable(node.signature, node.seq, node.value, publicKey)) continue
+      if (!latest) return node
+      if (!result || node.seq > result.seq) result = node
+    }
+
+    if (!result) throw Error('Not found')
+    return result
+  }
+
+  async mutablePut (keyPair, value, opts = {}) {
+    const target = Buffer.allocUnsafe(32)
+    sodium.crypto_generichash(target, keyPair.publicKey)
+
+    const seq = opts.seq || 0
+    const signature = Persistent.signMutable(seq, value, keyPair.secretKey)
+
+    const signed = c.encode(m.mutablePutRequest, {
+      publicKey: keyPair.publicKey,
+      seq,
+      value,
+      signature
+    })
+
+    opts = {
+      ...opts,
+      map: mapMutable,
+      commit (reply, dht) {
+        return dht.request({ token: reply.token, target, command: 'mutable_put', value: signed }, reply.from)
+      }
+    }
+
+    // use seq = 0, for the query part here, as we don't care about the actual values
+    const query = this.query({ target, command: 'mutable_get', value: c.encode(c.uint, 0) }, opts)
+    await query.finished()
+
+    return { publicKey: keyPair.publicKey, closestNodes: query.closestNodes, seq, signature }
+  }
+
   onrequest (req) {
     if (this._persistent !== null) {
       switch (req.command) {
@@ -182,6 +266,22 @@ module.exports = class HyperDHT extends DHT {
         }
         case 'unannounce': {
           this._persistent.onunannounce(req)
+          return true
+        }
+        case 'mutable_put': {
+          this._persistent.onmutableput(req)
+          return true
+        }
+        case 'mutable_get': {
+          this._persistent.onmutableget(req)
+          return true
+        }
+        case 'immutable_put': {
+          this._persistent.onimmutableput(req)
+          return true
+        }
+        case 'immutable_get': {
+          this._persistent.onimmutableget(req)
           return true
         }
       }
@@ -248,6 +348,36 @@ function mapFindPeer (node) {
       from: node.from,
       to: node.to,
       peer: c.decode(m.peer, node.value)
+    }
+  } catch {
+    return null
+  }
+}
+
+function mapImmutable (node) {
+  if (!node.value) return null
+
+  return {
+    token: node.token,
+    from: node.from,
+    to: node.to,
+    value: node.value
+  }
+}
+
+function mapMutable (node) {
+  if (!node.value) return null
+
+  try {
+    const { seq, value, signature } = c.decode(m.mutableGetResponse, node.value)
+
+    return {
+      token: node.token,
+      from: node.from,
+      to: node.to,
+      seq,
+      value,
+      signature
     }
   } catch {
     return null
