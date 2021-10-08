@@ -1,15 +1,17 @@
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
 const { dual } = require('bind-easy')
+const c = require('compact-encoding')
+const m = require('./lib/messages')
 const SocketPairer = require('./lib/socket-pairer')
-const Router = require('./lib/route')
+const Persistent = require('./lib/persistent')
+const Router = require('./lib/router')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, PROTOCOL } = require('./lib/constants')
+const { FIREWALL, PROTOCOL, BOOTSTRAP_NODES } = require('./lib/constants')
 
-const BOOTSTRAP_NODES = [
-  { host: '88.99.3.86', port: 10001 }
-]
+const maxSize = 65536
+const maxAge = 20 * 60 * 1000
 
 module.exports = class HyperDHT extends DHT {
   constructor (opts = {}) {
@@ -17,11 +19,17 @@ module.exports = class HyperDHT extends DHT {
 
     const self = this
     const port = opts.port || opts.bind || 49737
+    const cacheOpts = {
+      maxSize: opts.maxSize || maxSize,
+      maxAge: opts.maxAge || maxAge
+    }
 
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
+    this.listening = new Set()
 
-    this._router = new Router(this)
+    this._router = new Router(this, cacheOpts)
     this._sockets = null
+    this._persistent = new Persistent(this, cacheOpts)
 
     async function bind () {
       const { server, socket } = await dual(port)
@@ -54,109 +62,158 @@ module.exports = class HyperDHT extends DHT {
   }
 
   async destroy () {
+    const closing = []
+    for (const server of this.listening) closing.push(server.close())
+
+    await Promise.allSettled(closing)
     await super.destroy()
+
     if (this._sockets) await this._sockets.destroy()
   }
 
+  findPeer (publicKey, opts = {}) {
+    const target = opts.hash === false ? publicKey : hash(publicKey)
+    opts = { ...opts, map: mapFindPeer }
+    return this.query({ target, command: 'find_peer', value: null }, opts)
+  }
+
+  lookup (target, opts = {}) {
+    opts = { ...opts, map: mapLookup }
+    return this.query({ target, command: 'lookup', value: null }, opts)
+  }
+
+  lookupAndUnannounce (target, keyPair, opts = {}) {
+    const unannounces = []
+    const dht = this
+    const userCommit = opts.commit || noop
+
+    if (this._persistent !== null) { // unlink self
+      this._persistent.unannounce(target, keyPair.publicKey)
+    }
+
+    opts = { ...opts, map, commit }
+    return this.query({ target, command: 'lookup', value: null }, opts)
+
+    async function commit (reply, dht, query) {
+      while (unannounces.length) {
+        try {
+          await unannounces.pop()
+        } catch {
+          continue
+        }
+      }
+
+      return userCommit(reply, dht, query)
+    }
+
+    function map (reply) {
+      const data = mapLookup(reply)
+
+      if (!data || !data.token) return data
+
+      let found = data.peers.length >= 20
+      for (let i = 0; !found && i < data.peers.length; i++) {
+        found = data.peers[i].publicKey.equals(keyPair.publicKey)
+      }
+
+      if (!found) return data
+
+      const { token, from } = data
+      const unann = {
+        peer: {
+          publicKey: keyPair.publicKey,
+          relayAddresses: []
+        },
+        signature: null
+      }
+
+      unann.signature = Persistent.signUnannounce(target, token, from.id, unann, keyPair.secretKey)
+
+      const value = c.encode(m.unannounce, unann)
+      unannounces.push(dht.request({ token, target, command: 'unannounce', value }, from))
+
+      return data
+    }
+  }
+
+  unannounce (target, keyPair, opts = {}) {
+    return this.lookupAndUnannounce(target, keyPair, opts).finished()
+  }
+
+  announce (target, keyPair, relayAddresses = [], opts = {}) {
+    opts = { ...opts, commit }
+
+    return opts.clear
+      ? this.lookupAndUnannounce(target, keyPair, opts)
+      : this.lookup(target, opts)
+
+    function commit (reply, dht) {
+      const { token, from } = reply
+      const ann = {
+        peer: {
+          publicKey: keyPair.publicKey,
+          relayAddresses
+        },
+        refresh: null,
+        signature: null
+      }
+
+      ann.signature = Persistent.signAnnounce(target, token, from.id, ann, keyPair.secretKey)
+
+      const value = c.encode(m.announce, ann)
+      return dht.request({ token, target, command: 'announce', value }, from)
+    }
+  }
+
   onrequest (req) {
+    if (this._persistent !== null) {
+      switch (req.command) {
+        case 'lookup': {
+          this._persistent.onlookup(req)
+          return true
+        }
+        case 'find_peer': {
+          this._persistent.onfindpeer(req)
+          return true
+        }
+        case 'announce': {
+          this._persistent.onannounce(req)
+          return true
+        }
+        case 'unannounce': {
+          this._persistent.onunannounce(req)
+          return true
+        }
+      }
+    }
+
     switch (req.command) {
-      case 'lookup': {
-        this._onlookup(req)
-        break
-      }
-      case 'announce': {
-        this._onannounce(req)
-        break
-      }
-      case 'unannounce': {
-        this._onunannounce(req)
-        break
-      }
-      case 'find_peer': {
-        this._onfindpeer(req)
-        break
-      }
       case 'connect': {
         this._router.onconnect(req)
-        break
+        return true
       }
       case 'holepunch': {
         this._router.onholepunch(req)
-        break
-      }
-      default: {
-        return false
+        return true
       }
     }
 
-    return true
-  }
-
-  _onfindpeer (req) {
-    if (!req.target) return
-
-    const r = this._router.get(req.target)
-
-    if (r) {
-      req.reply(Buffer.from('ok'))
-      return
-    }
-
-    req.reply(null)
-  }
-
-  _onlookup (req) {
-    if (!req.target) return
-
-    const a = this._router.get(req.target)
-
-    if (a) {
-      req.reply(Buffer.from('ok'))
-      return
-    }
-
-    req.reply(null)
-  }
-
-  _onunannounce (req) {
-    if (!req.target) return
-    const existing = this._router.get(req.target)
-    if (existing) {
-      clearTimeout(existing.timeout)
-      this._router.delete(req.target)
-    }
-    req.reply(null)
-  }
-
-  _onannounce (req) {
-    if (!req.target || !req.token) return
-
-    const existing = this._router.get(req.target)
-    if (existing) {
-      clearTimeout(existing.timeout)
-    }
-
-    const c = {
-      relay: req.from,
-      onconnect: null,
-      onholepunch: null,
-      timeout: null
-    }
-
-    c.timeout = setTimeout(() => {
-      if (this._router.get(req.target) === c) {
-        this._router.delete(req.target)
-      }
-    }, 10 * 60 * 1000)
-
-    this._router.set(req.target, c)
-
-    req.reply(null)
+    return false
   }
 
   static keyPair (seed) {
     return createKeyPair(seed)
   }
+
+  static hash (data) {
+    return hash(data)
+  }
+}
+
+function hash (data) {
+  const out = Buffer.allocUnsafe(32)
+  sodium.crypto_generichash(out, data)
+  return out
 }
 
 function createKeyPair (seed) {
@@ -166,3 +223,35 @@ function createKeyPair (seed) {
   else sodium.crypto_sign_keypair(publicKey, secretKey)
   return { publicKey, secretKey }
 }
+
+function mapLookup (node) {
+  if (!node.value) return null
+
+  try {
+    return {
+      token: node.token,
+      from: node.from,
+      to: node.to,
+      peers: c.decode(m.peers, node.value)
+    }
+  } catch {
+    return null
+  }
+}
+
+function mapFindPeer (node) {
+  if (!node.value) return null
+
+  try {
+    return {
+      token: node.token,
+      from: node.from,
+      to: node.to,
+      peer: c.decode(m.peer, node.value)
+    }
+  } catch {
+    return null
+  }
+}
+
+function noop () {}

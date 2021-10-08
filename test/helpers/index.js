@@ -1,6 +1,12 @@
 const HyperDHT = require('../../')
 
-module.exports = { swarm, destroy }
+module.exports = { swarm, destroy, toArray }
+
+async function toArray (iterable) {
+  const result = []
+  for await (const data of iterable) result.push(data)
+  return result
+}
 
 async function destroy (...nodes) {
   for (const node of nodes) {
