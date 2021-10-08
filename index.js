@@ -29,7 +29,11 @@ module.exports = class HyperDHT extends DHT {
 
     this._router = new Router(this, cacheOpts)
     this._sockets = null
-    this._persistent = new Persistent(this, cacheOpts)
+    this._persistent = null
+
+    this.once('persistent', () => {
+      this._persistent = new Persistent(this, cacheOpts)
+    })
 
     async function bind () {
       const { server, socket } = await dual(port)
