@@ -239,7 +239,7 @@ test('peer with multiple relays', function (t) {
   t.alike(d, peer)
 })
 
-test('lookup', function (t) {
+test('peers', function (t) {
   const state = { start: 0, end: 0, buffer: null }
 
   const peers = [{
@@ -258,14 +258,14 @@ test('lookup', function (t) {
     relayAddresses: []
   }]
 
-  m.lookup.preencode(state, peers)
+  m.peers.preencode(state, peers)
   state.buffer = Buffer.allocUnsafe(state.end)
-  m.lookup.encode(state, peers)
+  m.peers.encode(state, peers)
 
   t.is(state.end, state.start, 'fully encoded')
 
   state.start = 0
-  const d = m.lookup.decode(state)
+  const d = m.peers.decode(state)
 
   t.alike(d, peers)
 })
