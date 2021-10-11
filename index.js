@@ -13,7 +13,7 @@ const { FIREWALL, PROTOCOL, BOOTSTRAP_NODES } = require('./lib/constants')
 const maxSize = 65536
 const maxAge = 20 * 60 * 1000
 
-module.exports = class HyperDHT extends DHT {
+class HyperDHT extends DHT {
   constructor (opts = {}) {
     super({ bootstrap: BOOTSTRAP_NODES, ...opts, bind })
 
@@ -40,18 +40,6 @@ module.exports = class HyperDHT extends DHT {
       self._sockets = new SocketPairer(self, server)
       return socket
     }
-  }
-
-  static get BOOTSTRAP () {
-    return BOOTSTRAP_NODES
-  }
-
-  static get FIREWALL () {
-    return FIREWALL
-  }
-
-  static get PROTOCOL () {
-    return PROTOCOL
   }
 
   connect (remotePublicKey, opts) {
@@ -314,6 +302,12 @@ module.exports = class HyperDHT extends DHT {
     return hash(data)
   }
 }
+
+HyperDHT.BOOTSTRAP = BOOTSTRAP_NODES
+HyperDHT.FIREWALL = FIREWALL
+HyperDHT.PROTOCOL = PROTOCOL
+
+module.exports = HyperDHT
 
 function hash (data) {
   const out = Buffer.allocUnsafe(32)
