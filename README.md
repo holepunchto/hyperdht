@@ -21,7 +21,8 @@ To see the v4 documentation/code go to https://github.com/hyperswarm/dht/tree/v4
 To try it out, first instantiate a DHT instance
 
 ``` js
-const DHT = require('@hyperswarm/dht')
+import DHT from '@hyperswarm/dht'
+
 const node = new DHT()
 ```
 
@@ -91,9 +92,16 @@ Returns an object with `{publicKey, secretKey}`. `publicKey` holds a public key 
 
 If you pass any options they are forwarded to dht-rpc.
 
-#### `await node.destroy()`
+#### `await node.destroy([options])`
 
 Fully destroy this DHT node.
+
+This will also unannounce any running servers.
+If you want to force close the node without waiting for the servers to unannounce pass `{ force: true }`.
+
+#### `node = DHT.boostrapper(bind, [options])`
+
+If you want to run your own Hyperswarm network use this method to easily create a bootstrap node.
 
 ## Creating P2P servers
 
@@ -139,7 +147,6 @@ Returns an object containing the address of the server:
 
 ```js
 {
-  type, // NAT type (inferred by staticstics),
   host, // external IP of the server,
   port, // external port of the server if predictable,
   publicKey // public key of the server
@@ -193,10 +200,8 @@ The returned stream looks like this
 
 ```js
 {
-  // The DHT id of the responding peer (hash of their address)
-  id: <node-id-of-the-dht-peer>,
   // Who sent the response?
-  from: { host, port },
+  from: { id, host, port },
   // What address they responded to (i.e. your address)
   to: { host, port },
   // List of peers announcing under this topic
@@ -208,11 +213,11 @@ To connect to the peers you should afterwards call `connect` with those public k
 
 If you pass any options they are forwarded to dht-rpc.
 
-#### `const stream = node.announce(topic, keyPair, [nodes], [options])`
+#### `const stream = node.announce(topic, keyPair, [relayAddresses], [options])`
 
 Announce that you are listening on a key-pair to the DHT under a specific topic.
 
-When announcing you'll send a signed proof to peers that you own the key-pair and wish to announce under the specific topic. Optionally you can provide up to 3 nodes, indicating which DHT nodes you are "close" to in terms of XOR distance from the hash of your public key - this speeds up connects later on for other users.
+When announcing you'll send a signed proof to peers that you own the key-pair and wish to announce under the specific topic. Optionally you can provide up to 3 nodes, indicating which DHT nodes can relay messages to you - this speeds up connects later on for other users.
 
 An announce does a parallel lookup so the stream returned looks like the lookup stream.
 
@@ -234,19 +239,19 @@ Store an immutable value in the DHT. When successful, the hash of the value is r
 
 If you pass any options they are forwarded to dht-rpc.
 
-#### `{ value, from, closestNodes } = await node.immutableGet(hash, [options])`
+#### `{ value, from } = await node.immutableGet(hash, [options])`
 
 Fetch an immutable value from the DHT. When successful, it returns the value corresponding to the hash.
 
 If you pass any options they are forwarded to dht-rpc.
 
-#### `await { seq, closestNodes } = node.mutablePut(keyPair, value, [options])`
+#### `await { publicKey, closestNodes, seq, signature } = node.mutablePut(keyPair, value, [options])`
 
 Store a mutable value in the DHT.
 
 If you pass any options they are forwarded to dht-rpc.
 
-#### `await { seq, value, from, closestNodes } = node.mutableGet(publicKey, [options])`
+#### `await { value, from, seq, signature } = node.mutableGet(publicKey, [options])`
 
 Fetch a mutable value from the DHT.
 
