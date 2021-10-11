@@ -65,13 +65,14 @@ module.exports = class HyperDHT extends DHT {
     return s
   }
 
-  async destroy () {
-    const closing = []
-    for (const server of this.listening) closing.push(server.close())
+  async destroy ({ force } = {}) {
+    if (!force) {
+      const closing = []
+      for (const server of this.listening) closing.push(server.close())
+      await Promise.allSettled(closing)
+    }
 
-    await Promise.allSettled(closing)
     await super.destroy()
-
     if (this._sockets) await this._sockets.destroy()
   }
 
