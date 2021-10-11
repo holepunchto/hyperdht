@@ -11,13 +11,15 @@
     "noise-curve-ed": "^1.0.2",
     "noise-handshake": "^2.1.0",
     "noise-secret-stream": "^4.1.0",
+    "record-cache": "^1.1.1",
     "safety-catch": "^1.0.1",
     "sodium-universal": "^3.0.4",
-    "utp-native": "^2.5.3"
+    "utp-native": "^2.5.3",
+    "xache": "^1.0.0"
   },
   "devDependencies": {
     "brittle": "^1.2.0",
-    "standard": "^16.0.3"
+    "standard": "^16.0.4"
   },
   "scripts": {
     "test": "standard && brittle test/*.js",
