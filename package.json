@@ -4,21 +4,24 @@
   "description": "The DHT powering the HyperSwarm stack",
   "main": "index.js",
   "dependencies": {
-    "compact-encoding": "^2.1.0",
-    "dht-rpc": "next",
-    "noise-protocol": "^3.0.1",
-    "noise-secret-stream": "^3.0.1",
-    "record-cache": "^1.1.1",
+    "bind-easy": "^1.0.1",
+    "bogon": "^1.0.0",
+    "compact-encoding": "^2.4.1",
+    "dht-rpc": "github:mafintosh/dht-rpc#iterate-rc",
+    "nat-sampler": "^1.0.1",
+    "noise-curve-ed": "^1.0.2",
+    "noise-handshake": "^2.1.0",
+    "noise-secret-stream": "^4.1.0",
+    "safety-catch": "^1.0.1",
     "sodium-universal": "^3.0.4",
-    "utp-native": "^2.4.0",
-    "xache": "^1.0.0"
+    "utp-native": "^2.5.3"
   },
   "devDependencies": {
-    "standard": "^16.0.3",
-    "tape": "^5.2.2"
+    "brittle": "^1.2.0",
+    "standard": "^16.0.3"
   },
   "scripts": {
-    "test": "standard && tape test/*.js",
+    "test": "standard && brittle test/*.js",
     "lint": "standard"
   },
   "author": "Mathias Buus (@mafintosh)",
@@ -35,5 +38,10 @@
   "bugs": {
     "url": "https://github.com/hyperswarm/dht/issues"
   },
-  "homepage": "https://github.com/hyperswarm/dht#readme"
+  "homepage": "https://github.com/hyperswarm/dht#readme",
+  "standard": {
+    "ignore": [
+      "**/*.mjs"
+    ]
+  }
 }
