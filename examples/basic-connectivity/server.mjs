@@ -4,6 +4,7 @@ const node = new DHT({
   ephemeral: true // just setting this because this is a demo file
 })
 
+// Just wait for this in the background
 printInfo()
 
 // Obvs no security implied here!

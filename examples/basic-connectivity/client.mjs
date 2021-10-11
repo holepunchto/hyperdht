@@ -1,21 +1,16 @@
 import DHT from '../../index.js'
 
 const node = new DHT({
-  quickFirewall: false,
   ephemeral: true // just setting this because this is a demo file
 })
 
+// Just wait for this in the background
 printInfo()
 
 // Obvs no security implied here!
 const serverKeyPair = DHT.keyPair(Buffer.alloc(32).fill('basic-connectivity-server'))
 
-const encryptedSocket = node.connect(serverKeyPair.publicKey, {
-  holepunch (remoteFirewall, localFirewall, remoteAddress, localAddress) {
-    console.log('going to bail punch!', { remoteFirewall, localFirewall, remoteAddress, localAddress })
-    return false
-  }
-})
+const encryptedSocket = node.connect(serverKeyPair.publicKey)
 
 encryptedSocket.on('open', function () {
   console.log('Client connected!')
@@ -27,6 +22,15 @@ encryptedSocket.on('error', function (err) {
 
 encryptedSocket.on('close', function () {
   console.log('Client closed...')
+})
+
+encryptedSocket.on('data', function (data) {
+  console.log('Client got data:', data.toString())
+})
+
+encryptedSocket.on('end', function () {
+  console.log('Client ended...')
+  encryptedSocket.end()
 })
 
 async function printInfo () {
