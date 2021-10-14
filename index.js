@@ -48,6 +48,7 @@ class HyperDHT extends DHT {
 
   createServer (opts, onconnection) {
     if (typeof opts === 'function') return this.createServer({}, opts)
+    if (opts.onconnection) onconnection = opts.onconnection
     const s = new Server(this, opts)
     if (onconnection) s.on('connection', onconnection)
     return s
@@ -122,7 +123,7 @@ class HyperDHT extends DHT {
 
       unann.signature = Persistent.signUnannounce(target, token, from.id, unann, keyPair.secretKey)
 
-      const value = c.encode(m.unannounce, unann)
+      const value = c.encode(m.announce, unann)
       unannounces.push(dht.request({ token, target, command: COMMANDS.UNANNOUNCE, value }, from))
 
       return data
@@ -145,7 +146,7 @@ class HyperDHT extends DHT {
       const ann = {
         peer: {
           publicKey: keyPair.publicKey,
-          relayAddresses
+          relayAddresses: relayAddresses || []
         },
         refresh: null,
         signature: null
