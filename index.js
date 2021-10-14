@@ -8,7 +8,7 @@ const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, PROTOCOL, BOOTSTRAP_NODES } = require('./lib/constants')
+const { FIREWALL, PROTOCOL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
 
 const maxSize = 65536
 const maxAge = 20 * 60 * 1000
@@ -67,12 +67,12 @@ class HyperDHT extends DHT {
   findPeer (publicKey, opts = {}) {
     const target = opts.hash === false ? publicKey : hash(publicKey)
     opts = { ...opts, map: mapFindPeer }
-    return this.query({ target, command: 'find_peer', value: null }, opts)
+    return this.query({ target, command: COMMANDS.FIND_PEER, value: null }, opts)
   }
 
   lookup (target, opts = {}) {
     opts = { ...opts, map: mapLookup }
-    return this.query({ target, command: 'lookup', value: null }, opts)
+    return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
   }
 
   lookupAndUnannounce (target, keyPair, opts = {}) {
@@ -85,7 +85,7 @@ class HyperDHT extends DHT {
     }
 
     opts = { ...opts, map, commit }
-    return this.query({ target, command: 'lookup', value: null }, opts)
+    return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
 
     async function commit (reply, dht, query) {
       while (unannounces.length) {
@@ -123,7 +123,7 @@ class HyperDHT extends DHT {
       unann.signature = Persistent.signUnannounce(target, token, from.id, unann, keyPair.secretKey)
 
       const value = c.encode(m.unannounce, unann)
-      unannounces.push(dht.request({ token, target, command: 'unannounce', value }, from))
+      unannounces.push(dht.request({ token, target, command: COMMANDS.UNANNOUNCE, value }, from))
 
       return data
     }
@@ -154,14 +154,14 @@ class HyperDHT extends DHT {
       ann.signature = Persistent.signAnnounce(target, token, from.id, ann, keyPair.secretKey)
 
       const value = c.encode(m.announce, ann)
-      return dht.request({ token, target, command: 'announce', value }, from)
+      return dht.request({ token, target, command: COMMANDS.ANNOUNCE, value }, from)
     }
   }
 
   async immutableGet (target, opts = {}) {
     opts = { ...opts, map: mapImmutable }
 
-    const query = this.query({ target, command: 'immutable_get', value: null }, opts)
+    const query = this.query({ target, command: COMMANDS.IMMUTABLE_GET, value: null }, opts)
     const check = Buffer.allocUnsafe(32)
 
     for await (const node of query) {
@@ -181,11 +181,11 @@ class HyperDHT extends DHT {
       ...opts,
       map: mapImmutable,
       commit (reply, dht) {
-        return dht.request({ token: reply.token, target, command: 'immutable_put', value }, reply.from)
+        return dht.request({ token: reply.token, target, command: COMMANDS.IMMUTABLE_PUT, value }, reply.from)
       }
     }
 
-    const query = this.query({ target, command: 'immutable_get', value: null }, opts)
+    const query = this.query({ target, command: COMMANDS.IMMUTABLE_GET, value: null }, opts)
     await query.finished()
 
     return { hash: target, closestNodes: query.closestNodes }
@@ -198,7 +198,7 @@ class HyperDHT extends DHT {
     sodium.crypto_generichash(target, publicKey)
 
     const userSeq = opts.seq || 0
-    const query = this.query({ target, command: 'mutable_get', value: c.encode(c.uint, userSeq) }, opts)
+    const query = this.query({ target, command: COMMANDS.MUTABLE_GET, value: c.encode(c.uint, userSeq) }, opts)
     const latest = opts.latest !== false
 
     let result = null
@@ -231,62 +231,62 @@ class HyperDHT extends DHT {
       ...opts,
       map: mapMutable,
       commit (reply, dht) {
-        return dht.request({ token: reply.token, target, command: 'mutable_put', value: signed }, reply.from)
+        return dht.request({ token: reply.token, target, command: COMMANDS.MUTABLE_PUT, value: signed }, reply.from)
       }
     }
 
     // use seq = 0, for the query part here, as we don't care about the actual values
-    const query = this.query({ target, command: 'mutable_get', value: c.encode(c.uint, 0) }, opts)
+    const query = this.query({ target, command: COMMANDS.MUTABLE_GET, value: c.encode(c.uint, 0) }, opts)
     await query.finished()
 
     return { publicKey: keyPair.publicKey, closestNodes: query.closestNodes, seq, signature }
   }
 
   onrequest (req) {
-    if (this._persistent !== null) {
-      switch (req.command) {
-        case 'lookup': {
-          this._persistent.onlookup(req)
-          return true
-        }
-        case 'find_peer': {
-          this._persistent.onfindpeer(req)
-          return true
-        }
-        case 'announce': {
-          this._persistent.onannounce(req)
-          return true
-        }
-        case 'unannounce': {
-          this._persistent.onunannounce(req)
-          return true
-        }
-        case 'mutable_put': {
-          this._persistent.onmutableput(req)
-          return true
-        }
-        case 'mutable_get': {
-          this._persistent.onmutableget(req)
-          return true
-        }
-        case 'immutable_put': {
-          this._persistent.onimmutableput(req)
-          return true
-        }
-        case 'immutable_get': {
-          this._persistent.onimmutableget(req)
-          return true
-        }
+    switch (req.command) {
+      case COMMANDS.PEER_HANDSHAKE: {
+        this._router.onpeerhandshake(req)
+        return true
+      }
+      case COMMANDS.PEER_HOLEPUNCH: {
+        this._router.onpeerholepunch(req)
+        return true
       }
     }
 
+    if (this._persistent === null) return false
+
     switch (req.command) {
-      case 'connect': {
-        this._router.onconnect(req)
+      case COMMANDS.FIND_PEER: {
+        this._persistent.onfindpeer(req)
         return true
       }
-      case 'holepunch': {
-        this._router.onholepunch(req)
+      case COMMANDS.LOOKUP: {
+        this._persistent.onlookup(req)
+        return true
+      }
+      case COMMANDS.ANNOUNCE: {
+        this._persistent.onannounce(req)
+        return true
+      }
+      case COMMANDS.UNANNOUNCE: {
+        this._persistent.onunannounce(req)
+        return true
+      }
+      case COMMANDS.MUTABLE_PUT: {
+        this._persistent.onmutableput(req)
+        return true
+      }
+      case COMMANDS.MUTABLE_GET: {
+        this._persistent.onmutableget(req)
+        return true
+      }
+      case COMMANDS.IMMUTABLE_PUT: {
+        this._persistent.onimmutableput(req)
+        return true
+      }
+      case COMMANDS.IMMUTABLE_GET: {
+        this._persistent.onimmutableget(req)
         return true
       }
     }
