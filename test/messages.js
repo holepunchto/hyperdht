@@ -119,6 +119,7 @@ test('basic holepunch payload', function (t) {
     error: 0,
     firewall: 0,
     round: 0,
+    connected: false,
     punching: false,
     addresses: null,
     remoteAddress: null,
@@ -145,6 +146,7 @@ test('holepunch payload with flag and addresses', function (t) {
     error: 0,
     firewall: 0,
     round: 1,
+    connected: false,
     punching: true,
     addresses: [{
       id: null,
@@ -175,6 +177,7 @@ test('holepunch payload with flag and remoteToken', function (t) {
     error: 0,
     firewall: 0,
     round: 0,
+    connected: false,
     punching: true,
     addresses: null,
     remoteAddress: null,
