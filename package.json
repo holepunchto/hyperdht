@@ -8,7 +8,7 @@
     "bind-easy": "^1.0.1",
     "bogon": "^1.0.0",
     "compact-encoding": "^2.4.1",
-    "dht-rpc": "next",
+    "dht-rpc": "^5.0.0",
     "noise-curve-ed": "^1.0.2",
     "noise-handshake": "^2.1.0",
     "record-cache": "^1.1.1",
