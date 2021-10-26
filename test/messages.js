@@ -41,13 +41,12 @@ test('noise payload with holepunch and addresses', function (t) {
       id: 10,
       relays: [
         {
-          peerAddress: { id: null, host: '1.2.3.4', port: 1425 },
-          relayAddress: { id: null, host: '4.56.2.1', port: 4244 }
+          peerAddress: { host: '1.2.3.4', port: 1425 },
+          relayAddress: { host: '4.56.2.1', port: 4244 }
         }
       ]
     },
     addresses: [{
-      id: null,
       host: '127.0.0.1',
       port: 10240
     }]
@@ -76,7 +75,6 @@ test('noise payload only addresses', function (t) {
     protocols: 0,
     holepunch: null,
     addresses: [{
-      id: null,
       host: '127.0.0.1',
       port: 10241
     }]
@@ -149,7 +147,6 @@ test('holepunch payload with flag and addresses', function (t) {
     connected: false,
     punching: true,
     addresses: [{
-      id: null,
       host: '127.0.0.1',
       port: 10241
     }],
@@ -220,11 +217,9 @@ test('peer with multiple relays', function (t) {
   const peer = {
     publicKey: Buffer.alloc(32).fill('abc'),
     relayAddresses: [{
-      id: null,
       host: '127.0.0.1',
       port: 4242
     }, {
-      id: null,
       host: '8.1.4.1',
       port: 402
     }]
@@ -248,11 +243,9 @@ test('peers', function (t) {
   const peers = [{
     publicKey: Buffer.alloc(32).fill('abc'),
     relayAddresses: [{
-      id: null,
       host: '127.0.0.1',
       port: 4242
     }, {
-      id: null,
       host: '8.1.4.1',
       port: 402
     }]
