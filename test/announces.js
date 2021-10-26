@@ -53,7 +53,7 @@ test('announce to group and lookup', async function (t) {
     const latest = result[0].peers[result[0].peers[0].publicKey.equals(keyPair2.publicKey) ? 0 : 1]
 
     t.is(latest.relayAddresses.length, 1, 'announced one relay')
-    t.alike(latest.relayAddresses[0], { id: null, host: '1.2.3.4', port: 1234 })
+    t.alike(latest.relayAddresses[0], { host: '1.2.3.4', port: 1234 })
   }
 
   for await (const data of a.findPeer(keyPair1.publicKey)) {
