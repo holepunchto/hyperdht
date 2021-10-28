@@ -1,6 +1,6 @@
 {
   "name": "@hyperswarm/dht",
-  "version": "5.0.3",
+  "version": "5.0.4",
   "description": "The DHT powering the HyperSwarm stack",
   "main": "index.js",
   "dependencies": {
