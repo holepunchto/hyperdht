@@ -236,3 +236,13 @@ test('tcp noise, client ends, no crash', async function (t) {
   await new Promise((resolve) => sock.on('close', resolve))
   t.pass('did not crash')
 })
+
+test('tcp noise, client writes undefined, no crash', async function (t) {
+  const [, node] = await swarm(t, 2)
+  const sock = net.connect(node.address().port)
+
+  sock.write()
+
+  await new Promise((resolve) => sock.on('close', resolve))
+  t.pass('did not crash')
+})
