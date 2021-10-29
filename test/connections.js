@@ -1,4 +1,5 @@
 const test = require('brittle')
+const net = require('net')
 const { swarm } = require('./helpers')
 const DHT = require('../')
 
@@ -224,4 +225,14 @@ test('client choosing to abort holepunch', async function (t) {
   await server.close()
   await a.destroy()
   await b.destroy()
+})
+
+test('tcp noise, client ends, no crash', async function (t) {
+  const [, node] = await swarm(t, 2)
+  const sock = net.connect(node.address().port)
+
+  sock.end('hi')
+
+  await new Promise((resolve) => sock.on('close', resolve))
+  t.pass('did not crash')
 })
