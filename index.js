@@ -2,6 +2,7 @@ const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
 const { dual } = require('bind-easy')
 const c = require('compact-encoding')
+const b4a = require('b4a')
 const m = require('./lib/messages')
 const SocketPairer = require('./lib/socket-pairer')
 const Persistent = require('./lib/persistent')
@@ -164,7 +165,7 @@ class HyperDHT extends DHT {
     opts = { ...opts, map: mapImmutable }
 
     const query = this.query({ target, command: COMMANDS.IMMUTABLE_GET, value: null }, opts)
-    const check = Buffer.allocUnsafe(32)
+    const check = b4a.allocUnsafe(32)
 
     for await (const node of query) {
       const { value } = node
@@ -176,7 +177,7 @@ class HyperDHT extends DHT {
   }
 
   async immutablePut (value, opts = {}) {
-    const target = Buffer.allocUnsafe(32)
+    const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, value)
 
     opts = {
@@ -196,7 +197,7 @@ class HyperDHT extends DHT {
   async mutableGet (publicKey, opts = {}) {
     opts = { ...opts, map: mapMutable }
 
-    const target = Buffer.alloc(32)
+    const target = b4a.alloc(32)
     sodium.crypto_generichash(target, publicKey)
 
     const userSeq = opts.seq || 0
@@ -216,7 +217,7 @@ class HyperDHT extends DHT {
   }
 
   async mutablePut (keyPair, value, opts = {}) {
-    const target = Buffer.allocUnsafe(32)
+    const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, keyPair.publicKey)
 
     const seq = opts.seq || 0
