@@ -3,6 +3,7 @@
   "version": "5.0.8",
   "description": "The DHT powering the HyperSwarm stack",
   "main": "index.js",
+  "browser": "browser.js",
   "dependencies": {
     "@hyperswarm/secret-stream": "^5.1.0",
     "bind-easy": "^1.0.1",
