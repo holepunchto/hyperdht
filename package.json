@@ -19,7 +19,7 @@
     "xache": "^1.0.0"
   },
   "devDependencies": {
-    "brittle": "^1.4.3",
+    "brittle": "^2.0.0",
     "standard": "^16.0.4"
   },
   "scripts": {
