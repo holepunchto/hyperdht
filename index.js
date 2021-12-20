@@ -114,10 +114,15 @@ class HyperDHT extends DHT {
         signature: null
       }
 
-      unann.signature = Persistent.signUnannounce(target, token, from.id, unann, keyPair.secretKey)
+      unannounces.push(Promise.resolve()
+        .then(async () => {
+          unann.signature = await Persistent.signUnannounce(target, token, from.id, unann, opts.sign || keyPair.secretKey)
 
-      const value = c.encode(m.announce, unann)
-      unannounces.push(dht.request({ token, target, command: COMMANDS.UNANNOUNCE, value }, from).catch(noop))
+          const value = c.encode(m.announce, unann)
+          return dht.request({ token, target, command: COMMANDS.UNANNOUNCE, value }, from)
+        })
+        .catch(noop)
+      )
 
       return data
     }
@@ -134,7 +139,7 @@ class HyperDHT extends DHT {
       ? this.lookupAndUnannounce(target, keyPair, opts)
       : this.lookup(target, opts)
 
-    function commit (reply, dht) {
+    async function commit (reply, dht) {
       const { token, from } = reply
       const ann = {
         peer: {
@@ -145,7 +150,7 @@ class HyperDHT extends DHT {
         signature: null
       }
 
-      ann.signature = Persistent.signAnnounce(target, token, from.id, ann, keyPair.secretKey)
+      ann.signature = await Persistent.signAnnounce(target, token, from.id, ann, opts.sign || keyPair.secretKey)
 
       const value = c.encode(m.announce, ann)
       return dht.request({ token, target, command: COMMANDS.ANNOUNCE, value }, from)
@@ -212,7 +217,7 @@ class HyperDHT extends DHT {
     sodium.crypto_generichash(target, keyPair.publicKey)
 
     const seq = opts.seq || 0
-    const signature = Persistent.signMutable(seq, value, keyPair.secretKey)
+    const signature = await Persistent.signMutable(seq, value, opts.sign || keyPair.secretKey)
 
     const signed = c.encode(m.mutablePutRequest, {
       publicKey: keyPair.publicKey,
