@@ -89,14 +89,7 @@ class HyperDHT extends DHT {
     return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
 
     async function commit (reply, dht, query) {
-      while (unannounces.length) {
-        try {
-          await unannounces.pop()
-        } catch {
-          continue
-        }
-      }
-
+      await Promise.all(unannounces) // can never fail, caught below
       return userCommit(reply, dht, query)
     }
 
@@ -124,7 +117,7 @@ class HyperDHT extends DHT {
       unann.signature = Persistent.signUnannounce(target, token, from.id, unann, keyPair.secretKey)
 
       const value = c.encode(m.announce, unann)
-      unannounces.push(dht.request({ token, target, command: COMMANDS.UNANNOUNCE, value }, from))
+      unannounces.push(dht.request({ token, target, command: COMMANDS.UNANNOUNCE, value }, from).catch(noop))
 
       return data
     }
