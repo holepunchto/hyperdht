@@ -1,6 +1,7 @@
 const test = require('brittle')
 const NoiseSecretStream = require('@hyperswarm/secret-stream')
 const NoiseWrap = require('../lib/noise-wrap')
+const Persistent = require('../lib/persistent')
 const { swarm } = require('./helpers')
 const DHT = require('../')
 
@@ -28,12 +29,13 @@ test('createServer + connect - external secret key', async (t) => {
       })
   })
 
-  // Only pass the public key to the server which will prevent it from
-  // announcing itself
-  await server.listen({ publicKey: serverKeyPair.publicKey })
-
-  // Manually announce the server to the DHT to make it discoverable
-  await a.announce(server.target, serverKeyPair).finished()
+  await server.listen({
+    // Only pass the public key to the server
+    publicKey: serverKeyPair.publicKey
+  }, {
+    signAnnounce: signAnnounce(serverKeyPair),
+    signUnannounce: signUnannounce(serverKeyPair)
+  })
 
   const clientKeyPair = DHT.keyPair()
 
@@ -41,7 +43,7 @@ test('createServer + connect - external secret key', async (t) => {
     handshake: handshake(clientKeyPair),
     secretStream,
 
-    /// Only pass the public key to the client
+    // Only pass the public key to the client
     keyPair: { publicKey: clientKeyPair.publicKey }
   })
 
@@ -52,9 +54,9 @@ test('createServer + connect - external secret key', async (t) => {
   await server.close()
 })
 
-// These functions are meant to show how to perform a handshake and setup a
-// secret stream without any sensitive data being exposed to the relaying DHT
-// node.
+// These functions are meant to show how to perform a handshake, setup a
+// secret stream, and sign announces/unannounces without any sensitive data
+// being exposed to the relaying DHT node.
 
 function handshake (keyPair) {
   return (_, remotePublicKey) => new class extends NoiseWrap {
@@ -87,4 +89,14 @@ function secretStream (isInitiator, rawSocket, opts) {
       return super.start(rawSocket, opts)
     }
   }(isInitiator, rawSocket, opts)
+}
+
+function signAnnounce (keyPair) {
+  return (target, token, id, data) =>
+    Persistent.signAnnounce(target, token, id, data, keyPair.secretKey)
+}
+
+function signUnannounce (keyPair) {
+  return (target, token, id, data) =>
+    Persistent.signUnannounce(target, token, id, data, keyPair.secretKey)
 }

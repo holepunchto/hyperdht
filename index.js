@@ -80,6 +80,7 @@ class HyperDHT extends DHT {
     const unannounces = []
     const dht = this
     const userCommit = opts.commit || noop
+    const signUnannounce = opts.signUnannounce || Persistent.signUnannounce
 
     if (this._persistent !== null) { // unlink self
       this._persistent.unannounce(target, keyPair.publicKey)
@@ -114,7 +115,7 @@ class HyperDHT extends DHT {
         signature: null
       }
 
-      unann.signature = Persistent.signUnannounce(target, token, from.id, unann, keyPair.secretKey)
+      unann.signature = signUnannounce(target, token, from.id, unann, keyPair.secretKey)
 
       const value = c.encode(m.announce, unann)
       unannounces.push(dht.request({ token, target, command: COMMANDS.UNANNOUNCE, value }, from).catch(noop))
@@ -128,6 +129,8 @@ class HyperDHT extends DHT {
   }
 
   announce (target, keyPair, relayAddresses = [], opts = {}) {
+    const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
+
     opts = { ...opts, commit }
 
     return opts.clear
@@ -145,7 +148,7 @@ class HyperDHT extends DHT {
         signature: null
       }
 
-      ann.signature = Persistent.signAnnounce(target, token, from.id, ann, keyPair.secretKey)
+      ann.signature = signAnnounce(target, token, from.id, ann, keyPair.secretKey)
 
       const value = c.encode(m.announce, ann)
       return dht.request({ token, target, command: COMMANDS.ANNOUNCE, value }, from)
@@ -208,11 +211,13 @@ class HyperDHT extends DHT {
   }
 
   async mutablePut (keyPair, value, opts = {}) {
+    const signMutable = opts.signMutable || Persistent.signMutable
+
     const target = Buffer.allocUnsafe(32)
     sodium.crypto_generichash(target, keyPair.publicKey)
 
     const seq = opts.seq || 0
-    const signature = Persistent.signMutable(seq, value, keyPair.secretKey)
+    const signature = signMutable(seq, value, keyPair.secretKey)
 
     const signed = c.encode(m.mutablePutRequest, {
       publicKey: keyPair.publicKey,
