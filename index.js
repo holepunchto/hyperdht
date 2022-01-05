@@ -86,15 +86,12 @@ class HyperDHT extends DHT {
       this._persistent.unannounce(target, keyPair.publicKey)
     }
 
-    opts = { ...opts, map, commit }
-    return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
-
-    async function commit (reply, dht, query) {
+    const commit = async (reply, dht, query) => {
       await Promise.all(unannounces) // can never fail, caught below
       return userCommit(reply, dht, query)
     }
 
-    function map (reply) {
+    const map = (reply) => {
       const data = mapLookup(reply)
 
       if (!data || !data.token) return data
@@ -106,22 +103,23 @@ class HyperDHT extends DHT {
 
       if (!found) return data
 
-      const { token, from } = data
-      const unann = {
-        peer: {
-          publicKey: keyPair.publicKey,
-          relayAddresses: []
-        },
-        signature: null
-      }
-
-      unann.signature = signUnannounce(target, token, from.id, unann, keyPair.secretKey)
-
-      const value = c.encode(m.announce, unann)
-      unannounces.push(dht.request({ token, target, command: COMMANDS.UNANNOUNCE, value }, from).catch(noop))
+      unannounces.push(
+        this._requestUnannounce(
+          keyPair,
+          dht,
+          target,
+          data.token,
+          data.from,
+          signUnannounce
+        ).catch(noop)
+      )
 
       return data
     }
+
+    opts = { ...opts, map, commit }
+
+    return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
   }
 
   unannounce (target, keyPair, opts = {}) {
@@ -131,28 +129,23 @@ class HyperDHT extends DHT {
   announce (target, keyPair, relayAddresses = [], opts = {}) {
     const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
 
+    const commit = (reply, dht) => {
+      return this._requestAnnounce(
+        keyPair,
+        dht,
+        target,
+        reply.token,
+        reply.from,
+        relayAddresses,
+        signAnnounce
+      )
+    }
+
     opts = { ...opts, commit }
 
     return opts.clear
       ? this.lookupAndUnannounce(target, keyPair, opts)
       : this.lookup(target, opts)
-
-    function commit (reply, dht) {
-      const { token, from } = reply
-      const ann = {
-        peer: {
-          publicKey: keyPair.publicKey,
-          relayAddresses: relayAddresses || []
-        },
-        refresh: null,
-        signature: null
-      }
-
-      ann.signature = signAnnounce(target, token, from.id, ann, keyPair.secretKey)
-
-      const value = c.encode(m.announce, ann)
-      return dht.request({ token, target, command: COMMANDS.ANNOUNCE, value }, from)
-    }
   }
 
   async immutableGet (target, opts = {}) {
@@ -217,7 +210,7 @@ class HyperDHT extends DHT {
     sodium.crypto_generichash(target, keyPair.publicKey)
 
     const seq = opts.seq || 0
-    const signature = signMutable(seq, value, keyPair.secretKey)
+    const signature = await signMutable(seq, value, keyPair.secretKey)
 
     const signed = c.encode(m.mutablePutRequest, {
       publicKey: keyPair.publicKey,
@@ -299,6 +292,49 @@ class HyperDHT extends DHT {
 
   static hash (data) {
     return hash(data)
+  }
+
+  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses = [], sign) {
+    const ann = {
+      peer: {
+        publicKey: keyPair.publicKey,
+        relayAddresses: relayAddresses
+      },
+      refresh: null,
+      signature: null
+    }
+
+    ann.signature = await sign(target, token, from.id, ann, keyPair.secretKey)
+
+    const value = c.encode(m.announce, ann)
+
+    return dht.request({
+      token,
+      target,
+      command: COMMANDS.ANNOUNCE,
+      value
+    }, from)
+  }
+
+  async _requestUnannounce (keyPair, dht, target, token, from, sign) {
+    const unann = {
+      peer: {
+        publicKey: keyPair.publicKey,
+        relayAddresses: []
+      },
+      signature: null
+    }
+
+    unann.signature = await sign(target, token, from.id, unann, keyPair.secretKey)
+
+    const value = c.encode(m.announce, unann)
+
+    return dht.request({
+      token,
+      target,
+      command: COMMANDS.UNANNOUNCE,
+      value
+    }, from)
   }
 }
 

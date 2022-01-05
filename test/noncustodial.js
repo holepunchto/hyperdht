@@ -14,8 +14,8 @@ test('createServer + connect - external secret key', async (t) => {
   const serverKeyPair = DHT.keyPair()
 
   const server = a.createServer({
-    handshake: handshake(serverKeyPair),
-    secretStream
+    createHandshake: createHandshake(serverKeyPair),
+    createSecretStream
   })
 
   server.on('connection', (socket) => {
@@ -40,8 +40,8 @@ test('createServer + connect - external secret key', async (t) => {
   const clientKeyPair = DHT.keyPair()
 
   const client = b.connect(server.publicKey, {
-    handshake: handshake(clientKeyPair),
-    secretStream,
+    createHandshake: createHandshake(clientKeyPair),
+    createSecretStream,
 
     // Only pass the public key to the client
     keyPair: { publicKey: clientKeyPair.publicKey }
@@ -58,7 +58,7 @@ test('createServer + connect - external secret key', async (t) => {
 // secret stream, and sign announces/unannounces without any sensitive data
 // being exposed to the relaying DHT node.
 
-function handshake (keyPair) {
+function createHandshake (keyPair) {
   return (_, remotePublicKey) => new class extends NoiseWrap {
     final () {
       const { hash, rx, tx, ...rest } = super.final()
@@ -73,7 +73,7 @@ function handshake (keyPair) {
   }(keyPair, remotePublicKey)
 }
 
-function secretStream (isInitiator, rawSocket, opts) {
+function createSecretStream (isInitiator, rawSocket, opts) {
   if (opts.handshake) {
     const { $secret, ...rest } = opts.handshake
     opts = { ...opts, handshake: { ...rest, ...$secret } }
