@@ -86,12 +86,15 @@ class HyperDHT extends DHT {
       this._persistent.unannounce(target, keyPair.publicKey)
     }
 
-    const commit = async (reply, dht, query) => {
+    opts = { ...opts, map, commit }
+    return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
+
+    async function commit (reply, dht, query) {
       await Promise.all(unannounces) // can never fail, caught below
       return userCommit(reply, dht, query)
     }
 
-    const map = (reply) => {
+    function map (reply) {
       const data = mapLookup(reply)
 
       if (!data || !data.token) return data
@@ -116,10 +119,6 @@ class HyperDHT extends DHT {
 
       return data
     }
-
-    opts = { ...opts, map, commit }
-
-    return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
   }
 
   unannounce (target, keyPair, opts = {}) {
@@ -129,8 +128,14 @@ class HyperDHT extends DHT {
   announce (target, keyPair, relayAddresses = [], opts = {}) {
     const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
 
-    const commit = (reply, dht) => {
-      return this._requestAnnounce(
+    opts = { ...opts, commit }
+
+    return opts.clear
+      ? this.lookupAndUnannounce(target, keyPair, opts)
+      : this.lookup(target, opts)
+
+    function commit (reply, dht) {
+      return dht._requestAnnounce(
         keyPair,
         dht,
         target,
@@ -140,12 +145,6 @@ class HyperDHT extends DHT {
         signAnnounce
       )
     }
-
-    opts = { ...opts, commit }
-
-    return opts.clear
-      ? this.lookupAndUnannounce(target, keyPair, opts)
-      : this.lookup(target, opts)
   }
 
   async immutableGet (target, opts = {}) {
