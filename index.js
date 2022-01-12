@@ -80,6 +80,7 @@ class HyperDHT extends DHT {
     const unannounces = []
     const dht = this
     const userCommit = opts.commit || noop
+    const signUnannounce = opts.signUnannounce || Persistent.signUnannounce
 
     if (this._persistent !== null) { // unlink self
       this._persistent.unannounce(target, keyPair.publicKey)
@@ -105,19 +106,16 @@ class HyperDHT extends DHT {
 
       if (!found) return data
 
-      const { token, from } = data
-      const unann = {
-        peer: {
-          publicKey: keyPair.publicKey,
-          relayAddresses: []
-        },
-        signature: null
-      }
-
-      unann.signature = Persistent.signUnannounce(target, token, from.id, unann, keyPair.secretKey)
-
-      const value = c.encode(m.announce, unann)
-      unannounces.push(dht.request({ token, target, command: COMMANDS.UNANNOUNCE, value }, from).catch(noop))
+      unannounces.push(
+        this._requestUnannounce(
+          keyPair,
+          dht,
+          target,
+          data.token,
+          data.from,
+          signUnannounce
+        ).catch(noop)
+      )
 
       return data
     }
@@ -128,6 +126,8 @@ class HyperDHT extends DHT {
   }
 
   announce (target, keyPair, relayAddresses = [], opts = {}) {
+    const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
+
     opts = { ...opts, commit }
 
     return opts.clear
@@ -135,20 +135,15 @@ class HyperDHT extends DHT {
       : this.lookup(target, opts)
 
     function commit (reply, dht) {
-      const { token, from } = reply
-      const ann = {
-        peer: {
-          publicKey: keyPair.publicKey,
-          relayAddresses: relayAddresses || []
-        },
-        refresh: null,
-        signature: null
-      }
-
-      ann.signature = Persistent.signAnnounce(target, token, from.id, ann, keyPair.secretKey)
-
-      const value = c.encode(m.announce, ann)
-      return dht.request({ token, target, command: COMMANDS.ANNOUNCE, value }, from)
+      return dht._requestAnnounce(
+        keyPair,
+        dht,
+        target,
+        reply.token,
+        reply.from,
+        relayAddresses,
+        signAnnounce
+      )
     }
   }
 
@@ -208,11 +203,13 @@ class HyperDHT extends DHT {
   }
 
   async mutablePut (keyPair, value, opts = {}) {
+    const signMutable = opts.signMutable || Persistent.signMutable
+
     const target = Buffer.allocUnsafe(32)
     sodium.crypto_generichash(target, keyPair.publicKey)
 
     const seq = opts.seq || 0
-    const signature = Persistent.signMutable(seq, value, keyPair.secretKey)
+    const signature = await signMutable(seq, value, keyPair.secretKey)
 
     const signed = c.encode(m.mutablePutRequest, {
       publicKey: keyPair.publicKey,
@@ -294,6 +291,49 @@ class HyperDHT extends DHT {
 
   static hash (data) {
     return hash(data)
+  }
+
+  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses = [], sign) {
+    const ann = {
+      peer: {
+        publicKey: keyPair.publicKey,
+        relayAddresses: relayAddresses
+      },
+      refresh: null,
+      signature: null
+    }
+
+    ann.signature = await sign(target, token, from.id, ann, keyPair.secretKey)
+
+    const value = c.encode(m.announce, ann)
+
+    return dht.request({
+      token,
+      target,
+      command: COMMANDS.ANNOUNCE,
+      value
+    }, from)
+  }
+
+  async _requestUnannounce (keyPair, dht, target, token, from, sign) {
+    const unann = {
+      peer: {
+        publicKey: keyPair.publicKey,
+        relayAddresses: []
+      },
+      signature: null
+    }
+
+    unann.signature = await sign(target, token, from.id, unann, keyPair.secretKey)
+
+    const value = c.encode(m.announce, unann)
+
+    return dht.request({
+      token,
+      target,
+      command: COMMANDS.UNANNOUNCE,
+      value
+    }, from)
   }
 }
 
