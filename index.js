@@ -1,4 +1,5 @@
 const DHT = require('dht-rpc')
+const Buffer = require('b4a')
 const sodium = require('sodium-universal')
 const { dual } = require('bind-easy')
 const c = require('compact-encoding')
