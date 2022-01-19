@@ -107,7 +107,7 @@ class HyperDHT extends DHT {
       if (!found) return data
 
       unannounces.push(
-        this._requestUnannounce(
+        dht._requestUnannounce(
           keyPair,
           dht,
           target,
