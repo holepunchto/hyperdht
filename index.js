@@ -36,7 +36,7 @@ class HyperDHT extends DHT {
     })
 
     async function bind () {
-      const { server, socket } = await dual(port)
+      const { server, socket } = await dual(port, { allowHalfOpen: true })
       self._sockets = new SocketPairer(self, server)
       return socket
     }
