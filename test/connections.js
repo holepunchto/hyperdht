@@ -275,3 +275,27 @@ test('tcp noise, client ends, no crash', async function (t) {
   await new Promise((resolve) => sock.on('close', resolve))
   t.pass('did not crash')
 })
+
+test('half open', async function (t) {
+  t.plan(2)
+
+  const [, a] = await swarm(t)
+
+  const server = a.createServer()
+  await server.listen()
+
+  const socket = a.connect(server.address().publicKey)
+
+  server.on('connection', (socket) => {
+    socket.on('data', (data) => {
+      t.alike(data.toString(), 'ping')
+      setTimeout(() => socket.end('pong'))
+    })
+  })
+
+  socket
+    .on('data', (data) => {
+      t.alike(data.toString(), 'pong')
+    })
+    .end('ping')
+})
