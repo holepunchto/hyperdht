@@ -185,7 +185,7 @@ class HyperDHT extends DHT {
   async mutableGet (publicKey, opts = {}) {
     opts = { ...opts, map: mapMutable }
 
-    const target = b4a.alloc(32)
+    const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, publicKey)
 
     const userSeq = opts.seq || 0
