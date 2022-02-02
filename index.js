@@ -2,6 +2,7 @@ const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
 const { dual } = require('bind-easy')
 const c = require('compact-encoding')
+const b4a = require('b4a')
 const m = require('./lib/messages')
 const SocketPairer = require('./lib/socket-pairer')
 const Persistent = require('./lib/persistent')
@@ -9,6 +10,7 @@ const Router = require('./lib/router')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
 const { FIREWALL, PROTOCOL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
+const { hash, createKeyPair } = require('./lib/crypto')
 
 const maxSize = 65536
 const maxAge = 20 * 60 * 1000
@@ -36,7 +38,7 @@ class HyperDHT extends DHT {
     })
 
     async function bind () {
-      const { server, socket } = await dual(port)
+      const { server, socket } = await dual(port, { allowHalfOpen: true })
       self._sockets = new SocketPairer(self, server)
       return socket
     }
@@ -80,6 +82,7 @@ class HyperDHT extends DHT {
     const unannounces = []
     const dht = this
     const userCommit = opts.commit || noop
+    const signUnannounce = opts.signUnannounce || Persistent.signUnannounce
 
     if (this._persistent !== null) { // unlink self
       this._persistent.unannounce(target, keyPair.publicKey)
@@ -105,19 +108,16 @@ class HyperDHT extends DHT {
 
       if (!found) return data
 
-      const { token, from } = data
-      const unann = {
-        peer: {
-          publicKey: keyPair.publicKey,
-          relayAddresses: []
-        },
-        signature: null
-      }
-
-      unann.signature = Persistent.signUnannounce(target, token, from.id, unann, keyPair.secretKey)
-
-      const value = c.encode(m.announce, unann)
-      unannounces.push(dht.request({ token, target, command: COMMANDS.UNANNOUNCE, value }, from).catch(noop))
+      unannounces.push(
+        dht._requestUnannounce(
+          keyPair,
+          dht,
+          target,
+          data.token,
+          data.from,
+          signUnannounce
+        ).catch(noop)
+      )
 
       return data
     }
@@ -127,7 +127,9 @@ class HyperDHT extends DHT {
     return this.lookupAndUnannounce(target, keyPair, opts).finished()
   }
 
-  announce (target, keyPair, relayAddresses = [], opts = {}) {
+  announce (target, keyPair, relayAddresses, opts = {}) {
+    const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
+
     opts = { ...opts, commit }
 
     return opts.clear
@@ -135,20 +137,15 @@ class HyperDHT extends DHT {
       : this.lookup(target, opts)
 
     function commit (reply, dht) {
-      const { token, from } = reply
-      const ann = {
-        peer: {
-          publicKey: keyPair.publicKey,
-          relayAddresses: relayAddresses || []
-        },
-        refresh: null,
-        signature: null
-      }
-
-      ann.signature = Persistent.signAnnounce(target, token, from.id, ann, keyPair.secretKey)
-
-      const value = c.encode(m.announce, ann)
-      return dht.request({ token, target, command: COMMANDS.ANNOUNCE, value }, from)
+      return dht._requestAnnounce(
+        keyPair,
+        dht,
+        target,
+        reply.token,
+        reply.from,
+        relayAddresses,
+        signAnnounce
+      )
     }
   }
 
@@ -156,7 +153,7 @@ class HyperDHT extends DHT {
     opts = { ...opts, map: mapImmutable }
 
     const query = this.query({ target, command: COMMANDS.IMMUTABLE_GET, value: null }, opts)
-    const check = Buffer.allocUnsafe(32)
+    const check = b4a.allocUnsafe(32)
 
     for await (const node of query) {
       const { value } = node
@@ -168,7 +165,7 @@ class HyperDHT extends DHT {
   }
 
   async immutablePut (value, opts = {}) {
-    const target = Buffer.allocUnsafe(32)
+    const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, value)
 
     opts = {
@@ -188,7 +185,7 @@ class HyperDHT extends DHT {
   async mutableGet (publicKey, opts = {}) {
     opts = { ...opts, map: mapMutable }
 
-    const target = Buffer.alloc(32)
+    const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, publicKey)
 
     const userSeq = opts.seq || 0
@@ -208,11 +205,13 @@ class HyperDHT extends DHT {
   }
 
   async mutablePut (keyPair, value, opts = {}) {
-    const target = Buffer.allocUnsafe(32)
+    const signMutable = opts.signMutable || Persistent.signMutable
+
+    const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, keyPair.publicKey)
 
     const seq = opts.seq || 0
-    const signature = Persistent.signMutable(seq, value, keyPair.secretKey)
+    const signature = await signMutable(seq, value, keyPair.secretKey)
 
     const signed = c.encode(m.mutablePutRequest, {
       publicKey: keyPair.publicKey,
@@ -295,6 +294,49 @@ class HyperDHT extends DHT {
   static hash (data) {
     return hash(data)
   }
+
+  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign) {
+    const ann = {
+      peer: {
+        publicKey: keyPair.publicKey,
+        relayAddresses: relayAddresses || []
+      },
+      refresh: null,
+      signature: null
+    }
+
+    ann.signature = await sign(target, token, from.id, ann, keyPair.secretKey)
+
+    const value = c.encode(m.announce, ann)
+
+    return dht.request({
+      token,
+      target,
+      command: COMMANDS.ANNOUNCE,
+      value
+    }, from)
+  }
+
+  async _requestUnannounce (keyPair, dht, target, token, from, sign) {
+    const unann = {
+      peer: {
+        publicKey: keyPair.publicKey,
+        relayAddresses: []
+      },
+      signature: null
+    }
+
+    unann.signature = await sign(target, token, from.id, unann, keyPair.secretKey)
+
+    const value = c.encode(m.announce, unann)
+
+    return dht.request({
+      token,
+      target,
+      command: COMMANDS.UNANNOUNCE,
+      value
+    }, from)
+  }
 }
 
 HyperDHT.BOOTSTRAP = BOOTSTRAP_NODES
@@ -302,20 +344,6 @@ HyperDHT.FIREWALL = FIREWALL
 HyperDHT.PROTOCOL = PROTOCOL
 
 module.exports = HyperDHT
-
-function hash (data) {
-  const out = Buffer.allocUnsafe(32)
-  sodium.crypto_generichash(out, data)
-  return out
-}
-
-function createKeyPair (seed) {
-  const publicKey = Buffer.alloc(32)
-  const secretKey = Buffer.alloc(64)
-  if (seed) sodium.crypto_sign_seed_keypair(publicKey, secretKey, seed)
-  else sodium.crypto_sign_keypair(publicKey, secretKey)
-  return { publicKey, secretKey }
-}
 
 function mapLookup (node) {
   if (!node.value) return null
