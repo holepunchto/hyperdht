@@ -127,7 +127,7 @@ class HyperDHT extends DHT {
     return this.lookupAndUnannounce(target, keyPair, opts).finished()
   }
 
-  announce (target, keyPair, relayAddresses = [], opts = {}) {
+  announce (target, keyPair, relayAddresses, opts = {}) {
     const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
 
     opts = { ...opts, commit }
@@ -295,11 +295,11 @@ class HyperDHT extends DHT {
     return hash(data)
   }
 
-  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses = [], sign) {
+  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign) {
     const ann = {
       peer: {
         publicKey: keyPair.publicKey,
-        relayAddresses: relayAddresses
+        relayAddresses: relayAddresses || []
       },
       refresh: null,
       signature: null

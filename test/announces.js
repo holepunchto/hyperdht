@@ -66,3 +66,11 @@ test('announce to group and lookup', async function (t) {
     t.absent(data, 'just make standard happy')
   }
 })
+
+test('announce null relay addresses', async function (t) {
+  const [a] = await swarm(t)
+  const keyPair = DHT.keyPair()
+  const target = DHT.hash(Buffer.from('testing...'))
+
+  await t.execution(a.announce(target, keyPair, null).finished())
+})
