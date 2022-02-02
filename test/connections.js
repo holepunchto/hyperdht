@@ -299,3 +299,30 @@ test('half open', async function (t) {
     })
     .end('ping')
 })
+
+test('server responds and immediately ends, multiple connects', async (t) => {
+  const [a, b] = await swarm(t)
+
+  const lc = t.test('socket lifecycle')
+  lc.plan(1)
+
+  const server = a.createServer((socket) => {
+    socket.end('hi')
+  })
+
+  await server.listen()
+
+  let n = 100
+
+  for (let i = n; i > 0; i--) {
+    const socket = b.connect(server.publicKey)
+
+    socket.on('open', () => {
+      if (--n === 0) lc.pass()
+    })
+  }
+
+  await lc
+
+  await server.close()
+})
