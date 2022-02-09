@@ -328,7 +328,7 @@ test('server responds and immediately ends, multiple connects', async function (
 })
 
 test('dht node can host server', async function (t) {
-  const [a, b, c] = await swarm(t, 3)
+  const [, b, c] = await swarm(t, 3)
 
   const lc = t.test('socket lifecycle')
 
