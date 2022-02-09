@@ -300,7 +300,7 @@ test('half open', async function (t) {
     .end('ping')
 })
 
-test('server responds and immediately ends, multiple connects', async (t) => {
+test('server responds and immediately ends, multiple connects', async function (t) {
   const [a, b] = await swarm(t)
 
   const lc = t.test('socket lifecycle')
@@ -323,6 +323,46 @@ test('server responds and immediately ends, multiple connects', async (t) => {
   }
 
   await lc
+
+  await server.close()
+})
+
+test('dht node can host server', async function (t) {
+  const [a, b, c] = await swarm(t, 3)
+
+  const lc = t.test('socket lifecycle')
+
+  t.plan(2)
+  lc.plan(4)
+
+  const server = b.createServer(function (socket) {
+    lc.pass('server side opened')
+
+    socket.once('end', function () {
+      lc.pass('server side ended')
+      socket.end()
+    })
+  })
+
+  await server.listen()
+
+  const socket = c.connect(server.publicKey)
+
+  socket.once('open', function () {
+    lc.pass('client side opened')
+  })
+
+  socket.once('end', function () {
+    lc.pass('client side ended')
+  })
+
+  socket.end()
+
+  await lc
+
+  server.on('close', function () {
+    t.pass('server closed')
+  })
 
   await server.close()
 })
