@@ -103,7 +103,7 @@ class HyperDHT extends DHT {
 
       let found = data.peers.length >= 20
       for (let i = 0; !found && i < data.peers.length; i++) {
-        found = data.peers[i].publicKey.equals(keyPair.publicKey)
+        found = b4a.equals(data.peers[i].publicKey, keyPair.publicKey)
       }
 
       if (!found) return data
@@ -158,7 +158,7 @@ class HyperDHT extends DHT {
     for await (const node of query) {
       const { value } = node
       sodium.crypto_generichash(check, value)
-      if (check.equals(target)) return node
+      if (b4a.equals(check, target)) return node
     }
 
     throw Error('Not found')
