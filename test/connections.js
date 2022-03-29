@@ -146,14 +146,13 @@ test('createServer + connect - force holepunch', async function (t) {
   await b.ready()
 
   const lc = t.test('socket lifecycle')
-  lc.plan(6)
+  lc.plan(4)
 
   const server = a.createServer({ shareLocalAddress: false }, function (socket) {
-    lc.ok(!!socket.rawStream._utp, 'server is utp') // TODO: make this easier to detect!
-    lc.pass('utp server side opened')
+    lc.pass('udx server side opened')
 
     socket.once('end', function () {
-      lc.pass('utp server side ended')
+      lc.pass('udx server side ended')
       socket.end()
     })
   })
@@ -163,12 +162,11 @@ test('createServer + connect - force holepunch', async function (t) {
   const socket = b.connect(server.publicKey)
 
   socket.once('open', function () {
-    lc.ok(!!socket.rawStream._utp, 'client is utp') // TODO: make this easier to detect!
-    lc.pass('utp client side opened')
+    lc.pass('udx client side opened')
   })
 
   socket.once('end', function () {
-    lc.pass('utp client side ended')
+    lc.pass('udx client side ended')
   })
 
   socket.end()

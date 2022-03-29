@@ -9,18 +9,19 @@ test('basic noise payload', function (t) {
     error: 0,
     firewall: 0,
     protocols: 0,
+    streamId: 0,
     holepunch: null,
     addresses: null
   }
 
   m.noisePayload.preencode(state, c)
 
-  t.is(state.end, 5)
+  t.is(state.end, 6)
 
   state.buffer = Buffer.allocUnsafe(state.end)
   m.noisePayload.encode(state, c)
 
-  t.is(state.start, 5)
+  t.is(state.start, 6)
 
   state.start = 0
 
@@ -37,6 +38,7 @@ test('noise payload with holepunch and addresses', function (t) {
     error: 0,
     firewall: 2,
     protocols: 0,
+    streamId: 0,
     holepunch: {
       id: 10,
       relays: [
@@ -73,6 +75,7 @@ test('noise payload only addresses', function (t) {
     error: 0,
     firewall: 2,
     protocols: 0,
+    streamId: 0,
     holepunch: null,
     addresses: [{
       host: '127.0.0.1',
@@ -105,6 +108,7 @@ test('noise payload newer version', function (t) {
     error: 0,
     firewall: 0,
     protocols: 0,
+    streamId: 0,
     holepunch: null,
     addresses: null
   })
