@@ -1,6 +1,6 @@
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
-const { dual } = require('bind-easy')
+const udx = require('udx-native')
 const c = require('compact-encoding')
 const b4a = require('b4a')
 const m = require('./lib/messages')
@@ -37,9 +37,16 @@ class HyperDHT extends DHT {
       this._persistent = new Persistent(this, cacheOpts)
     })
 
-    async function bind () {
-      const { server, socket } = await dual(port, { allowHalfOpen: true })
-      self._sockets = new SocketPairer(self, server)
+    function bind () {
+      const socket = udx.createSocket()
+      try {
+        socket.bind(port)
+      } catch (err) {
+        socket.bind()
+      }
+
+      self._sockets = new SocketPairer(self, socket)
+
       return socket
     }
   }
