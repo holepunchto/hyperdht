@@ -1,5 +1,5 @@
 const test = require('brittle')
-const net = require('net')
+const dgram = require('dgram')
 const { swarm } = require('./helpers')
 const DHT = require('../')
 
@@ -264,13 +264,14 @@ test('client choosing to abort holepunch', async function (t) {
   await b.destroy()
 })
 
-test('tcp noise, client ends, no crash', async function (t) {
+test('udp noise, client ends, no crash', async function (t) {
   const [, node] = await swarm(t, 2)
-  const sock = net.connect(node.address().port)
 
-  sock.end('hi')
+  const socket = dgram.createSocket('udp4')
+  socket.send('hi', node.address().port)
+  socket.close()
 
-  await new Promise((resolve) => sock.on('close', resolve))
+  await new Promise((resolve) => socket.on('close', resolve))
   t.pass('did not crash')
 })
 
