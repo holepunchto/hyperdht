@@ -38,16 +38,19 @@ class HyperDHT extends DHT {
     })
 
     function bind () {
-      const socket = udx.createSocket()
+      const client = udx.createSocket()
       try {
-        socket.bind(port)
+        client.bind(port)
       } catch (err) {
-        socket.bind()
+        client.bind()
       }
 
-      self._sockets = new SocketPairer(self, socket)
+      const server = udx.createSocket()
+      server.bind()
 
-      return socket
+      self._sockets = new SocketPairer(self, server)
+
+      return client
     }
   }
 
