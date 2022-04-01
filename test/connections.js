@@ -104,7 +104,7 @@ test('createServer + connect - exchange data', async function (t) {
 
   const socket = b.connect(server.publicKey)
   const blk = Buffer.alloc(4096)
-  const expected = 20 * 1024 * blk.byteLength
+  const expected = 1024 * blk.byteLength
 
   let sent = 0
   let recv = 0
