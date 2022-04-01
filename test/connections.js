@@ -316,9 +316,12 @@ test('server responds and immediately ends, multiple connects', async function (
   for (let i = n; i > 0; i--) {
     const socket = b.connect(server.publicKey)
 
-    socket.on('open', () => {
-      if (--n === 0) lc.pass()
-    })
+    socket
+      .on('close', () => {
+        if (--n === 0) lc.pass()
+      })
+      .resume()
+      .end()
   }
 
   await lc
