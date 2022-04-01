@@ -38,19 +38,16 @@ class HyperDHT extends DHT {
     })
 
     function bind () {
-      const client = udx.createSocket()
+      const socket = udx.createSocket()
       try {
-        client.bind(port)
+        socket.bind(port)
       } catch (err) {
-        client.bind()
+        socket.bind()
       }
 
-      const server = udx.createSocket()
-      server.bind()
+      self._sockets = new SocketPairer(self, socket)
 
-      self._sockets = new SocketPairer(self, server)
-
-      return client
+      return socket
     }
   }
 
@@ -73,8 +70,9 @@ class HyperDHT extends DHT {
       await Promise.allSettled(closing)
     }
 
+    if (this._sockets) this._sockets.destroy()
+
     await super.destroy()
-    if (this._sockets) await this._sockets.destroy()
   }
 
   findPeer (publicKey, opts = {}) {
