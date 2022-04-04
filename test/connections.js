@@ -275,16 +275,15 @@ test('udp noise, client ends, no crash', async function (t) {
   t.pass('did not crash')
 })
 
-// TODO: fix this
-test.skip('half open', async function (t) {
+test('half open', async function (t) {
   t.plan(2)
 
-  const [, a] = await swarm(t)
+  const [, a, b] = await swarm(t)
 
   const server = a.createServer()
   await server.listen()
 
-  const socket = a.connect(server.address().publicKey)
+  const socket = b.connect(server.address().publicKey)
 
   server.on('connection', (socket) => {
     socket.on('data', (data) => {
@@ -368,4 +367,24 @@ test('dht node can host server', async function (t) {
   })
 
   await server.close()
+})
+
+// TODO: fix this
+test.skip('server and client on same node', async function (t) {
+  t.plan(2)
+
+  const [, a] = await swarm(t)
+
+  const server = a.createServer()
+  await server.listen()
+
+  const socket = a.connect(server.address().publicKey)
+
+  server.on('connection', () => {
+    t.pass('server connected')
+  })
+
+  socket.on('open', () => {
+    t.pass('client connected')
+  })
 })
