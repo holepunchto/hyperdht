@@ -11,6 +11,7 @@
     "bogon": "^1.0.0",
     "compact-encoding": "^2.4.1",
     "compact-encoding-net": "^1.0.1",
+    "debugging-stream": "^1.0.0",
     "dht-rpc": "^5.0.1",
     "noise-curve-ed": "^1.0.2",
     "noise-handshake": "^2.1.0",

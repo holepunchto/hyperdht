@@ -32,6 +32,7 @@ class HyperDHT extends DHT {
     this._router = new Router(this, cacheOpts)
     this._sockets = null
     this._persistent = null
+    this._debuggingStream = opts.debuggingStream || null
 
     this.once('persistent', () => {
       this._persistent = new Persistent(this, cacheOpts)
