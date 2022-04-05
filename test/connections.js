@@ -369,8 +369,7 @@ test('dht node can host server', async function (t) {
   await server.close()
 })
 
-// TODO: fix this
-test.skip('server and client on same node', async function (t) {
+test('server and client on same node', async function (t) {
   t.plan(2)
 
   const [, a] = await swarm(t)
@@ -380,11 +379,13 @@ test.skip('server and client on same node', async function (t) {
 
   const socket = a.connect(server.address().publicKey)
 
-  server.on('connection', () => {
+  server.on('connection', (socket) => {
     t.pass('server connected')
+    socket.end()
   })
 
   socket.on('open', () => {
     t.pass('client connected')
+    socket.end()
   })
 })
