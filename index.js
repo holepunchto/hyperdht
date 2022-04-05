@@ -29,6 +29,7 @@ class HyperDHT extends DHT {
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
 
+    this._streamIds = new Set()
     this._router = new Router(this, cacheOpts)
     this._sockets = null
     this._persistent = null
@@ -344,6 +345,14 @@ class HyperDHT extends DHT {
       command: COMMANDS.UNANNOUNCE,
       value
     }, from)
+  }
+
+  _availableStreamId () {
+    while (true) {
+      const id = (Math.random() * 0xffffffff) >>> 0
+      if (this._streamIds.has(id)) continue
+      return id
+    }
   }
 }
 
