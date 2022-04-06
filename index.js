@@ -34,6 +34,9 @@ class HyperDHT extends DHT {
     this._sockets = null
     this._persistent = null
 
+    this._debugStream = (opts.debug && opts.debug.stream) || null
+    this._debugHandshakeLatency = toRange((opts.debug && opts.debug.handshake && opts.debug.handshake.latency) || 0)
+
     this.once('persistent', () => {
       this._persistent = new Persistent(this, cacheOpts)
     })
@@ -423,3 +426,8 @@ function mapMutable (node) {
 }
 
 function noop () {}
+
+function toRange (n) {
+  if (!n) return null
+  return typeof n === 'number' ? [n, n] : n
+}

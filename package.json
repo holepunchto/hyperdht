@@ -1,6 +1,6 @@
 {
   "name": "@hyperswarm/dht",
-  "version": "5.0.20",
+  "version": "5.0.23",
   "description": "The DHT powering the HyperSwarm stack",
   "main": "index.js",
   "browser": "browser.js",
@@ -10,6 +10,7 @@
     "bogon": "^1.0.0",
     "compact-encoding": "^2.4.1",
     "compact-encoding-net": "^1.0.1",
+    "debugging-stream": "^2.0.0",
     "dht-rpc": "^5.0.1",
     "events": "^3.3.0",
     "noise-curve-ed": "^1.0.2",
