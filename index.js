@@ -16,8 +16,8 @@ const maxSize = 65536
 const maxAge = 20 * 60 * 1000
 
 class HyperDHT extends DHT {
-  constructor (opts = {}) {
-    super({ bootstrap: BOOTSTRAP_NODES, ...opts, bind })
+  constructor ({ bootstrap = BOOTSTRAP_NODES, ...opts } = {}) {
+    super({ bootstrap, ...opts, bind })
 
     const self = this
     const port = opts.port || opts.bind || 49737
