@@ -278,7 +278,7 @@ test('udp noise, client ends, no crash', async function (t) {
 test('half open', async function (t) {
   t.plan(2)
 
-  const [, a, b] = await swarm(t)
+  const [a, b] = await swarm(t)
 
   const server = a.createServer()
   await server.listen()
