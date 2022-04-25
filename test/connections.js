@@ -82,6 +82,8 @@ test('createServer + connect - emits connect', async function (t) {
 })
 
 test('createServer + connect - exchange data', async function (t) {
+  t.timeout(60000)
+
   const [a, b] = await swarm(t)
   const lc = t.test('socket lifecycle')
 
