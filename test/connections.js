@@ -332,8 +332,7 @@ test('server responds and immediately ends, multiple connects', async function (
   await server.close()
 })
 
-// TODO: "Could not connect to peer"
-test.skip('dht node can host server', async function (t) {
+test('dht node can host server', async function (t) {
   const [, b, c] = await swarm(t, 3)
 
   const lc = t.test('socket lifecycle')
