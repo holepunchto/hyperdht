@@ -1,10 +1,10 @@
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
-const udx = require('udx-native')
 const c = require('compact-encoding')
 const b4a = require('b4a')
 const m = require('./lib/messages')
 const SocketPairer = require('./lib/socket-pairer')
+const SocketPool = require('./lib/socket-pool')
 const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Server = require('./lib/server')
@@ -32,6 +32,7 @@ class HyperDHT extends DHT {
     this._streamIds = new Set()
     this._router = new Router(this, cacheOpts)
     this._sockets = null
+    this._socketPool = new SocketPool(this)
     this._persistent = null
 
     this._debugStream = (opts.debug && opts.debug.stream) || null
@@ -42,12 +43,7 @@ class HyperDHT extends DHT {
     })
 
     function bind () {
-      const socket = udx.createSocket()
-      try {
-        socket.bind(port)
-      } catch (err) {
-        socket.bind()
-      }
+      const { socket } = self._socketPool.get({ port })
 
       self._sockets = new SocketPairer(self, socket)
 
