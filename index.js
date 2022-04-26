@@ -72,9 +72,9 @@ class HyperDHT extends DHT {
 
     if (this._sockets) this._sockets.destroy()
 
-    this._socketPool.destroy()
-
     await super.destroy()
+
+    this._socketPool.destroy()
   }
 
   findPeer (publicKey, opts = {}) {
