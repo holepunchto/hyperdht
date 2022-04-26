@@ -16,7 +16,7 @@ test('pair', async function (t) {
   const stream = a.connect(1, 2, b.address().port)
   stream.end(Buffer.from('hello'))
 
-  pool.pair(2, { once: true }, (socket, id, address) => {
+  pool.pair(2, (socket, id, address) => {
     t.is(socket, b)
     t.is(id, 2)
 
