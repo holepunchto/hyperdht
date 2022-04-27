@@ -391,3 +391,50 @@ test('server and client on same node', async function (t) {
     socket.end()
   })
 })
+
+test('relayed connection', async function (t) {
+  t.plan(2)
+
+  const { createNode } = await swarm(t)
+
+  const a = createNode()
+  const b = createNode()
+
+  const server = a.createServer()
+  await server.listen()
+
+  const socket = b.connect(server.address().publicKey)
+
+  server.on('connection', (socket) => {
+    t.pass('server connected')
+    socket.end()
+  })
+
+  socket.on('open', () => {
+    t.pass('client connected')
+    socket.end()
+  })
+})
+
+test('relayed connection on same node', async function (t) {
+  t.plan(2)
+
+  const { createNode } = await swarm(t)
+
+  const a = createNode()
+
+  const server = a.createServer()
+  await server.listen()
+
+  const socket = a.connect(server.address().publicKey)
+
+  server.on('connection', (socket) => {
+    t.pass('server connected')
+    socket.end()
+  })
+
+  socket.on('open', () => {
+    t.pass('client connected')
+    socket.end()
+  })
+})

@@ -24,5 +24,16 @@ async function swarm (t, n = 32, bootstrap) {
     nodes.push(node)
   }
   t.teardown(() => destroy(nodes))
-  return nodes
+  return {
+    nodes,
+    bootstrap,
+    createNode (opts = {}) {
+      const node = new HyperDHT({ bootstrap, ephemeral: true, ...opts })
+      nodes.push(node)
+      return node
+    },
+    [Symbol.iterator] () {
+      return nodes[Symbol.iterator]()
+    }
+  }
 }
