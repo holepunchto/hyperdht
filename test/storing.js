@@ -3,7 +3,7 @@ const HyperDHT = require('../')
 const { swarm } = require('./helpers')
 
 test('immutable put - get', async function (t) {
-  const nodes = await swarm(t, 100)
+  const { nodes } = await swarm(t, 100)
 
   const { hash } = await nodes[30].immutablePut(Buffer.from('testing'))
   const res = await nodes[3].immutableGet(hash)
@@ -19,7 +19,7 @@ test('immutable put - get', async function (t) {
 })
 
 test('mutable put - get', async function (t) {
-  const nodes = await swarm(t, 100)
+  const { nodes } = await swarm(t, 100)
   const keyPair = HyperDHT.keyPair()
 
   const put = await nodes[30].mutablePut(keyPair, Buffer.from('testing'))
@@ -42,7 +42,7 @@ test('mutable put - get', async function (t) {
 })
 
 test('mutable put - put - get', async function (t) {
-  const nodes = await swarm(t, 100)
+  const { nodes } = await swarm(t, 100)
   const keyPair = HyperDHT.keyPair()
 
   const put = await nodes[30].mutablePut(keyPair, Buffer.from('testing'))
