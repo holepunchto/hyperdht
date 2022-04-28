@@ -2,6 +2,7 @@ const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
 const udx = require('udx-native')
 const c = require('compact-encoding')
+const os = require('os')
 const b4a = require('b4a')
 const m = require('./lib/messages')
 const SocketPairer = require('./lib/socket-pairer')
@@ -311,6 +312,27 @@ class HyperDHT extends DHT {
     return hash(data)
   }
 
+  localAddress () {
+    return {
+      host: localIP(), // we should cache this i think for some time / based on some heuristics...
+      port: this.io.serverSocket.address().port
+    }
+  }
+
+  remoteAdddress () {
+    if (!this.host) return null
+    if (!this.port) return null
+    if (this.firewalled) return null
+
+    const port = this.io.serverSocket.address().port
+    if (port !== this.port) return null
+
+    return {
+      host: this.host,
+      port
+    }
+  }
+
   async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign) {
     const ann = {
       peer: {
@@ -434,4 +456,14 @@ function noop () {}
 function toRange (n) {
   if (!n) return null
   return typeof n === 'number' ? [n, n] : n
+}
+
+function localIP () {
+  const nets = os.networkInterfaces()
+  for (const n of Object.keys(nets)) {
+    for (const i of nets[n]) {
+      if (i.family === 'IPv4' && !i.internal) return i.address
+    }
+  }
+  return '127.0.0.1'
 }
