@@ -1,6 +1,6 @@
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
-const udx = require('udx-native')
+const UDX = require('udx-native')
 const c = require('compact-encoding')
 const os = require('os')
 const b4a = require('b4a')
@@ -31,6 +31,7 @@ class HyperDHT extends DHT {
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
 
+    this._udx = new UDX()
     this._streamIds = new Set()
     this._router = new Router(this, cacheOpts)
     this._sockets = null
@@ -45,7 +46,7 @@ class HyperDHT extends DHT {
     })
 
     function bind () {
-      const socket = udx.createSocket()
+      const socket = self._udx.createSocket()
       try {
         socket.bind(port)
       } catch {
