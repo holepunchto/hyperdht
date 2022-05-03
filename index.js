@@ -13,6 +13,7 @@ const Server = require('./lib/server')
 const connect = require('./lib/connect')
 const { FIREWALL, PROTOCOL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
+const RawStreamSet = require('./lib/raw-stream-set')
 
 const maxSize = 65536
 const maxAge = 20 * 60 * 1000
@@ -36,6 +37,7 @@ class HyperDHT extends DHT {
     this._router = new Router(this, cacheOpts)
     this._sockets = null
     this._socketPool = new SocketPool(this)
+    this._rawStreams = new RawStreamSet(this)
     this._persistent = null
 
     this._debugStream = (opts.debug && opts.debug.stream) || null
