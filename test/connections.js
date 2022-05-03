@@ -299,8 +299,7 @@ test('half open', async function (t) {
     .end('ping')
 })
 
-// TODO: Occasional "Socket is closed"
-test.skip('server responds and immediately ends, multiple connects', async function (t) {
+test('server responds and immediately ends, multiple connects', async function (t) {
   const [a, b] = await swarm(t)
 
   const lc = t.test('socket lifecycle')
@@ -331,8 +330,7 @@ test.skip('server responds and immediately ends, multiple connects', async funct
   await server.close()
 })
 
-// TODO: Times out
-test.skip('dht node can host server', async function (t) {
+test('dht node can host server', async function (t) {
   const [, b, c] = await swarm(t, 3)
 
   const lc = t.test('socket lifecycle')

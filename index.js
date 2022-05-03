@@ -5,7 +5,6 @@ const c = require('compact-encoding')
 const os = require('os')
 const b4a = require('b4a')
 const m = require('./lib/messages')
-const SocketPairer = require('./lib/socket-pairer')
 const SocketPool = require('./lib/socket-pool')
 const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
@@ -35,7 +34,6 @@ class HyperDHT extends DHT {
     this._udx = new UDX()
     this._streamIds = new Set()
     this._router = new Router(this, cacheOpts)
-    this._sockets = null
     this._socketPool = new SocketPool(this)
     this._rawStreams = new RawStreamSet(this)
     this._persistent = null
@@ -49,13 +47,12 @@ class HyperDHT extends DHT {
 
     function bind () {
       const socket = self._udx.createSocket()
+
       try {
         socket.bind(port)
       } catch {
         socket.bind()
       }
-
-      self._sockets = new SocketPairer(self, socket)
 
       return socket
     }
@@ -79,8 +76,6 @@ class HyperDHT extends DHT {
       for (const server of this.listening) closing.push(server.close())
       await Promise.allSettled(closing)
     }
-
-    if (this._sockets) this._sockets.destroy()
 
     await super.destroy()
 
@@ -322,7 +317,7 @@ class HyperDHT extends DHT {
     }
   }
 
-  remoteAdddress () {
+  remoteAddress () {
     if (!this.host) return null
     if (!this.port) return null
     if (this.firewalled) return null
