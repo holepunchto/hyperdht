@@ -15,12 +15,12 @@ async function destroy (...nodes) {
   }
 }
 
-async function swarm (t, n = 32, bootstrap) {
+async function swarm (t, n = 32, bootstrap = []) {
   const nodes = []
   while (nodes.length < n) {
     const node = new HyperDHT({ bootstrap, ephemeral: false })
     await node.ready()
-    if (!bootstrap) bootstrap = [{ host: '127.0.0.1', port: node.address().port }]
+    if (!bootstrap.length) bootstrap = [{ host: '127.0.0.1', port: node.address().port }]
     nodes.push(node)
   }
   t.teardown(() => destroy(nodes))
