@@ -373,14 +373,6 @@ class HyperDHT extends DHT {
       value
     }, from)
   }
-
-  _availableStreamId () {
-    while (true) {
-      const id = (Math.random() * 0xffffffff) >>> 0
-      if (this._streamIds.has(id)) continue
-      return id
-    }
-  }
 }
 
 HyperDHT.BOOTSTRAP = BOOTSTRAP_NODES
