@@ -9,7 +9,9 @@ async function toArray (iterable) {
 }
 
 async function destroy (...nodes) {
-  for (const node of nodes) {
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const node = nodes[i]
+
     if (Array.isArray(node)) await destroy(...node)
     else await node.destroy()
   }
