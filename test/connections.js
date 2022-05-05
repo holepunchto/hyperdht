@@ -416,7 +416,7 @@ test('relayed connection', async function (t) {
 })
 
 test('relayed connection on same node', async function (t) {
-  t.plan(2)
+  t.plan(4)
 
   const { createNode } = await swarm(t)
 
@@ -430,10 +430,18 @@ test('relayed connection on same node', async function (t) {
   server.on('connection', (socket) => {
     t.pass('server connected')
     socket.end()
+
+    socket.on('close', function () {
+      t.pass('server socket closed')
+    })
   })
 
   socket.on('open', () => {
     t.pass('client connected')
     socket.end()
+  })
+
+  socket.on('close', function () {
+    t.pass('client socket closed')
   })
 })
