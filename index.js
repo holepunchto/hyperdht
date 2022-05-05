@@ -77,9 +77,9 @@ class HyperDHT extends DHT {
       await Promise.allSettled(closing)
     }
 
-    await super.destroy()
+    await this._socketPool.destroy()
 
-    this._socketPool.destroy()
+    await super.destroy()
   }
 
   findPeer (publicKey, opts = {}) {
