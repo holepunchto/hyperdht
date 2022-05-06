@@ -18,11 +18,13 @@ const maxSize = 65536
 const maxAge = 20 * 60 * 1000
 
 class HyperDHT extends DHT {
-  constructor ({ bootstrap = BOOTSTRAP_NODES, ...opts } = {}) {
-    super({ bootstrap, ...opts, bind })
+  constructor (opts = {}) {
+    const udx = new UDX()
+    const port = opts.port || 49737
+    const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
 
-    const self = this
-    const port = opts.port || opts.bind || 49737
+    super({ ...opts, udx, port, bootstrap })
+
     const cacheOpts = {
       maxSize: opts.maxSize || maxSize,
       maxAge: opts.maxAge || maxAge
@@ -31,7 +33,7 @@ class HyperDHT extends DHT {
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
 
-    this._udx = new UDX()
+    this._udx = udx
     this._streamIds = new Set()
     this._router = new Router(this, cacheOpts)
     this._socketPool = new SocketPool(this)
@@ -44,18 +46,6 @@ class HyperDHT extends DHT {
     this.once('persistent', () => {
       this._persistent = new Persistent(this, cacheOpts)
     })
-
-    function bind () {
-      const socket = self._udx.createSocket()
-
-      try {
-        socket.bind(port)
-      } catch {
-        socket.bind()
-      }
-
-      return socket
-    }
   }
 
   connect (remotePublicKey, opts) {

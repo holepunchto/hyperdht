@@ -101,7 +101,7 @@ Fully destroy this DHT node.
 This will also unannounce any running servers.
 If you want to force close the node without waiting for the servers to unannounce pass `{ force: true }`.
 
-#### `node = DHT.bootstrapper(bind, [options])`
+#### `node = DHT.bootstrapper(port, [options])`
 
 If you want to run your own Hyperswarm network use this method to easily create a bootstrap node.
 
