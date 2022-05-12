@@ -300,11 +300,28 @@ class HyperDHT extends DHT {
     return hash(data)
   }
 
+  static connectRawStream (encryptedStream, rawStream, remoteId) {
+    const stream = encryptedStream.rawStream
+
+    if (!stream.connected) throw new Error('Encrypted stream is not connected')
+
+    rawStream.connect(
+      stream.socket,
+      remoteId,
+      stream.remotePort,
+      stream.remoteHost
+    )
+  }
+
   localAddress () {
     return {
       host: localIP(), // we should cache this i think for some time / based on some heuristics...
       port: this.io.serverSocket.address().port
     }
+  }
+
+  createRawStream (opts) {
+    return this._rawStreams.add(opts)
   }
 
   remoteAddress () {
