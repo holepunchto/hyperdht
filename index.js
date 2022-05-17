@@ -2,7 +2,6 @@ const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
 const UDX = require('udx-native')
 const c = require('compact-encoding')
-const os = require('os')
 const b4a = require('b4a')
 const m = require('./lib/messages')
 const SocketPool = require('./lib/socket-pool')
@@ -315,7 +314,7 @@ class HyperDHT extends DHT {
 
   localAddress () {
     return {
-      host: localIP(), // we should cache this i think for some time / based on some heuristics...
+      host: localIP(this._udx),
       port: this.io.serverSocket.address().port
     }
   }
@@ -455,12 +454,9 @@ function toRange (n) {
   return typeof n === 'number' ? [n, n] : n
 }
 
-function localIP () {
-  const nets = os.networkInterfaces()
-  for (const n of Object.keys(nets)) {
-    for (const i of nets[n]) {
-      if (i.family === 'IPv4' && !i.internal) return i.address
-    }
+function localIP (udx) {
+  for (const n of udx.networkInterfaces()) {
+    if (n.family === 4 && !n.internal) return n.host
   }
   return '127.0.0.1'
 }
