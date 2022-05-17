@@ -445,3 +445,43 @@ test('relayed connection on same node', async function (t) {
     t.pass('client socket closed')
   })
 })
+
+test('create raw stream from encrypted stream', async function (t) {
+  const msg = t.test('message')
+  msg.plan(1)
+
+  const [a, b] = await swarm(t)
+
+  const server = a.createServer()
+  await server.listen()
+
+  const socket = b.connect(server.address().publicKey)
+
+  const aRawStream = a.createRawStream()
+  const bRawStream = b.createRawStream()
+
+  server.on('connection', (socket) => {
+    socket.on('error', () => {})
+
+    DHT.connectRawStream(socket, aRawStream, bRawStream.id)
+
+    aRawStream.write('hello')
+  })
+
+  socket.on('open', () => {
+    DHT.connectRawStream(socket, bRawStream, aRawStream.id)
+
+    bRawStream.on('data', (data) => {
+      msg.alike(data, Buffer.from('hello'))
+
+      socket.destroy()
+    })
+  })
+
+  await msg
+
+  aRawStream.destroy()
+  bRawStream.destroy()
+
+  await server.close()
+})
