@@ -19,7 +19,7 @@
     "safety-catch": "^1.0.1",
     "sodium-universal": "^3.0.4",
     "udx-native": "latest",
-    "xache": "^1.0.0"
+    "xache": "^1.1.0"
   },
   "devDependencies": {
     "brittle": "^2.0.0",
