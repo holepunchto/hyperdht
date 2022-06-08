@@ -33,7 +33,6 @@ class HyperDHT extends DHT {
     this.listening = new Set()
 
     this._udx = udx
-    this._streamIds = new Set()
     this._router = new Router(this, cacheOpts)
     this._socketPool = new SocketPool(this)
     this._rawStreams = new RawStreamSet(this)
