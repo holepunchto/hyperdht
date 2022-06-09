@@ -76,7 +76,7 @@ Options include:
 ```js
 {
   // Optionally overwrite the default bootstrap servers
-  // Defaults to ['testnet1.hyperdht.org:49736', 'testnet2.hyperdht.org:49736', 'testnet3.hyperdht.org:49736']
+  // Defaults to ['testnet1.hyperdht.org:55547', 'testnet2.hyperdht.org:55547', 'testnet3.hyperdht.org:55547']
   bootstrap: ['host:port'],
   keyPair // set the default key pair to use for server.listen and connect
 }
