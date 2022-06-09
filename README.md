@@ -131,6 +131,10 @@ You can run servers on normal home computers, as the DHT will UDP holepunch conn
 Make the server listen on a keyPair.
 To connect to this server use keyPair.publicKey as the connect address.
 
+#### `server.refresh()`
+
+Refresh the server, causing it to reannounce its address. This is automatically called on network changes.
+
 #### `server.on('connection', encryptedConnection)`
 
 Emitted when a new encrypted connection has passed the firewall check.

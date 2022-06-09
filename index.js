@@ -44,6 +44,10 @@ class HyperDHT extends DHT {
     this.once('persistent', () => {
       this._persistent = new Persistent(this, cacheOpts)
     })
+
+    this.on('network-change', () => {
+      for (const server of this.listening) server.refresh()
+    })
   }
 
   connect (remotePublicKey, opts) {
