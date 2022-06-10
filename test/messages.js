@@ -8,7 +8,6 @@ test('basic noise payload', function (t) {
     version: 1,
     error: 0,
     firewall: 0,
-    protocols: 0,
     streamId: 0,
     holepunch: null,
     addresses: null
@@ -37,7 +36,6 @@ test('noise payload with holepunch and addresses', function (t) {
     version: 1,
     error: 0,
     firewall: 2,
-    protocols: 0,
     streamId: 0,
     holepunch: {
       id: 10,
@@ -74,7 +72,6 @@ test('noise payload only addresses', function (t) {
     version: 1,
     error: 0,
     firewall: 2,
-    protocols: 0,
     streamId: 0,
     holepunch: null,
     addresses: [{
@@ -107,7 +104,6 @@ test('noise payload newer version', function (t) {
     version: 2,
     error: 0,
     firewall: 0,
-    protocols: 0,
     streamId: 0,
     holepunch: null,
     addresses: null

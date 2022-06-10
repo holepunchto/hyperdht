@@ -9,7 +9,7 @@ const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, PROTOCOL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
+const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 
@@ -386,7 +386,6 @@ class HyperDHT extends DHT {
 
 HyperDHT.BOOTSTRAP = BOOTSTRAP_NODES
 HyperDHT.FIREWALL = FIREWALL
-HyperDHT.PROTOCOL = PROTOCOL
 
 module.exports = HyperDHT
 
