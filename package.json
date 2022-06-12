@@ -13,6 +13,7 @@
     "debugging-stream": "^2.0.0",
     "dht-rpc": "github:kasperisager/dht-rpc#udx",
     "events": "^3.3.0",
+    "hypercore-crypto": "^3.3.0",
     "noise-curve-ed": "^1.0.2",
     "noise-handshake": "^2.1.0",
     "record-cache": "^1.1.1",
