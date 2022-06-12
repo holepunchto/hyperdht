@@ -11,13 +11,6 @@ Built on top of [dht-rpc](https://github.com/mafintosh/dht-rpc).
 The Hyperswarm DHT uses a series of hole punching techniques to make sure connectivity works on most networks,
 and is mainly used to facilitate finding and connecting to peers using end to end encrypted Noise streams.
 
-## NOTE: v5
-
-Note that this is the README for v5 which is tagged under next.
-To see the v4 documentation/code go to https://github.com/hyperswarm/dht/tree/v4
-
-As v5 fully matures over the next month it will be shifted to npm latest.
-
 ## Usage
 
 To try it out, first instantiate a DHT instance
