@@ -76,7 +76,7 @@ Options include:
 ```js
 {
   // Optionally overwrite the default bootstrap servers
-  // Defaults to ['testnet1.hyperdht.org:49736', 'testnet2.hyperdht.org:49736', 'testnet3.hyperdht.org:49736']
+  // Defaults to ['testnet1.hyperdht.org:55547', 'testnet2.hyperdht.org:55547', 'testnet3.hyperdht.org:55547']
   bootstrap: ['host:port'],
   keyPair // set the default key pair to use for server.listen and connect
 }
@@ -101,7 +101,7 @@ Fully destroy this DHT node.
 This will also unannounce any running servers.
 If you want to force close the node without waiting for the servers to unannounce pass `{ force: true }`.
 
-#### `node = DHT.bootstrapper(bind, [options])`
+#### `node = DHT.bootstrapper(port, [options])`
 
 If you want to run your own Hyperswarm network use this method to easily create a bootstrap node.
 
@@ -130,6 +130,10 @@ You can run servers on normal home computers, as the DHT will UDP holepunch conn
 
 Make the server listen on a keyPair.
 To connect to this server use keyPair.publicKey as the connect address.
+
+#### `server.refresh()`
+
+Refresh the server, causing it to reannounce its address. This is automatically called on network changes.
 
 #### `server.on('connection', encryptedConnection)`
 

@@ -1,26 +1,29 @@
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
-const { dual } = require('bind-easy')
+const UDX = require('udx-native')
 const c = require('compact-encoding')
 const b4a = require('b4a')
 const m = require('./lib/messages')
-const SocketPairer = require('./lib/socket-pairer')
+const SocketPool = require('./lib/socket-pool')
 const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, PROTOCOL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
+const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
+const RawStreamSet = require('./lib/raw-stream-set')
 
 const maxSize = 65536
 const maxAge = 20 * 60 * 1000
 
 class HyperDHT extends DHT {
-  constructor ({ bootstrap = BOOTSTRAP_NODES, ...opts } = {}) {
-    super({ bootstrap, ...opts, bind })
+  constructor (opts = {}) {
+    const udx = new UDX()
+    const port = opts.port || 55547
+    const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
 
-    const self = this
-    const port = opts.port || opts.bind || 49737
+    super({ ...opts, udx, port, bootstrap })
+
     const cacheOpts = {
       maxSize: opts.maxSize || maxSize,
       maxAge: opts.maxAge || maxAge
@@ -29,8 +32,10 @@ class HyperDHT extends DHT {
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
 
+    this._udx = udx
     this._router = new Router(this, cacheOpts)
-    this._sockets = null
+    this._socketPool = new SocketPool(this)
+    this._rawStreams = new RawStreamSet(this)
     this._persistent = null
 
     this._debugStream = (opts.debug && opts.debug.stream) || null
@@ -40,11 +45,9 @@ class HyperDHT extends DHT {
       this._persistent = new Persistent(this, cacheOpts)
     })
 
-    async function bind () {
-      const { server, socket } = await dual(port, { allowHalfOpen: true })
-      self._sockets = new SocketPairer(self, server)
-      return socket
-    }
+    this.on('network-change', () => {
+      for (const server of this.listening) server.refresh()
+    })
   }
 
   connect (remotePublicKey, opts) {
@@ -66,8 +69,9 @@ class HyperDHT extends DHT {
       await Promise.allSettled(closing)
     }
 
+    await this._socketPool.destroy()
+
     await super.destroy()
-    if (this._sockets) await this._sockets.destroy()
   }
 
   findPeer (publicKey, opts = {}) {
@@ -298,6 +302,44 @@ class HyperDHT extends DHT {
     return hash(data)
   }
 
+  static connectRawStream (encryptedStream, rawStream, remoteId) {
+    const stream = encryptedStream.rawStream
+
+    if (!stream.connected) throw new Error('Encrypted stream is not connected')
+
+    rawStream.connect(
+      stream.socket,
+      remoteId,
+      stream.remotePort,
+      stream.remoteHost
+    )
+  }
+
+  localAddress () {
+    return {
+      host: localIP(this._udx),
+      port: this.io.serverSocket.address().port
+    }
+  }
+
+  createRawStream (opts) {
+    return this._rawStreams.add(opts)
+  }
+
+  remoteAddress () {
+    if (!this.host) return null
+    if (!this.port) return null
+    if (this.firewalled) return null
+
+    const port = this.io.serverSocket.address().port
+    if (port !== this.port) return null
+
+    return {
+      host: this.host,
+      port
+    }
+  }
+
   async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign) {
     const ann = {
       peer: {
@@ -344,7 +386,6 @@ class HyperDHT extends DHT {
 
 HyperDHT.BOOTSTRAP = BOOTSTRAP_NODES
 HyperDHT.FIREWALL = FIREWALL
-HyperDHT.PROTOCOL = PROTOCOL
 
 module.exports = HyperDHT
 
@@ -413,4 +454,11 @@ function noop () {}
 function toRange (n) {
   if (!n) return null
   return typeof n === 'number' ? [n, n] : n
+}
+
+function localIP (udx) {
+  for (const n of udx.networkInterfaces()) {
+    if (n.family === 4 && !n.internal) return n.host
+  }
+  return '127.0.0.1'
 }
