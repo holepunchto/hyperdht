@@ -8,19 +8,21 @@ test('basic noise payload', function (t) {
     version: 1,
     error: 0,
     firewall: 0,
-    streamId: 0,
     holepunch: null,
-    addresses: null
+    addresses4: [],
+    addresses6: [],
+    udx: null,
+    secretStream: null
   }
 
   m.noisePayload.preencode(state, c)
 
-  t.is(state.end, 6)
+  t.is(state.end, 4)
 
   state.buffer = Buffer.allocUnsafe(state.end)
   m.noisePayload.encode(state, c)
 
-  t.is(state.start, 6)
+  t.is(state.start, 4)
 
   state.start = 0
 
@@ -36,7 +38,6 @@ test('noise payload with holepunch and addresses', function (t) {
     version: 1,
     error: 0,
     firewall: 2,
-    streamId: 0,
     holepunch: {
       id: 10,
       relays: [
@@ -46,10 +47,13 @@ test('noise payload with holepunch and addresses', function (t) {
         }
       ]
     },
-    addresses: [{
+    addresses4: [{
       host: '127.0.0.1',
       port: 10240
-    }]
+    }],
+    addresses6: [],
+    udx: null,
+    secretStream: null
   }
 
   m.noisePayload.preencode(state, c)
@@ -72,12 +76,44 @@ test('noise payload only addresses', function (t) {
     version: 1,
     error: 0,
     firewall: 2,
-    streamId: 0,
     holepunch: null,
-    addresses: [{
+    addresses4: [{
       host: '127.0.0.1',
       port: 10241
-    }]
+    }],
+    addresses6: [],
+    udx: null,
+    secretStream: null
+  }
+
+  m.noisePayload.preencode(state, c)
+
+  state.buffer = Buffer.allocUnsafe(state.end)
+  m.noisePayload.encode(state, c)
+
+  state.start = 0
+
+  const d = m.noisePayload.decode(state)
+
+  t.is(state.start, state.end)
+  t.alike(d, c)
+})
+
+test('noise payload ipv6', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const c = {
+    version: 1,
+    error: 0,
+    firewall: 2,
+    holepunch: null,
+    addresses4: [],
+    addresses6: [{
+      host: '0:0:0:0:0:0:0:1',
+      port: 42420
+    }],
+    udx: null,
+    secretStream: null
   }
 
   m.noisePayload.preencode(state, c)
@@ -104,9 +140,11 @@ test('noise payload newer version', function (t) {
     version: 2,
     error: 0,
     firewall: 0,
-    streamId: 0,
     holepunch: null,
-    addresses: null
+    addresses4: [],
+    addresses6: [],
+    udx: null,
+    secretStream: null
   })
 })
 
