@@ -1,14 +1,14 @@
 # @hyperswarm/dht
 
-The DHT powering the HyperSwarm network
+The DHT powering Hyperswarm
 
 ```
-npm install @hyperswarm/dht@next
+npm install @hyperswarm/dht
 ```
 
 Built on top of [dht-rpc](https://github.com/mafintosh/dht-rpc).
 
-The Hyperswarm DHT uses a series of hole punching techniques to make sure connectivity works on most networks,
+The Hyperswarm DHT uses a series of holepunching techniques to make sure connectivity works on most networks,
 and is mainly used to facilitate finding and connecting to peers using end to end encrypted Noise streams.
 
 ## Usage
@@ -267,11 +267,13 @@ See [dht-rpc](https://github.com/mafintosh/dht-rpc) for the additional APIs the 
 
 ## CLI
 
-You can start a DHT node in the command line, using the [@hyperswarm/cli](https://github.com/hyperswarm/cli) package:
+You can start a DHT node in the command line, with the bundled cli tool:
 
 ```sh
-npm install -g @hyperswarm/cli
+npm install -g @hyperswarm/dht
 hyperswarm-dht # runs a DHT node
+hyperswarm-dht --bootstrap # runs a DHT node with bootstrap settings
+hyperswarm-dht --nodes 5 # runs 5 nodes
 ```
 
 ## License
