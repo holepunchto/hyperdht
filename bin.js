@@ -6,7 +6,10 @@ const bootstrap = arg('bootstrap')
 const nodes = arg('node') ? '' : arg('nodes')
 
 if (nodes === null && bootstrap !== null) {
-  startBootstrapNode()
+  const port = Number(arg('port') || '0') || 49737
+  const host = arg('host')
+  if (!host) throw new Error('You need to specify --host <node ip>')
+  startBootstrapNode(port, host)
 } else {
   startNodes(Number(nodes) || 1, bootstrap ? bootstrap.split(',') : undefined)
 }
@@ -17,8 +20,8 @@ function arg (name) {
   return i < process.argv.length - 1 ? process.argv[i + 1] : ''
 }
 
-async function startBootstrapNode () {
-  const node = HyperDHT.bootstrapper(49737)
+async function startBootstrapNode (port, host) {
+  const node = HyperDHT.bootstrapper(port, host)
 
   await node.ready()
 
