@@ -22,7 +22,7 @@ class HyperDHT extends DHT {
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
 
-    super({ ...opts, udx, port, bootstrap })
+    super({ ...opts, udx, port, bootstrap, addNode })
 
     const cacheOpts = {
       maxSize: opts.maxSize || maxSize,
@@ -461,4 +461,9 @@ function localIP (udx) {
     if (n.family === 4 && !n.internal) return n.host
   }
   return '127.0.0.1'
+}
+
+function addNode (node) {
+  // always skip these testnet nodes that got mixed in by accident, until they get updated
+  return !(node.port === 49738 && (node.host === '134.209.28.98' || node.host === '167.99.142.185'))
 }
