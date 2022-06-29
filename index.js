@@ -4,7 +4,7 @@ const UDX = require('udx-native')
 const c = require('compact-encoding')
 const b4a = require('b4a')
 const m = require('./lib/messages')
-const SocketPool = require('./lib/socket-pool')
+const { SocketPool, ConnectionPool } = require('./lib/pools')
 const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Server = require('./lib/server')
@@ -35,6 +35,7 @@ class HyperDHT extends DHT {
     this._udx = udx
     this._router = new Router(this, cacheOpts)
     this._socketPool = new SocketPool(this)
+    this._connectionPool = new ConnectionPool(this._socketPool)
     this._rawStreams = new RawStreamSet(this)
     this._persistent = null
 
