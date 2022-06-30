@@ -20,8 +20,8 @@ class HyperDHT extends DHT {
   constructor (opts = {}) {
     const udx = new UDX()
     const port = opts.port || 49737
-    const bootstrap = opts.bootstrap || opts.testnet ? TESTNET_BOOTSTRAP_NODES : BOOTSTRAP_NODES
-    const name = opts.name || opts.testnet ? 'testnet' : null
+    const bootstrap = opts.bootstrap || (opts.testnet ? TESTNET_BOOTSTRAP_NODES : BOOTSTRAP_NODES)
+    const name = opts.name || (opts.testnet ? 'testnet' : null)
 
     super({ ...opts, name, udx, port, bootstrap, addNode })
 
