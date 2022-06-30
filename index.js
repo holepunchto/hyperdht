@@ -9,7 +9,7 @@ const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
+const { FIREWALL, BOOTSTRAP_NODES, TESTNET_BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 
@@ -20,9 +20,10 @@ class HyperDHT extends DHT {
   constructor (opts = {}) {
     const udx = new UDX()
     const port = opts.port || 49737
-    const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
+    const bootstrap = opts.bootstrap || opts.testnet ? TESTNET_BOOTSTRAP_NODES : BOOTSTRAP_NODES
+    const name = opts.name || opts.testnet ? 'testnet' : null
 
-    super({ ...opts, udx, port, bootstrap, addNode })
+    super({ ...opts, name, udx, port, bootstrap, addNode })
 
     const cacheOpts = {
       maxSize: opts.maxSize || maxSize,
