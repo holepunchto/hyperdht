@@ -168,7 +168,7 @@ class HyperDHT extends DHT {
       if (b4a.equals(check, target)) return node
     }
 
-    throw Error('Not found')
+    return null
   }
 
   async immutablePut (value, opts = {}) {
@@ -207,7 +207,6 @@ class HyperDHT extends DHT {
       if (!result || node.seq > result.seq) result = node
     }
 
-    if (!result) throw Error('Not found')
     return result
   }
 
