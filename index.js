@@ -190,7 +190,11 @@ class HyperDHT extends DHT {
   }
 
   async mutableGet (publicKey, opts = {}) {
-    opts = { ...opts, map: mapMutable }
+    let refresh = opts.refresh || null
+    let signed = null
+    let result = null
+
+    opts = { ...opts, map: mapMutable, commit: refresh ? commit : null }
 
     const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, publicKey)
@@ -199,15 +203,31 @@ class HyperDHT extends DHT {
     const query = this.query({ target, command: COMMANDS.MUTABLE_GET, value: c.encode(c.uint, userSeq) }, opts)
     const latest = opts.latest !== false
 
-    let result = null
-
     for await (const node of query) {
+      if (result && node.seq <= result.seq) continue
       if (node.seq < userSeq || !Persistent.verifyMutable(node.signature, node.seq, node.value, publicKey)) continue
       if (!latest) return node
       if (!result || node.seq > result.seq) result = node
     }
 
     return result
+
+    function commit (reply, dht) {
+      if (!signed && result && refresh) {
+        if (refresh(result)) {
+          signed = c.encode(m.mutablePutRequest, {
+            publicKey,
+            seq: result.seq,
+            value: result.value,
+            signature: result.signature
+          })
+        } else {
+          refresh = null
+        }
+      }
+
+      return signed ? dht.request({ token: reply.token, target, command: COMMANDS.MUTABLE_PUT, value: signed }, reply.from) : Promise.resolve(null)
+    }
   }
 
   async mutablePut (keyPair, value, opts = {}) {
