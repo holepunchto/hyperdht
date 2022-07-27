@@ -9,7 +9,9 @@ async function toArray (iterable) {
 }
 
 async function destroy (...nodes) {
-  for (const node of nodes) {
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const node = nodes[i]
+
     if (Array.isArray(node)) await destroy(...node)
     else await node.destroy()
   }
@@ -24,5 +26,16 @@ async function swarm (t, n = 32, bootstrap = []) {
     nodes.push(node)
   }
   t.teardown(() => destroy(nodes))
-  return nodes
+  return {
+    nodes,
+    bootstrap,
+    createNode (opts = {}) {
+      const node = new HyperDHT({ bootstrap, ephemeral: true, ...opts })
+      nodes.push(node)
+      return node
+    },
+    [Symbol.iterator] () {
+      return nodes[Symbol.iterator]()
+    }
+  }
 }

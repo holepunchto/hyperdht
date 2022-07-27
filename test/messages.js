@@ -1,4 +1,5 @@
 const test = require('brittle')
+const b4a = require('b4a')
 const m = require('../lib/messages')
 
 test('basic noise payload', function (t) {
@@ -8,19 +9,21 @@ test('basic noise payload', function (t) {
     version: 1,
     error: 0,
     firewall: 0,
-    protocols: 0,
     holepunch: null,
-    addresses: null
+    addresses4: [],
+    addresses6: [],
+    udx: null,
+    secretStream: null
   }
 
   m.noisePayload.preencode(state, c)
 
-  t.is(state.end, 5)
+  t.is(state.end, 4)
 
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.noisePayload.encode(state, c)
 
-  t.is(state.start, 5)
+  t.is(state.start, 4)
 
   state.start = 0
 
@@ -36,7 +39,6 @@ test('noise payload with holepunch and addresses', function (t) {
     version: 1,
     error: 0,
     firewall: 2,
-    protocols: 0,
     holepunch: {
       id: 10,
       relays: [
@@ -46,15 +48,18 @@ test('noise payload with holepunch and addresses', function (t) {
         }
       ]
     },
-    addresses: [{
+    addresses4: [{
       host: '127.0.0.1',
       port: 10240
-    }]
+    }],
+    addresses6: [],
+    udx: null,
+    secretStream: null
   }
 
   m.noisePayload.preencode(state, c)
 
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.noisePayload.encode(state, c)
 
   state.start = 0
@@ -72,17 +77,49 @@ test('noise payload only addresses', function (t) {
     version: 1,
     error: 0,
     firewall: 2,
-    protocols: 0,
     holepunch: null,
-    addresses: [{
+    addresses4: [{
       host: '127.0.0.1',
       port: 10241
-    }]
+    }],
+    addresses6: [],
+    udx: null,
+    secretStream: null
   }
 
   m.noisePayload.preencode(state, c)
 
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
+  m.noisePayload.encode(state, c)
+
+  state.start = 0
+
+  const d = m.noisePayload.decode(state)
+
+  t.is(state.start, state.end)
+  t.alike(d, c)
+})
+
+test('noise payload ipv6', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const c = {
+    version: 1,
+    error: 0,
+    firewall: 2,
+    holepunch: null,
+    addresses4: [],
+    addresses6: [{
+      host: '0:0:0:0:0:0:0:1',
+      port: 42420
+    }],
+    udx: null,
+    secretStream: null
+  }
+
+  m.noisePayload.preencode(state, c)
+
+  state.buffer = b4a.allocUnsafe(state.end)
   m.noisePayload.encode(state, c)
 
   state.start = 0
@@ -104,9 +141,11 @@ test('noise payload newer version', function (t) {
     version: 2,
     error: 0,
     firewall: 0,
-    protocols: 0,
     holepunch: null,
-    addresses: null
+    addresses4: [],
+    addresses6: [],
+    udx: null,
+    secretStream: null
   })
 })
 
@@ -127,7 +166,7 @@ test('basic holepunch payload', function (t) {
 
   m.holepunchPayload.preencode(state, h)
 
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.holepunchPayload.encode(state, h)
 
   state.start = 0
@@ -157,7 +196,7 @@ test('holepunch payload with flag and addresses', function (t) {
 
   m.holepunchPayload.preencode(state, h)
 
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.holepunchPayload.encode(state, h)
 
   state.start = 0
@@ -184,7 +223,7 @@ test('holepunch payload with flag and remoteToken', function (t) {
 
   m.holepunchPayload.preencode(state, h)
 
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.holepunchPayload.encode(state, h)
 
   state.start = 0
@@ -200,7 +239,7 @@ test('peer with no relays', function (t) {
   const peer = { publicKey: Buffer.alloc(32).fill('pk'), relayAddresses: [] }
 
   m.peer.preencode(state, peer)
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.peer.encode(state, peer)
 
   t.is(state.end, state.start, 'fully encoded')
@@ -226,7 +265,7 @@ test('peer with multiple relays', function (t) {
   }
 
   m.peer.preencode(state, peer)
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.peer.encode(state, peer)
 
   t.is(state.end, state.start, 'fully encoded')
@@ -255,7 +294,7 @@ test('peers', function (t) {
   }]
 
   m.peers.preencode(state, peers)
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.peers.encode(state, peers)
 
   t.is(state.end, state.start, 'fully encoded')
@@ -279,7 +318,7 @@ test('announce', function (t) {
   }
 
   m.announce.preencode(state, ann)
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.announce.encode(state, ann)
 
   t.is(state.end, state.start, 'fully encoded')
@@ -303,7 +342,7 @@ test('announce with signature', function (t) {
   }
 
   m.announce.preencode(state, ann)
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.announce.encode(state, ann)
 
   t.is(state.end, state.start, 'fully encoded')
@@ -327,7 +366,7 @@ test('announce with refresh', function (t) {
   }
 
   m.announce.preencode(state, ann)
-  state.buffer = Buffer.allocUnsafe(state.end)
+  state.buffer = b4a.allocUnsafe(state.end)
   m.announce.encode(state, ann)
 
   t.is(state.end, state.start, 'fully encoded')

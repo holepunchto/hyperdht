@@ -1,25 +1,29 @@
 {
   "name": "@hyperswarm/dht",
-  "version": "5.0.25",
-  "description": "The DHT powering the HyperSwarm stack",
+  "version": "6.2.1",
+  "description": "The DHT powering Hyperswarm",
   "main": "index.js",
   "browser": "browser.js",
+  "bin": {
+    "hyperswarm-dht": "./bin.js"
+  },
   "dependencies": {
-    "@hyperswarm/secret-stream": "^5.1.0",
+    "@hyperswarm/secret-stream": "^6.0.0",
     "b4a": "^1.3.1",
-    "bind-easy": "^1.0.1",
     "bogon": "^1.0.0",
     "compact-encoding": "^2.4.1",
     "compact-encoding-net": "^1.0.1",
     "debugging-stream": "^2.0.0",
-    "dht-rpc": "^5.0.1",
+    "dht-rpc": "^6.0.0",
+    "events": "^3.3.0",
+    "hypercore-crypto": "^3.3.0",
     "noise-curve-ed": "^1.0.2",
     "noise-handshake": "^2.1.0",
     "record-cache": "^1.1.1",
     "safety-catch": "^1.0.1",
     "sodium-universal": "^3.0.4",
-    "utp-native": "^2.5.3",
-    "xache": "^1.0.0"
+    "udx-native": "^1.1.0",
+    "xache": "^1.1.0"
   },
   "devDependencies": {
     "brittle": "^2.0.0",

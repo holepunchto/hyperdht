@@ -1,22 +1,15 @@
 # @hyperswarm/dht
 
-The DHT powering the HyperSwarm network
+The DHT powering Hyperswarm
 
 ```
-npm install @hyperswarm/dht@next
+npm install @hyperswarm/dht
 ```
 
 Built on top of [dht-rpc](https://github.com/mafintosh/dht-rpc).
 
-The Hyperswarm DHT uses a series of hole punching techniques to make sure connectivity works on most networks,
+The Hyperswarm DHT uses a series of holepunching techniques to make sure connectivity works on most networks,
 and is mainly used to facilitate finding and connecting to peers using end to end encrypted Noise streams.
-
-## NOTE: v5
-
-Note that this is the README for v5 which is tagged under next.
-To see the v4 documentation/code go to https://github.com/hyperswarm/dht/tree/v4
-
-As v5 fully matures over the next month it will be shifted to npm latest.
 
 ## Usage
 
@@ -75,8 +68,8 @@ Options include:
 
 ```js
 {
-  // Optionally overwrite the default bootstrap servers
-  // Defaults to ['testnet1.hyperdht.org:49736', 'testnet2.hyperdht.org:49736', 'testnet3.hyperdht.org:49736']
+  // Optionally overwrite the default bootstrap servers, just need to be an array of any known dht node(s)
+  // Defaults to ['node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737']
   bootstrap: ['host:port'],
   keyPair // set the default key pair to use for server.listen and connect
 }
@@ -101,7 +94,7 @@ Fully destroy this DHT node.
 This will also unannounce any running servers.
 If you want to force close the node without waiting for the servers to unannounce pass `{ force: true }`.
 
-#### `node = DHT.bootstrapper(bind, [options])`
+#### `node = DHT.bootstrapper(port, [options])`
 
 If you want to run your own Hyperswarm network use this method to easily create a bootstrap node.
 
@@ -130,6 +123,10 @@ You can run servers on normal home computers, as the DHT will UDP holepunch conn
 
 Make the server listen on a keyPair.
 To connect to this server use keyPair.publicKey as the connect address.
+
+#### `server.refresh()`
+
+Refresh the server, causing it to reannounce its address. This is automatically called on network changes.
 
 #### `server.on('connection', encryptedConnection)`
 
@@ -270,11 +267,13 @@ See [dht-rpc](https://github.com/mafintosh/dht-rpc) for the additional APIs the 
 
 ## CLI
 
-You can start a DHT node in the command line, using the [@hyperswarm/cli](https://github.com/hyperswarm/cli) package:
+You can start a DHT node in the command line, with the bundled cli tool:
 
 ```sh
-npm install -g @hyperswarm/cli
+npm install -g @hyperswarm/dht
 hyperswarm-dht # runs a DHT node
+hyperswarm-dht --bootstrap # runs a DHT node with bootstrap settings
+hyperswarm-dht --nodes 5 # runs 5 nodes
 ```
 
 ## License
