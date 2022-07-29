@@ -32,6 +32,8 @@ test('createServer + connect - destroy nodes without ending socket', { timeout: 
   })
 
   await server.close()
+
+  console.log('after server.close()')
 })
 
 test('createServer + connect - once defaults', async function (t) {
