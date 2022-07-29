@@ -12,11 +12,14 @@ test('createServer + connect - destroy nodes without ending socket', { timeout: 
 
   const server = a.createServer(function (socket) {
     lc.pass('server side opened')
+    socket.on('error', () => {})
   })
 
   await server.listen()
 
   const socket = b.connect(server.publicKey)
+
+  socket.on('error', () => {})
 
   socket.once('open', function () {
     lc.pass('client side opened')
