@@ -3,6 +3,34 @@ const dgram = require('dgram')
 const { swarm } = require('./helpers')
 const DHT = require('../')
 
+test('createServer + connect - destroy nodes without ending socket', { timeout: 60000 }, async function (t) {
+  const [a, b] = await swarm(t)
+  const lc = t.test('socket lifecycle')
+
+  t.plan(2)
+  lc.plan(2)
+
+  const server = a.createServer(function (socket) {
+    lc.pass('server side opened')
+  })
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey)
+
+  socket.once('open', function () {
+    lc.pass('client side opened')
+  })
+
+  await lc
+
+  server.on('close', function () {
+    t.pass('server closed')
+  })
+
+  await server.close()
+})
+
 test('createServer + connect - once defaults', async function (t) {
   const [a, b] = await swarm(t)
   const lc = t.test('socket lifecycle')
