@@ -77,7 +77,7 @@ Options include:
 
 See [dht-rpc](https://github.com/mafintosh/dht-rpc) for more options as HyperDHT inherits from that.
 
-*Note:* The default bootstrap servers are publicly served on behalf of the commons. To run a fully private DHT, start two or more dht nodes with an empty bootstrap array (`new DHT({bootstrap:[]})`) and then use the addresses of those nodes as the `bootstrap` option in all other dht nodes.
+*Note:* The default bootstrap servers are publicly served on behalf of the commons. To run a fully private DHT, start one or more dht nodes with an empty bootstrap array (`new DHT({bootstrap:[]})`) and then use the addresses of those nodes as the `bootstrap` option in all other dht nodes.
 
 #### `keyPair = DHT.keyPair([seed])`
 
