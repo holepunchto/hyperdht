@@ -1,7 +1,6 @@
 import DHT from '../index.js'
 
-const bootstrap1 = new DHT({ bootstrap: [], port: 49737, anyPort: false, ephemeral: false, firewalled: false })
-// const bootstrap1 = DHT.bootstrapper(49737) // TODO: use bootstrapper
+const bootstrap1 = DHT.bootstrapper(49737, '127.0.0.1', { host: '127.0.0.1' })
 await bootstrap1.ready()
 
 const bootstrap = [bootstrap1.address()]
