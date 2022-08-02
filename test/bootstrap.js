@@ -1,7 +1,5 @@
 const test = require('brittle')
-// const { swarm } = require('./helpers')
 const DHT = require('../')
-// const { BOOTSTRAP_NODES } = require('../lib/constants.js')
 
 test('local bootstrap with non ephemeral server', async function (t) {
   const bootstrap1 = DHT.bootstrapper(49737, '127.0.0.1')
@@ -23,15 +21,15 @@ test('local bootstrap with ephemeral server', async function (t) {
   await bootstrap1.destroy()
 })
 
-/* test('online bootstrap with non ephemeral server', async function (t) {
-  const bootstrap = BOOTSTRAP_NODES
+test('online bootstrap with non ephemeral server', async function (t) {
+  const bootstrap = [{ host: 'dht1.lukks.ar', port: 49737 }]
   await createServerAndConnect(t, { bootstrap, ephemeral: false })
 })
 
 test('online bootstrap with ephemeral server', async function (t) {
-  const bootstrap = BOOTSTRAP_NODES
+  const bootstrap = [{ host: 'dht1.lukks.ar', port: 49737 }]
   await createServerAndConnect(t, { bootstrap, ephemeral: true })
-}) */
+})
 
 async function createServerAndConnect (t, { bootstrap, ephemeral }) {
   const a = new DHT({ bootstrap, ephemeral })
