@@ -77,7 +77,7 @@ Options include:
 
 See [dht-rpc](https://github.com/mafintosh/dht-rpc) for more options as HyperDHT inherits from that.
 
-*Note:* The default bootstrap servers are publicly served on behalf of the commons. To run a fully private DHT, start two or more dht nodes with an empty bootstrap array (`new DHT({bootstrap:[]})`) and then use the addresses of those nodes as the `bootstrap` option in all other dht nodes.
+*Note:* The default bootstrap servers are publicly served on behalf of the commons. To run a fully isolated DHT, start one or more dht nodes with an empty bootstrap array (`new DHT({bootstrap:[]})`) and then use the addresses of those nodes as the `bootstrap` option in all other dht nodes. You'll need at least one persistent node for the network to be completely operational.
 
 #### `keyPair = DHT.keyPair([seed])`
 
@@ -94,7 +94,7 @@ Fully destroy this DHT node.
 This will also unannounce any running servers.
 If you want to force close the node without waiting for the servers to unannounce pass `{ force: true }`.
 
-#### `node = DHT.bootstrapper(port, [options])`
+#### `node = DHT.bootstrapper(port, host, [options])`
 
 If you want to run your own Hyperswarm network use this method to easily create a bootstrap node.
 
