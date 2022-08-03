@@ -35,7 +35,7 @@ const bootstrap = [{ host: MY_PUBLIC_IP, port: bootstrap1.address().port }]
 // 3) It's always running, as it has to be online for new nodes to join.
 
 // [PART 2]
-// Besides the bootstrap node, we need a persistent node to have a complete fully working DHT network.
+// Besides the bootstrap node, to have a complete DHT network: we need one persistent node.
 
 // You could have nodes that organically become persistent, but that takes ~30 mins.
 // Our network is new and no one is using it, so we need to create a forced persistent node to avoid waiting.
