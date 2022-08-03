@@ -2,7 +2,7 @@ import DHT from '../index.js'
 
 // [PART 1]
 // Let's say I used DigitalOcean to create a server and it has a public IP:
-const MY_PUBLIC_IP = '67.205.140.151' // If you're on a local machine then use '127.0.0.1'
+const MY_PUBLIC_IP = '67.205.140.151' // If you're on a local machine then use '127.0.0.1' or the corresponding internal address
 
 // Inside that server, to create our first bootstrap node:
 const bootstrap1 = DHT.bootstrapper(49737, MY_PUBLIC_IP)
