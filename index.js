@@ -335,9 +335,13 @@ class HyperDHT extends DHT {
     )
   }
 
-  localAddress () {
+  localAddress (opts = {}) {
+    const {
+      family = 4
+    } = opts
+
     return {
-      host: localIP(this._udx),
+      host: localIP(this._udx, family),
       port: this.io.serverSocket.address().port
     }
   }
@@ -476,11 +480,11 @@ function toRange (n) {
   return typeof n === 'number' ? [n, n] : n
 }
 
-function localIP (udx) {
+function localIP (udx, family = 4) {
   for (const n of udx.networkInterfaces()) {
-    if (n.family === 4 && !n.internal) return n.host
+    if (n.family === family && !n.internal) return n.host
   }
-  return '127.0.0.1'
+  return family === 4 ? '127.0.0.1' : '::1'
 }
 
 function addNode (node) {
