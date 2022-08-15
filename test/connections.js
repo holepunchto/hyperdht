@@ -4,10 +4,11 @@ const { swarm } = require('./helpers')
 const DHT = require('../')
 
 test('createServer + connect - once defaults', async function (t) {
+  t.plan(2)
+
   const [a, b] = await swarm(t)
   const lc = t.test('socket lifecycle')
 
-  t.plan(2)
   lc.plan(4)
 
   const server = a.createServer(function (socket) {
@@ -43,10 +44,11 @@ test('createServer + connect - once defaults', async function (t) {
 })
 
 test('createServer + connect - emits connect', async function (t) {
+  t.plan(2)
+
   const [a, b] = await swarm(t)
   const lc = t.test('socket lifecycle')
 
-  t.plan(2)
   lc.plan(4)
 
   const server = a.createServer(function (socket) {
@@ -331,11 +333,12 @@ test('server responds and immediately ends, multiple connects', async function (
 })
 
 test('dht node can host server', async function (t) {
+  t.plan(2)
+
   const [, b, c] = await swarm(t, 3)
 
   const lc = t.test('socket lifecycle')
 
-  t.plan(2)
   lc.plan(4)
 
   const server = b.createServer(function (socket) {
