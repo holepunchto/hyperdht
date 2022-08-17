@@ -20,10 +20,11 @@ const maxAge = 20 * 60 * 1000
 class HyperDHT extends DHT {
   constructor (opts = {}) {
     const udx = new UDX()
+    const host = opts.host || '::'
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
 
-    super({ ...opts, udx, port, bootstrap, addNode })
+    super({ ...opts, udx, host, port, bootstrap, addNode })
 
     const cacheOpts = {
       maxSize: opts.maxSize || maxSize,
