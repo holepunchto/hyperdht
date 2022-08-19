@@ -9,6 +9,10 @@ async function toArray (iterable) {
 }
 
 async function destroy (...nodes) {
+  for (const node of nodes) {
+    for (const server of node.listening) await server.close()
+  }
+
   for (let i = nodes.length - 1; i >= 0; i--) {
     const node = nodes[i]
 
@@ -25,7 +29,7 @@ async function swarm (t, n = 32, bootstrap = []) {
     if (!bootstrap.length) bootstrap = [{ host: '127.0.0.1', port: node.address().port }]
     nodes.push(node)
   }
-  t.teardown(() => destroy(nodes))
+  t.teardown(() => destroy(...nodes))
   return {
     nodes,
     bootstrap,
