@@ -1,13 +1,14 @@
 const test = require('brittle')
-const dgram = require('dgram')
+const UDX = require('udx-native')
 const { swarm } = require('./helpers')
 const DHT = require('../')
 
 test('createServer + connect - once defaults', async function (t) {
+  t.plan(2)
+
   const [a, b] = await swarm(t)
   const lc = t.test('socket lifecycle')
 
-  t.plan(2)
   lc.plan(4)
 
   const server = a.createServer(function (socket) {
@@ -43,10 +44,11 @@ test('createServer + connect - once defaults', async function (t) {
 })
 
 test('createServer + connect - emits connect', async function (t) {
+  t.plan(2)
+
   const [a, b] = await swarm(t)
   const lc = t.test('socket lifecycle')
 
-  t.plan(2)
   lc.plan(4)
 
   const server = a.createServer(function (socket) {
@@ -267,11 +269,11 @@ test('client choosing to abort holepunch', async function (t) {
 test('udp noise, client ends, no crash', async function (t) {
   const [, node] = await swarm(t, 2)
 
-  const socket = dgram.createSocket('udp4')
-  socket.send('hi', node.address().port)
-  socket.close()
+  const udx = new UDX()
+  const socket = udx.createSocket()
+  await socket.send(Buffer.from('hi'), node.address().port)
+  await socket.close()
 
-  await new Promise((resolve) => socket.on('close', resolve))
   t.pass('did not crash')
 })
 
@@ -331,11 +333,12 @@ test('server responds and immediately ends, multiple connects', async function (
 })
 
 test('dht node can host server', async function (t) {
+  t.plan(2)
+
   const [, b, c] = await swarm(t, 3)
 
   const lc = t.test('socket lifecycle')
 
-  t.plan(2)
   lc.plan(4)
 
   const server = b.createServer(function (socket) {

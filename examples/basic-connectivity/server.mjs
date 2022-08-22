@@ -1,8 +1,6 @@
 import DHT from '../../index.js'
 
-const node = new DHT({
-  ephemeral: true // just setting this because this is a demo file
-})
+const node = new DHT()
 
 // Just wait for this in the background
 printInfo()

@@ -12,6 +12,7 @@ const connect = require('./lib/connect')
 const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
+const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 
 const maxSize = 65536
 const maxAge = 20 * 60 * 1000
@@ -68,9 +69,7 @@ class HyperDHT extends DHT {
       for (const server of this.listening) closing.push(server.close())
       await Promise.allSettled(closing)
     }
-
     await this._socketPool.destroy()
-
     await super.destroy()
   }
 
@@ -324,7 +323,7 @@ class HyperDHT extends DHT {
   static connectRawStream (encryptedStream, rawStream, remoteId) {
     const stream = encryptedStream.rawStream
 
-    if (!stream.connected) throw new Error('Encrypted stream is not connected')
+    if (!stream.connected) throw STREAM_NOT_CONNECTED()
 
     rawStream.connect(
       stream.socket,

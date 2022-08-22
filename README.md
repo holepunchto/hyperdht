@@ -27,14 +27,14 @@ Then on one computer listen for connections
 // create a server to listen for secure connections
 const server = node.createServer()
 
-server.on('connection', function (noiseSocket) {
-  // noiseSocket is E2E between you and the other peer
+server.on('connection', function (socket) {
+  // socket is E2E encrypted between you and the other peer
   // pipe it somewhere like any duplex stream
 
-  console.log('Remote public key', noiseSocket.remotePublicKey)
-  console.log('Local public key', noiseSocket.publicKey) // same as keyPair.publicKey
+  console.log('Remote public key', socket.remotePublicKey)
+  console.log('Local public key', socket.publicKey) // same as keyPair.publicKey
 
-  process.stdin.pipe(noiseSocket).pipe(process.stdout)
+  process.stdin.pipe(socket).pipe(process.stdout)
 })
 
 // make a ed25519 keypair to listen on
@@ -48,14 +48,14 @@ Then on another connect to the computer using the public key of the key-pair it 
 
 ``` js
 // publicKey here is keyPair.publicKey from above
-const noiseSocket = anotherNode.connect(publicKey)
+const socket = anotherNode.connect(publicKey)
 
-noiseSocket.on('open', function () {
-  // noiseSocket fully open with the other peer
+socket.on('open', function () {
+  // socket fully open with the other peer
 })
 
 // pipe it somewhere like any duplex stream
-process.stdin.pipe(noiseSocket).pipe(process.stdout)
+process.stdin.pipe(socket).pipe(process.stdout)
 ```
 
 ## API
@@ -77,7 +77,7 @@ Options include:
 
 See [dht-rpc](https://github.com/mafintosh/dht-rpc) for more options as HyperDHT inherits from that.
 
-*Note:* The default bootstrap servers are publicly served on behalf of the commons. To run a fully private DHT, start two or more dht nodes with an empty bootstrap array (`new DHT({bootstrap:[]})`) and then use the addresses of those nodes as the `bootstrap` option in all other dht nodes.
+*Note:* The default bootstrap servers are publicly served on behalf of the commons. To run a fully isolated DHT, start one or more dht nodes with an empty bootstrap array (`new DHT({bootstrap:[]})`) and then use the addresses of those nodes as the `bootstrap` option in all other dht nodes. You'll need at least one persistent node for the network to be completely operational.
 
 #### `keyPair = DHT.keyPair([seed])`
 
@@ -94,7 +94,7 @@ Fully destroy this DHT node.
 This will also unannounce any running servers.
 If you want to force close the node without waiting for the servers to unannounce pass `{ force: true }`.
 
-#### `node = DHT.bootstrapper(port, [options])`
+#### `node = DHT.bootstrapper(port, host, [options])`
 
 If you want to run your own Hyperswarm network use this method to easily create a bootstrap node.
 
@@ -128,13 +128,13 @@ To connect to this server use keyPair.publicKey as the connect address.
 
 Refresh the server, causing it to reannounce its address. This is automatically called on network changes.
 
-#### `server.on('connection', encryptedConnection)`
+#### `server.on('connection', socket)`
 
 Emitted when a new encrypted connection has passed the firewall check.
 
-`encryptedConnection` is a [NoiseSecretStream](https://github.com/mafintosh/noise-secret-stream) instance.
+`socket` is a [NoiseSecretStream](https://github.com/mafintosh/noise-secret-stream) instance.
 
-You can check who you are connected to using `encryptedConnection.remotePublicKey` and `encryptedConnection.handshakeHash` contains a unique hash representing this crypto session (same on both sides).
+You can check who you are connected to using `socket.remotePublicKey` and `socket.handshakeHash` contains a unique hash representing this crypto session (same on both sides).
 
 #### `server.on('listening')`
 
@@ -164,7 +164,7 @@ Emitted when the server is fully closed.
 
 ## Connecting to P2P servers
 
-#### `const encryptedConnection = node.connect(remotePublicKey, [options])`
+#### `const socket = node.connect(remotePublicKey, [options])`
 
 Connect to a remote server. Similar to `createServer` this performs UDP holepunching for P2P connectivity.
 
@@ -177,15 +177,15 @@ Options include:
 }
 ```
 
-#### `encryptedConnection.on('open')`
+#### `socket.on('open')`
 
 Emitted when the encrypted connection has been fully established with the server.
 
-#### `encryptedConnection.remotePublicKey`
+#### `socket.remotePublicKey`
 
 The public key of the remote peer.
 
-#### `encryptedConnection.publicKey`
+#### `socket.publicKey`
 
 The connections public key.
 
