@@ -551,7 +551,8 @@ test('connect using specific key', async function (t) {
   const lc = t.test('socket lifecycle')
   lc.plan(4)
 
-  const keyPair = DHT.keyPair()
+  const keyPair = DHT.keyPair(Buffer.alloc(32, 'hello world'))
+  t.comment('publicKey', keyPair.publicKey)
 
   const server = a.createServer(function (socket) {
     lc.pass('server side opened')
