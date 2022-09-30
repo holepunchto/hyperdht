@@ -555,7 +555,6 @@ test('connect using specific key', async function (t) {
 
   const server = a.createServer(function (socket) {
     lc.pass('server side opened')
-
     t.alike(socket.remotePublicKey, keyPair.publicKey)
 
     socket.once('end', function () {
@@ -571,6 +570,7 @@ test('connect using specific key', async function (t) {
   socket
     .once('open', function () {
       lc.pass('client side opened')
+      t.alike(socket.publicKey, keyPair.publicKey)
     })
     .once('end', function () {
       lc.pass('client side ended')
