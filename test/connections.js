@@ -544,3 +544,44 @@ test('create many connections with reusable sockets', async function (t) {
   await a.destroy()
   await b.destroy()
 })
+
+test('connect using specific key', async function (t) {
+  const [a, b] = await swarm(t)
+
+  const lc = t.test('socket lifecycle')
+  lc.plan(4)
+
+  const keyPair = DHT.keyPair()
+
+  const server = a.createServer(function (socket) {
+    lc.pass('server side opened')
+
+    t.alike(socket.remotePublicKey, keyPair.publicKey)
+
+    socket.once('end', function () {
+      lc.pass('server side ended')
+      socket.end()
+    })
+  })
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey, { keyPair })
+
+  socket
+    .once('open', function () {
+      lc.pass('client side opened')
+    })
+    .once('end', function () {
+      lc.pass('client side ended')
+    })
+    .end()
+
+  await lc
+
+  server.on('close', function () {
+    t.pass('server closed')
+  })
+
+  await server.close()
+})
