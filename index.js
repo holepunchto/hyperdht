@@ -484,5 +484,6 @@ function localIP (udx) {
 
 function addNode (node) {
   // always skip these testnet nodes that got mixed in by accident, until they get updated
-  return !(node.port === 49738 && (node.host === '134.209.28.98' || node.host === '167.99.142.185'))
+  return !(node.port === 49738 && (node.host === '134.209.28.98' || node.host === '167.99.142.185')) &&
+    !(node.port === 9400 && node.host === '35.233.47.252')
 }
