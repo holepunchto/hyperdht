@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "brittle": "^3.0.0",
+    "keypear": "^1.1.1",
     "standard": "^16.0.4"
   },
   "scripts": {
