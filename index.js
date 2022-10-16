@@ -368,7 +368,7 @@ class HyperDHT extends DHT {
       signature: null
     }
 
-    ann.signature = await sign(target, token, from.id, ann, keyPair.secretKey)
+    ann.signature = await sign(target, token, from.id, ann, keyPair)
 
     const value = c.encode(m.announce, ann)
 
@@ -389,7 +389,7 @@ class HyperDHT extends DHT {
       signature: null
     }
 
-    unann.signature = await sign(target, token, from.id, unann, keyPair.secretKey)
+    unann.signature = await sign(target, token, from.id, unann, keyPair)
 
     const value = c.encode(m.announce, unann)
 
