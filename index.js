@@ -236,7 +236,7 @@ class HyperDHT extends DHT {
     sodium.crypto_generichash(target, keyPair.publicKey)
 
     const seq = opts.seq || 0
-    const signature = await signMutable(seq, value, keyPair.secretKey)
+    const signature = await signMutable(seq, value, keyPair)
 
     const signed = c.encode(m.mutablePutRequest, {
       publicKey: keyPair.publicKey,
@@ -368,7 +368,7 @@ class HyperDHT extends DHT {
       signature: null
     }
 
-    ann.signature = await sign(target, token, from.id, ann, keyPair.secretKey)
+    ann.signature = await sign(target, token, from.id, ann, keyPair)
 
     const value = c.encode(m.announce, ann)
 
@@ -389,7 +389,7 @@ class HyperDHT extends DHT {
       signature: null
     }
 
-    unann.signature = await sign(target, token, from.id, unann, keyPair.secretKey)
+    unann.signature = await sign(target, token, from.id, unann, keyPair)
 
     const value = c.encode(m.announce, unann)
 
