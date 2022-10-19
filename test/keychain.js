@@ -16,7 +16,7 @@ test('server with keychain', async function (t) {
   const socket = b.connect(server.publicKey)
 
   server.on('connection', (socket) => {
-    t.is(socket.publicKey, server.publicKey)
+    t.is(socket.publicKey, serverKeyPair.publicKey)
     t.pass('server connected')
     socket.end()
   })
