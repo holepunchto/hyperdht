@@ -11,12 +11,12 @@ test('server with keychain', async function (t) {
 
   const server = a.createServer()
   await server.listen(serverKeyPair)
-  t.is(server.publicKey, serverKeyPair.publicKey)
+  t.alike(server.publicKey, serverKeyPair.publicKey)
 
   const socket = b.connect(server.publicKey)
 
   server.on('connection', (socket) => {
-    t.is(socket.publicKey, serverKeyPair.publicKey)
+    t.alike(socket.publicKey, serverKeyPair.publicKey)
     t.pass('server connected')
     socket.end()
   })
@@ -38,7 +38,7 @@ test('client with keychain', async function (t) {
   await server.listen()
 
   const socket = b.connect(server.publicKey, { keyPair: clientKeyPair })
-  t.is(socket.publicKey, clientKeyPair.publicKey)
+  t.alike(socket.publicKey, clientKeyPair.publicKey)
 
   server.on('connection', (socket) => {
     t.alike(socket.remotePublicKey, clientKeyPair.publicKey)
