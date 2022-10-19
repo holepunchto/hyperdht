@@ -73,3 +73,19 @@ test('server and client, both with keychain', async function (t) {
     socket.end()
   })
 })
+
+test('mutable with keychain, put - put - get', async function (t) {
+  const { nodes } = await swarm(t, 100)
+  const keys = new Keychain()
+  const keyPair = keys.get()
+
+  const put = await nodes[30].mutablePut(keyPair, Buffer.from('testing'))
+  t.is(put.signature.length, 64)
+  t.is(put.seq, 0)
+
+  const res = await nodes[3].mutableGet(keyPair.publicKey)
+  t.is(res.seq, 0)
+  t.is(Buffer.isBuffer(res.value), true)
+  t.is(Buffer.compare(res.signature, put.signature), 0)
+  t.is(res.value.toString(), 'testing')
+})
