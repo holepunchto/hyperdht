@@ -258,6 +258,8 @@ Options:
 
 * `seq` - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
 * `latest` - OPTIONAL - default `false`, a boolean indicating whether the query should try to find the highest seq before returning, or just the first verified value larger than `options.seq` it sees.
+* `value` - OPTIONAL - if you have a cached value you can commit it even if it was dropped by the DHT (can't be refreshed), you will have to pass `opts.signature` too, and make sure `opts.seq` matches.
+* `signature` - OPTIONAL - with `opts.value` and `opts.seq` helps caching previously seen records without the original `keypair` after the record is dropped from the DHT.
 
 Any additional options you pass are forwarded to dht-rpc.
 

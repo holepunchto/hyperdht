@@ -193,7 +193,7 @@ class HyperDHT extends DHT {
     let signed = null
     let result = null
 
-    opts = { ...opts, map: mapMutable, commit: refresh ? commit : null }
+    opts = { ...opts, map: mapMutable, commit }
 
     const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, publicKey)
@@ -201,6 +201,15 @@ class HyperDHT extends DHT {
     const userSeq = opts.seq || 0
     const query = this.query({ target, command: COMMANDS.MUTABLE_GET, value: c.encode(c.uint, userSeq) }, opts)
     const latest = opts.latest !== false
+
+    if (opts.value && opts.signature) {
+      signed = c.encode(m.mutablePutRequest, {
+        publicKey,
+        seq: userSeq,
+        value: opts.value,
+        signature: opts.signature
+      })
+    }
 
     for await (const node of query) {
       if (result && node.seq <= result.seq) continue
