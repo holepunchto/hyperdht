@@ -69,6 +69,7 @@ class HyperDHT extends DHT {
       for (const server of this.listening) closing.push(server.close())
       await Promise.allSettled(closing)
     }
+    await this._rawStreams.destroy()
     await this._socketPool.destroy()
     await super.destroy()
   }
