@@ -475,10 +475,19 @@ function toRange (n) {
 }
 
 function localIP (udx) {
+  let host = null
+
   for (const n of udx.networkInterfaces()) {
-    if (n.family === 4 && !n.internal) return n.host
+    if (n.family !== 4 || n.internal) continue
+
+    // mac really likes en0, mb a better way but this shouldnt be bad anywhere so return now
+    if (n.name === 'en0') return n.host
+
+    // otherwise pick the first non internal host (let the loop continue in case we see en0)
+    if (host === null) host = n.host
   }
-  return '127.0.0.1'
+
+  return host || '127.0.0.1'
 }
 
 function addNode (node) {
