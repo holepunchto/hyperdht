@@ -599,22 +599,25 @@ test('close connections on destroy', async function (t) {
   const server = a.createServer(function (socket) {
     open.pass('server side opened')
 
-    socket.once('close', function () {
-      close.pass('server side closed')
-    })
+    socket
+      .on('error', () => {})
+      .once('close', function () {
+        close.pass('server side closed')
+      })
   })
 
   await server.listen()
 
   const socket = b.connect(server.publicKey)
 
-  socket.once('open', function () {
-    open.pass('client side opened')
-  })
-
-  socket.once('close', function () {
-    close.pass('client side closed')
-  })
+  socket
+    .on('error', () => {})
+    .once('open', function () {
+      open.pass('client side opened')
+    })
+    .once('close', function () {
+      close.pass('client side closed')
+    })
 
   server.on('close', function () {
     t.pass('server closed')
