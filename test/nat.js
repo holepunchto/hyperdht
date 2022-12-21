@@ -3,14 +3,14 @@ const Nat = require('../lib/nat')
 const { FIREWALL } = require('../lib/constants')
 
 test('firewall - open', function (t) {
-  const nat = new Nat({ firewalled: false }, null)
+  const nat = new Nat({ firewalled: false }, null, null)
 
   t.is(nat.sampled, 0)
   t.is(nat.firewall, FIREWALL.OPEN)
 })
 
 test('firewall - random', function (t) {
-  const nat = new Nat({ firewalled: true }, null)
+  const nat = new Nat({ firewalled: true }, null, null)
 
   nat.add({ host: '127.0.0.1', port: 8080 }, { host: '127.0.0.1', port: 8080 })
   t.is(nat.sampled, 1)
@@ -34,7 +34,7 @@ test('firewall - random', function (t) {
 })
 
 test('firewall - consistent', function (t) {
-  const nat = new Nat({ firewalled: true }, null)
+  const nat = new Nat({ firewalled: true }, null, null)
 
   nat.add({ host: '127.0.0.1', port: 8080 }, { host: '127.0.0.1', port: 8080 })
   t.is(nat.sampled, 1)
@@ -53,7 +53,7 @@ test('firewall - consistent', function (t) {
 })
 
 test('firewall - consistent with another sample', function (t) {
-  const nat = new Nat({ firewalled: true }, null)
+  const nat = new Nat({ firewalled: true }, null, null)
 
   nat.add({ host: '127.0.0.1', port: 8080 }, { host: '127.0.0.1', port: 8080 })
   t.is(nat.sampled, 1)
@@ -77,7 +77,7 @@ test('firewall - consistent with another sample', function (t) {
 })
 
 test('firewall - double consistent', function (t) {
-  const nat = new Nat({ firewalled: true }, null)
+  const nat = new Nat({ firewalled: true }, null, null)
 
   nat.add({ host: '127.0.0.1', port: 8080 }, { host: '127.0.0.1', port: 8080 })
   t.is(nat.sampled, 1)
@@ -101,7 +101,7 @@ test('firewall - double consistent', function (t) {
 })
 
 test('firewall - not quite consistent', function (t) {
-  const nat = new Nat({ firewalled: true }, null)
+  const nat = new Nat({ firewalled: true }, null, null)
 
   nat.add({ host: '127.0.0.1', port: 8080 }, { host: '127.0.0.1', port: 8080 })
   t.is(nat.sampled, 1)
