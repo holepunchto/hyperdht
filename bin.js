@@ -32,10 +32,13 @@ async function startBootstrapNode (port, host) {
 async function startNodes (cnt, bootstrap) {
   console.log('Booting DHT nodes...')
 
+  const port = Number(arg('port') || '0')
   const all = []
 
+  if (cnt !== 1 && port) throw new Error('--port is only valid when node count is one (1)')
+
   while (all.length < cnt) {
-    const node = new HyperDHT({ bootstrap })
+    const node = new HyperDHT({ port, bootstrap, ephemeral: arg('persistent') ? false : undefined })
     await node.ready()
     const id = all.length
 
