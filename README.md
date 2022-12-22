@@ -296,9 +296,7 @@ hyperswarm-dht --bootstrap --host server-ip # [--port 49737]
 
 Important: it requires the port to be open.
 
-Now your bootstrap node is ready to use at `server-ip:49737`.
-
-For example:
+Now your bootstrap node is ready to use at `server-ip:49737`, for example:
 ```js
 const node = new DHT({ bootstrap: ['server-ip:49737'] })
 ```
