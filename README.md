@@ -283,7 +283,7 @@ Or run multiple nodes:
 hyperswarm-dht --nodes 5 # [--bootstrap <list>]
 ```
 
-Note: by default it uses the mainnet bootstrap nodes.
+Note: by default it uses the [mainnet bootstrap nodes](lib/constants.js).
 
 #### Isolated DHT network
 
@@ -313,6 +313,8 @@ hyperswarm-dht --bootstrap server-ip:49737 --persistent --port 49738
 Important: it requires the port to be open like the bootstrap node.
 
 Don't use the `--persistent` flag again, or you could damage the network health.
+
+For more information: [`examples/isolated-dht.mjs`](examples/isolated-dht.mjs)
 
 ## License
 
