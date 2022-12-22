@@ -65,10 +65,6 @@ async function startNodes (cnt, bootstrap) {
     node.on('close', function () {
       console.log('Node #' + id + ' closed')
     })
-
-    setTimeout(() => {
-      node.destroy()
-    }, 2000)
   }
 
   console.log('Fully started ' + cnt + ' Hyperswarm DHT node' + (cnt === 1 ? '' : 's'))
