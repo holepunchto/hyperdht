@@ -275,12 +275,12 @@ npm install -g @hyperswarm/dht
 
 Run a DHT node:
 ```sh
-hyperswarm-dht # [--port 0] [--bootstrap <comma separated list of ip:port>]
+hyperswarm-dht # [--port 0] [--host 0.0.0.0] [--bootstrap <comma separated list of ip:port>]
 ```
 
 Or run multiple nodes:
 ```sh
-hyperswarm-dht --nodes 5 # [--bootstrap <list>]
+hyperswarm-dht --nodes 5 # [--host 0.0.0.0] [--bootstrap <list>]
 ```
 
 Note: by default it uses the [mainnet bootstrap nodes](lib/constants.js).
