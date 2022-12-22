@@ -291,14 +291,14 @@ To create your own DHT network is as follows:
 
 1) Run your first bootstrap node:
 ```sh
-hyperswarm-dht --bootstrap --host server-ip # [--port 49737]
+hyperswarm-dht --bootstrap --host (server-ip) # [--port 49737]
 ```
 
 Important: it requires the port to be open.
 
-Now your bootstrap node is ready to use at `server-ip:49737`, for example:
+Now your bootstrap node is ready to use at `(server-ip):49737`, for example:
 ```js
-const node = new DHT({ bootstrap: ['server-ip:49737'] })
+const node = new DHT({ bootstrap: ['(server-ip):49737'] })
 ```
 
 Note: You could configure some DNS for the bootstrap IP addresses.
@@ -307,7 +307,7 @@ For the network to be fully operational it needs at least one persistent node.
 
 2) Provide the first persistent node using your own bootstrap values:
 ```sh
-hyperswarm-dht --port 49738 --bootstrap server-ip:49737 --persistent
+hyperswarm-dht --port 49738 --bootstrap (server-ip):49737 --persistent
 ```
 
 Important: it requires the port to be open like the bootstrap node.
