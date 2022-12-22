@@ -295,8 +295,6 @@ Now your bootstrap node is ready to use at `server-ip:49737`.
 
 For example:
 ```js
-import DHT from '@hyperswarm/dht'
-
 const node = new DHT({ bootstrap: ['server-ip:49737'] })
 ```
 
