@@ -275,7 +275,7 @@ npm install -g @hyperswarm/dht
 
 Run a DHT node:
 ```sh
-hyperswarm-dht # [--port 49737] [--bootstrap <comma separated list of ip:port>]
+hyperswarm-dht # [--port 0] [--bootstrap <comma separated list of ip:port>]
 ```
 
 Or run multiple nodes:
