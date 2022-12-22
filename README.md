@@ -266,6 +266,9 @@ Any additional options you pass are forwarded to dht-rpc.
 See [dht-rpc](https://github.com/mafintosh/dht-rpc) for the additional APIs the DHT exposes.
 
 ## CLI
+
+You can start a DHT node in the command line:
+
 ```sh
 npm install -g @hyperswarm/dht
 ```
@@ -282,7 +285,9 @@ hyperswarm-dht --nodes 5 # [--bootstrap <list>]
 
 Note: by default it uses the mainnet bootstrap nodes.
 
-To create your own isolated DHT network is as follows:
+#### Isolated DHT network
+
+To create your own DHT network is as follows:
 
 1) Run your first bootstrap node:
 ```sh
