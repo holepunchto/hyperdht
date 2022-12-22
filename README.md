@@ -266,15 +266,52 @@ Any additional options you pass are forwarded to dht-rpc.
 See [dht-rpc](https://github.com/mafintosh/dht-rpc) for the additional APIs the DHT exposes.
 
 ## CLI
-
-You can start a DHT node in the command line, with the bundled cli tool:
-
 ```sh
 npm install -g @hyperswarm/dht
-hyperswarm-dht # runs a DHT node
-hyperswarm-dht --bootstrap # runs a DHT node with bootstrap settings
-hyperswarm-dht --nodes 5 # runs 5 nodes
 ```
+
+Run a DHT node:
+```sh
+hyperswarm-dht # [--port 49737] [--bootstrap <comma separated list of ip:port>]
+```
+
+Or run multiple nodes:
+```sh
+hyperswarm-dht --nodes 5 # [--bootstrap <list>]
+```
+
+Note: by default it uses the mainnet bootstrap nodes.
+
+To create your own isolated DHT network is as follows:
+
+1) Run your first bootstrap node:
+```sh
+hyperswarm-dht --bootstrap --host server-ip # [--port 49737]
+```
+
+Important: it requires the port to be open.
+
+Now your bootstrap node is ready to use at `server-ip:49737`.
+
+For example:
+```js
+import DHT from '@hyperswarm/dht'
+
+const node = new DHT({ bootstrap: ['server-ip:49737'] })
+```
+
+Note: You could configure some DNS for the bootstrap IP addresses.
+
+For the network to be fully operational it needs at least one persistent node.
+
+2) Provide the first persistent node using your own bootstrap values:
+```sh
+hyperswarm-dht --bootstrap server-ip:49737 --persistent --port 49738
+```
+
+Important: it requires the port to be open like the bootstrap node.
+
+Don't use the `--persistent` flag again, or you could damage the network health.
 
 ## License
 
