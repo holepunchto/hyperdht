@@ -49,13 +49,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hyperswarm/dht.git"
+    "url": "git+https://github.com/holepunchto/hyperswarm-dht.git"
   },
   "keywords": [],
   "bugs": {
-    "url": "https://github.com/hyperswarm/dht/issues"
+    "url": "https://github.com/holepunchto/hyperswarm-dht/issues"
   },
-  "homepage": "https://github.com/hyperswarm/dht#readme",
+  "homepage": "https://github.com/holepunchto/hyperswarm-dht#readme",
   "standard": {
     "ignore": [
       "**/*.mjs"

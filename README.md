@@ -134,7 +134,7 @@ Refresh the server, causing it to reannounce its address. This is automatically 
 
 Emitted when a new encrypted connection has passed the firewall check.
 
-`socket` is a [NoiseSecretStream](https://github.com/mafintosh/noise-secret-stream) instance.
+`socket` is a [NoiseSecretStream](https://github.com/holepunchto/hyperswarm-secret-stream) instance.
 
 You can check who you are connected to using `socket.remotePublicKey` and `socket.handshakeHash` contains a unique hash representing this crypto session (same on both sides).
 
