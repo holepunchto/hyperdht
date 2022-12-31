@@ -39,9 +39,15 @@ class HyperDHT extends DHT {
     this._debugStream = (opts.debug && opts.debug.stream) || null
     this._debugHandshakeLatency = toRange((opts.debug && opts.debug.handshake && opts.debug.handshake.latency) || 0)
 
+    // + "on" instead of "once"?
     this.once('persistent', () => {
       this._persistent = new Persistent(this, cacheOpts)
     })
+
+    // + plus this
+    /* this.once('ephemeral', () => {
+      if (this._persistent) this._persistent.destroy()
+    }) */
 
     this.on('network-change', () => {
       for (const server of this.listening) server.refresh()
