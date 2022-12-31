@@ -47,6 +47,7 @@ class HyperDHT extends DHT {
     // + plus this
     /* this.once('ephemeral', () => {
       if (this._persistent) this._persistent.destroy()
+      this._persistent = null
     }) */
 
     this.on('network-change', () => {
