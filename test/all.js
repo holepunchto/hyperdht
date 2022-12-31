@@ -8,6 +8,7 @@ async function runTests () {
   test.pause()
 
   await import('./announces.js')
+  await import('./bootstrapper.js')
   await import('./connections.js')
   await import('./keychain.js')
   await import('./messages.js')
