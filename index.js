@@ -1,6 +1,5 @@
 const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
-const UDX = require('udx-native')
 const c = require('compact-encoding')
 const b4a = require('b4a')
 const m = require('./lib/messages')
@@ -19,11 +18,10 @@ const maxAge = 20 * 60 * 1000
 
 class HyperDHT extends DHT {
   constructor (opts = {}) {
-    const udx = new UDX()
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
 
-    super({ ...opts, udx, port, bootstrap, addNode })
+    super({ ...opts, port, bootstrap, addNode })
 
     const cacheOpts = {
       maxSize: opts.maxSize || maxSize,
