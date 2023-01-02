@@ -61,7 +61,7 @@ test('first persistent node with no host given', async function (t) {
 
   t.ok(await makeServerAndClient([{ host: localIP(), port: bootstrap1.address().port }]))
 
-  // This is fine: it doesn't work due different NAT host. I mean it's reachable but NAT host address doesn't match
+  // This is fine: it doesn't work due different NAT host. I mean it's reachable but NAT host address, peer id or something doesn't match
   t.absent(await makeServerAndClient([{ host: '127.0.0.1', port: bootstrap1.address().port }]))
 
   await bootstrap1.destroy()
@@ -99,12 +99,20 @@ test('first persistent node with no host given but binds to local host address',
   await bootstrap1.destroy()
 })
 
+test.skip('ephemeral node enters persistent mode, and later goes back to ephemeral', async function (t) {
+  // + this should test when a node is adaptive and becomes persistent naturally
+  // but then later goes back into 'ephemeral' mode (i.e. due sleep, etc)
+  // currently, hyperdht is not destroying the persistent class object when it goes back to eph
+})
+
 async function makeServerAndClient (bootstrap) {
   const a = new DHT({ bootstrap, ephemeral: true })
+  await a.ready()
   const server = a.createServer()
   await server.listen()
 
   const b = new DHT({ bootstrap, ephemeral: true })
+  await b.ready()
   const result = await toArray(b.findPeer(server.publicKey))
 
   const success = result.length > 0 && result[0].peer.publicKey.toString() === server.publicKey.toString()

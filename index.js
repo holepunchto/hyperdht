@@ -41,15 +41,16 @@ class HyperDHT extends DHT {
 
     // + "on" instead of "once"?
     this.once('persistent', () => {
-      console.log('hyperdht is persistent')
+      console.log(this.name, 'hyperdht is persistent')
       this._persistent = new Persistent(this, cacheOpts)
     })
 
     // + plus this
-    /* this.once('ephemeral', () => {
-      if (this._persistent) this._persistent.destroy()
-      this._persistent = null
-    }) */
+    this.once('ephemeral', () => {
+      console.log(this.name, 'hyperdht is ephemeral')
+      // if (this._persistent) this._persistent.destroy()
+      // this._persistent = null
+    })
 
     this.on('network-change', () => {
       for (const server of this.listening) server.refresh()
