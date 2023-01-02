@@ -41,6 +41,7 @@ class HyperDHT extends DHT {
 
     // + "on" instead of "once"?
     this.once('persistent', () => {
+      console.log('hyperdht is persistent')
       this._persistent = new Persistent(this, cacheOpts)
     })
 
