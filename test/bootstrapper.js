@@ -134,3 +134,12 @@ function localIP () {
   }
   return host || '127.0.0.1'
 }
+
+/* function wait (ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function sleep (ms) {
+  if (!this.nil) this.nil = new Int32Array(new SharedArrayBuffer(4))
+  Atomics.wait(nil, 0, 0, ms)
+} */
