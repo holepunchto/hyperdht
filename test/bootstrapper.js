@@ -61,13 +61,14 @@ test('first persistent node with no host given', async function (t) {
 
   t.ok(await makeServerAndClient([{ host: localIP(), port: bootstrap1.address().port }]))
 
-  // This is fine: it doesn't work due different NAT host. I mean it's reachable but NAT host address, peer id or something doesn't match
+  // This is fine: it doesn't work due different peer id and/or NAT host. I mean it's reachable but NAT host address, peer id or something doesn't match
   t.absent(await makeServerAndClient([{ host: '127.0.0.1', port: bootstrap1.address().port }]))
 
   await bootstrap1.destroy()
 })
 
-test.skip('first persistent node with local IPv6 host', async function (t) {
+test.skip('first persistent node but binds to IPv6 localhost', async function (t) {
+  // + I think this deosn't due peer.id encoding
   const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false, host: '::1' })
   await bootstrap1.ready()
   t.is(bootstrap1.address().host, '::1')
@@ -77,8 +78,7 @@ test.skip('first persistent node with local IPv6 host', async function (t) {
   await bootstrap1.destroy()
 })
 
-test('first persistent node with no host given but binds to localhost', async function (t) {
-  // Host was given so it uses that one as a NAT host
+test('first persistent node but binds to IPv4 localhost', async function (t) {
   const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false, host: '127.0.0.1' })
   await bootstrap1.ready()
   t.is(bootstrap1.address().host, '127.0.0.1')
@@ -89,7 +89,6 @@ test('first persistent node with no host given but binds to localhost', async fu
 })
 
 test('first persistent node with no host given but binds to local host address', async function (t) {
-  // Host was given so it uses that one as a NAT host
   const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false, host: localIP() })
   await bootstrap1.ready()
   t.is(bootstrap1.address().host, localIP())
