@@ -31,6 +31,7 @@ class HyperDHT extends DHT {
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
 
+    this._udx = udx
     this._router = new Router(this, cacheOpts)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
     this._rawStreams = new RawStreamSet(this)
@@ -39,17 +40,9 @@ class HyperDHT extends DHT {
     this._debugStream = (opts.debug && opts.debug.stream) || null
     this._debugHandshakeLatency = toRange((opts.debug && opts.debug.handshake && opts.debug.handshake.latency) || 0)
 
-    // + "on" instead of "once"?
     this.once('persistent', () => {
       console.log(this.name, 'hyperdht is persistent')
       this._persistent = new Persistent(this, cacheOpts)
-    })
-
-    // + plus this
-    this.once('ephemeral', () => {
-      console.log(this.name, 'hyperdht is ephemeral')
-      // if (this._persistent) this._persistent.destroy()
-      // this._persistent = null
     })
 
     this.on('network-change', () => {
