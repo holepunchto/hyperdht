@@ -34,7 +34,8 @@
   "devDependencies": {
     "brittle": "^3.0.0",
     "keypear": "^1.1.1",
-    "standard": "^16.0.4"
+    "standard": "^16.0.4",
+    "udx-native": "^1.5.3"
   },
   "scripts": {
     "test": "standard && node test/all.js",
