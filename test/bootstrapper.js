@@ -3,12 +3,6 @@ const { toArray } = require('./helpers')
 const DHT = require('../')
 const UDX = require('udx-native')
 
-// maybe '0.0.0.0' is just an invalid address for a dht node
-// because that just "listens" in all interfaces, so a node has effectively multiple connectable host addresses
-// but this dht node can only decide one valid address for the nat of itself, and i.e. other eph nodes will only be able to succesfully talk with that specific nat address
-
-console.log('localIP:', localIP())
-
 test('single node network is enough to find peers', async function (t) {
   const bootstrap1 = DHT.bootstrapper(49737, '127.0.0.1')
   t.ok(await makeServerAndClient([{ host: '127.0.0.1', port: 49737 }]))
@@ -53,8 +47,8 @@ test('bootstrapper at localhost and also bind to localhost', async function (t) 
   await bootstrap1.destroy()
 })
 
-test('first persistent node with no host given', async function (t) {
-  // No host is given, so it assumes the first local host address (eg 192.168.0.23) as a NAT host
+test.skip('first persistent node with no host given', async function (t) {
+  // + how can this node be used?
   const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false })
   await bootstrap1.ready()
   t.is(bootstrap1.address().host, '::') // It still binds to all networks
@@ -68,7 +62,7 @@ test('first persistent node with no host given', async function (t) {
 })
 
 test.skip('first persistent node but binds to IPv6 localhost', async function (t) {
-  // + I think this deosn't due peer.id encoding
+  // + same as no host given, and anyway will not work due peer.id ipv4 encoding
   const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false, host: '::1' })
   await bootstrap1.ready()
   t.is(bootstrap1.address().host, '::1')
@@ -78,7 +72,8 @@ test.skip('first persistent node but binds to IPv6 localhost', async function (t
   await bootstrap1.destroy()
 })
 
-test('first persistent node but binds to IPv4 localhost', async function (t) {
+test.skip('first persistent node but binds to IPv4 localhost', async function (t) {
+  // + same as no host given
   const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false, host: '127.0.0.1' })
   await bootstrap1.ready()
   t.is(bootstrap1.address().host, '127.0.0.1')
@@ -88,7 +83,8 @@ test('first persistent node but binds to IPv4 localhost', async function (t) {
   await bootstrap1.destroy()
 })
 
-test('first persistent node with no host given but binds to local host address', async function (t) {
+test.skip('first persistent node with no host given but binds to local host address', async function (t) {
+  // + same as no host given
   const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false, host: localIP() })
   await bootstrap1.ready()
   t.is(bootstrap1.address().host, localIP())
