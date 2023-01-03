@@ -41,7 +41,6 @@ class HyperDHT extends DHT {
     this._debugHandshakeLatency = toRange((opts.debug && opts.debug.handshake && opts.debug.handshake.latency) || 0)
 
     this.once('persistent', () => {
-      console.log(this.name, 'hyperdht is persistent')
       this._persistent = new Persistent(this, cacheOpts)
     })
 
