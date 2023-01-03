@@ -1,5 +1,4 @@
 const test = require('brittle')
-const UDX = require('udx-native')
 const { swarm } = require('./helpers')
 const DHT = require('../')
 
@@ -269,8 +268,7 @@ test('client choosing to abort holepunch', async function (t) {
 test('udp noise, client ends, no crash', async function (t) {
   const [, node] = await swarm(t, 2)
 
-  const udx = new UDX()
-  const socket = udx.createSocket()
+  const socket = node.udx.createSocket()
   await socket.send(Buffer.from('hi'), node.address().port)
   await socket.close()
 

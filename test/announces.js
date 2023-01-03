@@ -74,3 +74,13 @@ test('announce null relay addresses', async function (t) {
 
   await t.execution(a.announce(target, keyPair, null).finished())
 })
+
+test('server listen returns server', async function (t) {
+  const [a, b] = await swarm(t)
+
+  const server = await a.createServer().listen()
+  const result = await toArray(b.findPeer(server.publicKey))
+
+  t.ok(result.length > 0, 'has at least one result')
+  t.alike(result[0].peer.publicKey, server.publicKey)
+})
