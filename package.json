@@ -20,7 +20,7 @@
     "compact-encoding": "^2.4.1",
     "compact-encoding-net": "^1.0.1",
     "debugging-stream": "^2.0.0",
-    "dht-rpc": "^6.5.0",
+    "dht-rpc": "github:mafintosh/dht-rpc",
     "events": "^3.3.0",
     "hypercore-crypto": "^3.3.0",
     "noise-curve-ed": "^2.0.0",
