@@ -336,29 +336,8 @@ class HyperDHT extends DHT {
     )
   }
 
-  localAddress () {
-    return {
-      host: localIP(this._udx),
-      port: this.io.serverSocket.address().port
-    }
-  }
-
   createRawStream (opts) {
     return this._rawStreams.add(opts)
-  }
-
-  remoteAddress () {
-    if (!this.host) return null
-    if (!this.port) return null
-    if (this.firewalled) return null
-
-    const port = this.io.serverSocket.address().port
-    if (port !== this.port) return null
-
-    return {
-      host: this.host,
-      port
-    }
   }
 
   async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign) {
@@ -475,22 +454,6 @@ function noop () {}
 function toRange (n) {
   if (!n) return null
   return typeof n === 'number' ? [n, n] : n
-}
-
-function localIP (udx) {
-  let host = null
-
-  for (const n of udx.networkInterfaces()) {
-    if (n.family !== 4 || n.internal) continue
-
-    // mac really likes en0, mb a better way but this shouldnt be bad anywhere so return now
-    if (n.name === 'en0') return n.host
-
-    // otherwise pick the first non internal host (let the loop continue in case we see en0)
-    if (host === null) host = n.host
-  }
-
-  return host || '127.0.0.1'
 }
 
 function addNode (node) {
