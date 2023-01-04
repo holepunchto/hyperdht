@@ -31,11 +31,9 @@ const server = node.createServer()
 
 server.on('connection', function (socket) {
   // socket is E2E encrypted between you and the other peer
-  // pipe it somewhere like any duplex stream
-
   console.log('Remote public key', socket.remotePublicKey)
-  console.log('Local public key', socket.publicKey) // same as keyPair.publicKey
 
+  // pipe it somewhere like any duplex stream
   process.stdin.pipe(socket).pipe(process.stdout)
 })
 
@@ -189,7 +187,7 @@ The public key of the remote peer.
 
 #### `socket.publicKey`
 
-The connections public key.
+The public key of the server.
 
 ## Additional peer discovery
 
