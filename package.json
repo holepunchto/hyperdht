@@ -27,7 +27,7 @@
     "noise-handshake": "^3.0.0",
     "record-cache": "^1.1.1",
     "safety-catch": "^1.0.1",
-    "sodium-universal": "^3.0.4",
+    "sodium-universal": "^4.0.0",
     "xache": "^1.1.0"
   },
   "devDependencies": {
