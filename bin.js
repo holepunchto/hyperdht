@@ -5,7 +5,7 @@ const HyperDHT = require('./')
 const bootstrap = arg('bootstrap')
 const nodes = arg('node') ? '' : arg('nodes')
 
-const isBootstrap = bootstrap === '' || bootstrap !== null && bootstrap.startsWith('--')
+const isBootstrap = bootstrap === '' || (bootstrap !== null && bootstrap.startsWith('--'))
 
 if (isBootstrap) {
   const port = Number(arg('port') || '0') || 49737
