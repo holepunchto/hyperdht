@@ -50,8 +50,8 @@ Then on another connect to the computer using the public key of the key-pair it 
 // publicKey here is keyPair.publicKey from above
 const socket = anotherNode.connect(publicKey)
 
-socket.on('open', function () {
-  // socket fully open with the other peer
+socket.on('connect', function () {
+  // socket fully connected with the other peer
 })
 
 // pipe it somewhere like any duplex stream
@@ -177,7 +177,7 @@ Options include:
 }
 ```
 
-#### `socket.on('open')`
+#### `socket.on('connect')`
 
 Emitted when the encrypted connection has been fully established with the server.
 
