@@ -187,7 +187,7 @@ The public key of the remote peer.
 
 #### `socket.publicKey`
 
-The public key of the server.
+The public key of the local socket.
 
 ## Additional peer discovery
 
