@@ -44,3 +44,15 @@ test('holepuncher match - with docker installed', async function (t) {
     [{ host: '192.168.0.23' }, { host: '192.168.122.1' }, { host: '172.17.0.1' }]
   ), { host: '192.168.122.1' })
 })
+
+test('holepuncher match - host docker container vs host virtual machine', async function (t) {
+  t.alike(Holepuncher.matchAddress(
+    [{ host: '172.17.0.2' }],
+    [{ host: '192.168.122.238' }]
+  ), { host: '192.168.122.238' })
+
+  t.alike(Holepuncher.matchAddress(
+    [{ host: '192.168.122.238' }],
+    [{ host: '172.17.0.2' }]
+  ), { host: '172.17.0.2' })
+})
