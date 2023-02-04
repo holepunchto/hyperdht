@@ -5,7 +5,9 @@
   "main": "index.js",
   "browser": "browser.js",
   "bin": {
-    "hyperswarm-dht": "./bin.js"
+    "hyperswarm-dht": "./bin.js",
+    "hyperswarm-dht-server": "./debug/server.mjs",
+    "hyperswarm-dht-client": "./debug/client.mjs"
   },
   "files": [
     "index.js",
