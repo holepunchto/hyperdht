@@ -37,6 +37,12 @@ test('holepuncher match - two different processes', async function (t) {
     [{ host: '67.205.156.23' }, { host: '10.10.0.6' }, { host: '10.116.0.3' }],
     [{ host: '10.10.0.6' }, { host: '10.116.0.3' }]
   ), { host: '10.10.0.6' })
+
+  // Only localhost
+  t.alike(Holepuncher.matchAddress(
+    [{ host: '127.0.0.1' }],
+    [{ host: '127.0.0.1' }]
+  ), { host: '127.0.0.1' })
 })
 
 test('holepuncher match - host vs virtual machine', async function (t) {
