@@ -40,6 +40,18 @@ test('holepuncher match - two different processes', async function (t) {
 })
 
 test('holepuncher match - host vs virtual machine', async function (t) {
+  // (host without docker, vm without docker)
+  t.alike(Holepuncher.matchAddress(
+    [ { host: '192.168.0.23' }, { host: '192.168.122.1' } ],
+    [ { host: '192.168.122.238' } ]
+  ), { host: '192.168.122.238' })
+
+  t.alike(Holepuncher.matchAddress(
+    [ { host: '192.168.122.238' } ],
+    [ { host: '192.168.0.23' }, { host: '192.168.122.1' } ]
+  ), { host: '192.168.122.1' })
+
+  // (host with docker, vm without docker)
   t.alike(Holepuncher.matchAddress(
     [ { host: '192.168.0.23' }, { host: '192.168.122.1' }, { host: '172.17.0.1' } ],
     [ { host: '192.168.122.238' }, { host: '172.17.0.1' } ]
@@ -47,6 +59,17 @@ test('holepuncher match - host vs virtual machine', async function (t) {
 
   t.alike(Holepuncher.matchAddress(
     [ { host: '192.168.122.238' }, { host: '172.17.0.1' } ],
+    [ { host: '192.168.0.23' }, { host: '192.168.122.1' }, { host: '172.17.0.1' } ]
+  ), { host: '192.168.122.1' })
+
+  // (host with docker, vm with docker)
+  t.alike(Holepuncher.matchAddress(
+    [ { host: '192.168.0.23' }, { host: '192.168.122.1' }, { host: '172.17.0.1' } ],
+    [ { host: '192.168.122.238' } ]
+  ), { host: '192.168.122.238' })
+
+  t.alike(Holepuncher.matchAddress(
+    [ { host: '192.168.122.238' } ],
     [ { host: '192.168.0.23' }, { host: '192.168.122.1' }, { host: '172.17.0.1' } ]
   ), { host: '192.168.122.1' })
 })
