@@ -34,17 +34,13 @@ test('holepuncher match local address', async function (t) {
 })
 
 test('holepuncher match - with docker installed', async function (t) {
-  // Server
   t.alike(Holepuncher.matchAddress(
     [{ host: '192.168.0.23' }, { host: '192.168.122.1' }, { host: '172.17.0.1' }],
-    [{ host: '192.168.122.238' }, { host: '172.17.0.1' }],
-    true
+    [{ host: '192.168.122.238' }, { host: '172.17.0.1' }]
   ), { host: '192.168.122.238' })
 
-  // Client
   t.alike(Holepuncher.matchAddress(
     [{ host: '192.168.122.238' }, { host: '172.17.0.1' }],
-    [{ host: '192.168.0.23' }, { host: '192.168.122.1' }, { host: '172.17.0.1' }],
-    false
+    [{ host: '192.168.0.23' }, { host: '192.168.122.1' }, { host: '172.17.0.1' }]
   ), { host: '192.168.122.1' })
 })
