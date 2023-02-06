@@ -18,7 +18,7 @@ const maxAge = 20 * 60 * 1000
 
 class HyperDHT extends DHT {
   constructor (opts = {}) {
-    const port = opts.port || 49737
+    const port = typeof opts.port === 'number' ? opts.port : 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
 
     super({ ...opts, port, bootstrap, addNode })
