@@ -140,9 +140,4 @@ test('holepuncher match - custom made', async function (t) {
     [{ host: '192.168.122.238' }],
     [{ host: '192.168.0.23' }, { host: '192.168.122.1' }, { host: '172.16.1.1' }]
   ), { host: '192.168.122.1' }, 'Same subnet (third segment)')
-
-  /* t.alike(Holepuncher.matchAddress(
-    [{ host: '192.168.122.238' }],
-    [{ host: '192.168.0.23' }, { host: '192.168.122.1' }, { host: '192.168.122.238' }, { host: '172.16.1.1' }]
-  ), { host: '192.168.122.238' }, 'Full match') */
 })
