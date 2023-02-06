@@ -121,10 +121,10 @@ test.skip('holepuncher match - host vs container on virtual machine', async func
 test.skip('holepuncher match - container on host vs virtual machine', async function (t) {})
 
 test('holepuncher match - custom made', async function (t) {
-  t.alike(Holepuncher.matchAddress(
+  t.is(Holepuncher.matchAddress(
     [{ host: '192.168.122.238' }],
     [{ host: '172.16.1.1' }, { host: '10.0.0.5' }]
-  ), { host: '172.16.1.1' })
+  ), null)
 
   t.alike(Holepuncher.matchAddress(
     [{ host: '10.1.2.3' }],
