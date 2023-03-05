@@ -150,7 +150,8 @@ class HyperDHT extends DHT {
         reply.token,
         reply.from,
         relayAddresses,
-        signAnnounce
+        signAnnounce,
+        opts.userData
       )
     }
   }
@@ -337,11 +338,12 @@ class HyperDHT extends DHT {
     return this._rawStreams.add(opts)
   }
 
-  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign) {
+  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign, userData) {
     const ann = {
       peer: {
         publicKey: keyPair.publicKey,
-        relayAddresses: relayAddresses || []
+        relayAddresses: relayAddresses || [],
+        userData
       },
       refresh: null,
       signature: null

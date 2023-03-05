@@ -84,3 +84,18 @@ test('server listen returns server', async function (t) {
   t.ok(result.length > 0, 'has at least one result')
   t.alike(result[0].peer.publicKey, server.publicKey)
 })
+
+test('announce with userData', async function (t) {
+  const [a, b] = await swarm(t)
+  const keyPair = DHT.keyPair()
+  const target = DHT.hash(Buffer.from('testing...'))
+
+  const userData = Buffer.alloc(600).fill('user-data')
+
+  await a.announce(target, keyPair, [], { userData }).finished()
+
+  const result = await toArray(b.lookup(target))
+  const peer = result[0].peers[0]
+
+  t.alike(peer.userData, userData)
+})

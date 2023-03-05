@@ -236,7 +236,7 @@ test('holepunch payload with flag and remoteToken', function (t) {
 test('peer with no relays', function (t) {
   const state = { start: 0, end: 0, buffer: null }
 
-  const peer = { publicKey: Buffer.alloc(32).fill('pk'), relayAddresses: [] }
+  const peer = { publicKey: Buffer.alloc(32).fill('pk'), relayAddresses: [], userData: null }
 
   m.peer.preencode(state, peer)
   state.buffer = b4a.allocUnsafe(state.end)
@@ -261,7 +261,8 @@ test('peer with multiple relays', function (t) {
     }, {
       host: '8.1.4.1',
       port: 402
-    }]
+    }],
+    userData: null
   }
 
   m.peer.preencode(state, peer)
@@ -287,10 +288,12 @@ test('peers', function (t) {
     }, {
       host: '8.1.4.1',
       port: 402
-    }]
+    }],
+    userData: null
   }, {
     publicKey: Buffer.alloc(32).fill('another'),
-    relayAddresses: []
+    relayAddresses: [],
+    userData: null
   }]
 
   m.peers.preencode(state, peers)
@@ -311,7 +314,8 @@ test('announce', function (t) {
   const ann = {
     peer: {
       publicKey: Buffer.alloc(32).fill('abc'),
-      relayAddresses: []
+      relayAddresses: [],
+      userData: null
     },
     refresh: null,
     signature: null
@@ -335,7 +339,8 @@ test('announce with signature', function (t) {
   const ann = {
     peer: {
       publicKey: Buffer.alloc(32).fill('abc'),
-      relayAddresses: []
+      relayAddresses: [],
+      userData: null
     },
     refresh: null,
     signature: Buffer.alloc(64).fill('signature')
@@ -359,7 +364,8 @@ test('announce with refresh', function (t) {
   const ann = {
     peer: {
       publicKey: Buffer.alloc(32).fill('abc'),
-      relayAddresses: []
+      relayAddresses: [],
+      userData: null
     },
     refresh: Buffer.alloc(32).fill('refresh'),
     signature: null
@@ -373,6 +379,44 @@ test('announce with refresh', function (t) {
 
   state.start = 0
   const d = m.announce.decode(state)
+
+  t.alike(d, ann)
+})
+
+test('announce with userData', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const userDataSize = 600
+
+  const ann = {
+    peer: {
+      publicKey: Buffer.alloc(32).fill('abc'),
+      relayAddresses: [{
+        host: '127.0.0.1',
+        port: 4242
+      }, {
+        host: '8.1.4.1',
+        port: 4002
+      }, {
+        host: '8.1.4.2',
+        port: 5002
+      }],
+      userData: Buffer.alloc(userDataSize).fill('user-data')
+    },
+    refresh: Buffer.alloc(32).fill('refresh'),
+    signature: Buffer.alloc(64).fill('signature')
+  }
+
+  m.announce.preencode(state, ann)
+  state.buffer = b4a.allocUnsafe(state.end)
+  m.announce.encode(state, ann)
+
+  t.is(state.end, state.start, 'fully encoded')
+
+  state.start = 0
+  const d = m.announce.decode(state)
+
+  t.ok(state.end <= 800, `stay <=800 to leave conservative margin for MTU, userData: ${userDataSize} bytes`)
 
   t.alike(d, ann)
 })
