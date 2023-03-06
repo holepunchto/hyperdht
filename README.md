@@ -204,7 +204,11 @@ The returned stream looks like this
   // What address they responded to (i.e. your address)
   to: { host, port },
   // List of peers announcing under this topic
-  peers: [ { publicKey, nodes: [{ host, port }, ...] } ]
+  peers: [ { 
+    publicKey, 
+    relayAddresses: [{ host, port }, ...], 
+    userData: <Buffer ...> 
+  } ]
 }
 ```
 
@@ -223,6 +227,8 @@ An announce does a parallel lookup so the stream returned looks like the lookup 
 Creating a server using `dht.createServer` automatically announces itself periodically on the key-pair it is listening on. When announcing the server under a specific topic, you can access the nodes it is close to using `server.nodes`.
 
 If you pass any options they are forwarded to dht-rpc.
+
+You can pass small application specific opaque token as `options.userData`, as long as the entire record fits in MTU, keeping the token smaller than 600 bytes should work.
 
 #### `await node.unannounce(topic, keyPair, [options])`
 
