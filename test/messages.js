@@ -293,7 +293,7 @@ test('peers', function (t) {
   }, {
     publicKey: Buffer.alloc(32).fill('another'),
     relayAddresses: [],
-    userData: null
+    userData: Buffer.alloc(500).fill('user-data')
   }]
 
   m.peers.preencode(state, peers)
