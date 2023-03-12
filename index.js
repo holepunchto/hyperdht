@@ -32,7 +32,7 @@ class HyperDHT extends DHT {
     this.listening = new Set()
 
     this._router = new Router(this, cacheOpts)
-    this._socketPool = new SocketPool(this)
+    this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
     this._rawStreams = new RawStreamSet(this)
     this._persistent = null
 
