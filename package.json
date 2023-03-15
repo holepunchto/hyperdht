@@ -20,7 +20,7 @@
     "compact-encoding": "^2.4.1",
     "compact-encoding-net": "^1.0.1",
     "debugging-stream": "^2.0.0",
-    "dht-rpc": "^6.6.3",
+    "dht-rpc": "^6.7.0",
     "events": "^3.3.0",
     "hypercore-crypto": "^3.3.0",
     "noise-curve-ed": "^2.0.0",
