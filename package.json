@@ -1,11 +1,11 @@
 {
-  "name": "@hyperswarm/dht",
+  "name": "hyperdht",
   "version": "6.5.1",
   "description": "The DHT powering Hyperswarm",
   "main": "index.js",
   "browser": "browser.js",
   "bin": {
-    "hyperswarm-dht": "./bin.js"
+    "hyperdht": "./bin.js"
   },
   "files": [
     "index.js",
@@ -48,13 +48,13 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/holepunchto/hyperswarm-dht.git"
+    "url": "git+https://github.com/holepunchto/hyperdht.git"
   },
   "keywords": [],
   "bugs": {
-    "url": "https://github.com/holepunchto/hyperswarm-dht/issues"
+    "url": "https://github.com/holepunchto/hyperdht/issues"
   },
-  "homepage": "https://github.com/holepunchto/hyperswarm-dht#readme",
+  "homepage": "https://github.com/holepunchto/hyperdht#readme",
   "standard": {
     "ignore": [
       "**/*.mjs"

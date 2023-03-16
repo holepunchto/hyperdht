@@ -1,11 +1,11 @@
-# @hyperswarm/dht
+# hyperdht
 
 ### [See the full API docs at docs.holepunch.to](https://docs.holepunch.to/building-blocks/hyperswarm#dht)
 
 The DHT powering Hyperswarm
 
 ```
-npm install @hyperswarm/dht
+npm install hyperdht
 ```
 
 Built on top of [dht-rpc](https://github.com/mafintosh/dht-rpc).
@@ -18,7 +18,7 @@ and is mainly used to facilitate finding and connecting to peers using end to en
 To try it out, first instantiate a DHT instance
 
 ``` js
-import DHT from '@hyperswarm/dht'
+import DHT from 'hyperdht'
 
 const node = new DHT()
 ```
@@ -62,7 +62,7 @@ process.stdin.pipe(socket).pipe(process.stdout)
 
 #### `const node = new DHT([options])`
 
-Create a new HyperSwarm DHT node.
+Create a new DHT node.
 
 Options include:
 
@@ -270,10 +270,10 @@ See [dht-rpc](https://github.com/mafintosh/dht-rpc) for the additional APIs the 
 You can start a DHT node in the command line, with the bundled cli tool:
 
 ```sh
-npm install -g @hyperswarm/dht
-hyperswarm-dht # runs a DHT node
-hyperswarm-dht --bootstrap # runs a DHT node with bootstrap settings
-hyperswarm-dht --nodes 5 # runs 5 nodes
+npm install -g hyperdht
+hyperdht # runs a DHT node
+hyperdht --bootstrap # runs a DHT node with bootstrap settings
+hyperdht --nodes 5 # runs 5 nodes
 ```
 
 ## License
