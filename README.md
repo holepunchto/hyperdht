@@ -311,7 +311,7 @@ For the network to be fully operational it needs at least one persistent node.
 hyperdht --port 49738 --bootstrap (server-ip):49737
 ```
 
-You need to wait some time ~30 mins for the node to become persistent.
+You need to wait around ~30 mins for the node to become persistent.
 
 Important: it requires the port to be open too.
 
