@@ -298,22 +298,22 @@ Important: it requires the port to be open.
 
 Now your bootstrap node is ready to use at `(server-ip):49737`, for example:
 ```js
-const node = new DHT({ bootstrap: ['(server-ip):49737'] })
+const dht = new DHT({ bootstrap: ['(server-ip):49737'] })
 ```
 
 Note: You could configure some DNS for the bootstrap IP addresses.
 
 For the network to be fully operational it needs at least one persistent node.
 
-2) Provide the first persistent node using your own bootstrap values:
+2) Provide the first node using your own bootstrap values:
 
 ```sh
-hyperdht --port 49738 --bootstrap (server-ip):49737 --persistent
+hyperdht --port 49738 --bootstrap (server-ip):49737
 ```
 
-Important: it requires the port to be open like the bootstrap node.
+You need to wait some time ~30 mins for the node to become persistent.
 
-Don't use the `--persistent` flag again, or you could damage the network health.
+Important: it requires the port to be open too.
 
 For more information: [`examples/isolated-dht.mjs`](examples/isolated-dht.mjs)
 
