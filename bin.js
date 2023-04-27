@@ -45,14 +45,12 @@ async function startNodes (cnt, bootstrap) {
 
   const port = Number(arg('port') || '0') || 0
   const host = arg('host') || undefined
-  const persistent = arg('persistent') === '' || arg('persistent') !== null
   const all = []
-  const persistentSetting = persistent ? false : undefined
 
   if (port && cnt !== 1) throw new Error('--port is only valid when running a single node')
 
   while (all.length < cnt) {
-    const node = new HyperDHT({ host, port, anyPort: !port, bootstrap, ephemeral: persistentSetting, firewalled: persistentSetting })
+    const node = new HyperDHT({ host, port, anyPort: !port, bootstrap })
     await node.ready()
 
     all.push(node)
