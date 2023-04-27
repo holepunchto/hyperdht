@@ -267,14 +267,57 @@ See [dht-rpc](https://github.com/mafintosh/dht-rpc) for the additional APIs the 
 
 ## CLI
 
-You can start a DHT node in the command line, with the bundled cli tool:
+You can start a DHT node in the command line:
 
 ```sh
 npm install -g hyperdht
-hyperdht # runs a DHT node
-hyperdht --bootstrap # runs a DHT node with bootstrap settings
-hyperdht --nodes 5 # runs 5 nodes
 ```
+
+Run a DHT node:
+```sh
+hyperdht # [--port 0] [--host 0.0.0.0] [--bootstrap <comma separated list of ip:port>]
+```
+
+Or run multiple nodes:
+```sh
+hyperdht --nodes 5 # [--host 0.0.0.0] [--bootstrap <list>]
+```
+
+Note: by default it uses the [mainnet bootstrap nodes](lib/constants.js).
+
+#### Isolated DHT network
+
+To create your own DHT network is as follows:
+
+1) Run your first bootstrap node:
+```sh
+hyperdht --bootstrap --host (server-ip) # [--port 49737]
+```
+
+Important: it requires the port to be open.
+
+Now your bootstrap node is ready to use at `(server-ip):49737`, for example:
+```js
+const dht = new DHT({ bootstrap: ['(server-ip):49737'] })
+```
+
+Note: You could configure some DNS for the bootstrap IP addresses.
+
+For the network to be fully operational it needs at least one persistent node.
+
+2) Provide the first node by using your own bootstrap values:
+
+```sh
+hyperdht --port 49738 --bootstrap (server-ip):49737
+```
+
+Important: it requires the port to be open too.
+
+You need to wait ~30 mins for the node to become persistent.
+
+Having persistent nodes in different places makes the network more decentralized and resilient!
+
+For more information: [`examples/isolated-dht.mjs`](examples/isolated-dht.mjs)
 
 ## License
 
