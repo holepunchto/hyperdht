@@ -58,8 +58,12 @@ async function startNodes (cnt, bootstrap) {
     const id = all.push(node) - 1
     console.log('Node #' + id + ' bound to', node.address())
 
+    node.on('ephemeral', function () {
+      console.log('Node #' + id + ' is ephemeral', node.address())
+    })
+
     node.on('persistent', function () {
-      console.log('Node #' + id + ' seems stable, joining remote routing tables', node.address())
+      console.log('Node #' + id + ' is persistent, joining remote routing tables', node.address())
     })
 
     node.on('close', function () {
