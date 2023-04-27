@@ -73,7 +73,7 @@ async function startNodes (cnt, bootstrap) {
 
   console.log('Fully started ' + cnt + ' Hyperswarm DHT node' + (cnt === 1 ? '' : 's'))
 
-  process.once('SIGINT', async function () {
+  process.once('SIGINT', function () {
     console.log('Shutting down nodes...')
 
     for (const node of all) {
