@@ -14,12 +14,12 @@ test('peer exchange', async (t) => {
   await b.ready()
   await c.ready()
 
-  const as = a.createServer({ shareLocalAddress: false, reusableSocket: true })
+  const as = a.createServer({ shareLocalAddress: false })
   await as.listen()
 
   t.comment('a key', as.publicKey.toString('hex'))
 
-  const bs = b.createServer({ shareLocalAddress: false, reusableSocket: true })
+  const bs = b.createServer({ shareLocalAddress: false })
   await bs.listen()
 
   t.comment('b key', bs.publicKey.toString('hex'))
@@ -28,7 +28,7 @@ test('peer exchange', async (t) => {
     const lc = t.test('socket lifecycle')
     lc.plan(1)
 
-    b.connect(as.publicKey, { localConnection: false, reusableSocket: true })
+    b.connect(as.publicKey, { localConnection: false })
       .on('error', () => {})
       .on('open', () => {
         lc.pass('b connected to a')
@@ -41,7 +41,7 @@ test('peer exchange', async (t) => {
     const lc = t.test('socket lifecycle')
     lc.plan(2)
 
-    const stream = c.connect(bs.publicKey, { localConnection: false, reusableSocket: true })
+    const stream = c.connect(bs.publicKey, { localConnection: false })
       .on('error', () => {})
       .on('open', async () => {
         lc.pass('c connected to b')
