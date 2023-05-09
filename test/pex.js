@@ -24,7 +24,12 @@ test('peer exchange', async (t) => {
     const pex = new PEX(stream)
     pex
       .on('want', (discoveryKey) => {
+        // TODO: Where do we map discovery keys to peers?
+
         pex.have(discoveryKey, [{ publicKey: as.publicKey }])
+      })
+      .on('connect', (target, mode, noise, { peerAddress, relayAddress }) => {
+        // TODO: Forward to PEX session with `a`
       })
   })
   await bs.listen()
@@ -57,6 +62,10 @@ test('peer exchange', async (t) => {
         pex
           .on('have', (discoveryKey, capability, peers) => {
             lc.pass('b has a')
+
+            const [peer] = peers
+
+            pex.connect(peer.publicKey, 1, Buffer.alloc(0))
           })
           .want(Buffer.alloc(32, 'discovery key'))
       })
