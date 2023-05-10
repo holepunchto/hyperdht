@@ -68,11 +68,9 @@ async function makeServerAndClient (bootstrap) {
 // i.e. 192.168.0.23
 function localIP (family = 4) {
   const udx = new UDX()
-  let host = null
   for (const n of udx.networkInterfaces()) {
     if (n.family !== family || n.internal) continue
-    if (n.name === 'en0') return n.host
-    if (host === null) host = n.host
+    return n.host
   }
-  return host || (family === 4 ? '127.0.0.1' : '::1')
+  return family === 4 ? '127.0.0.1' : '::1'
 }
