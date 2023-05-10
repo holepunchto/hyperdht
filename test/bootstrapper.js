@@ -12,7 +12,7 @@ test('single node network is enough to find peers', async function (t) {
 test('bootstrapper at localhost but bind to all networks (IPv6)', async function (t) {
   const bootstrap1 = DHT.bootstrapper(49737, '127.0.0.1') // NAT host / peer.id is given
   await bootstrap1.ready()
-  t.is(bootstrap1.address().host, '::') // It still binds to all networks (if this is a problem, is kind of improvable)
+  t.is(bootstrap1.address().host, '0.0.0.0') // It still binds to all networks (if this is a problem, is kind of improvable)
 
   t.ok(await makeServerAndClient([{ host: '127.0.0.1', port: 49737 }]))
   // t.ok(await makeServerAndClient([{ host: '0.0.0.0', port: 49737 }])) // + why this works? I think it should not work (and btw '::' doesn't)
