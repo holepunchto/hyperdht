@@ -47,55 +47,6 @@ test('bootstrapper at localhost and also bind to localhost', async function (t) 
   await bootstrap1.destroy()
 })
 
-test.skip('first persistent node with no host given', async function (t) {
-  const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false })
-  await bootstrap1.ready()
-  t.is(bootstrap1.address().host, '::')
-
-  t.ok(await makeServerAndClient([{ host: localIP(), port: bootstrap1.address().port }]))
-
-  t.absent(await makeServerAndClient([{ host: '127.0.0.1', port: bootstrap1.address().port }]))
-
-  await bootstrap1.destroy()
-})
-
-test.skip('first persistent node but binds to IPv6 localhost', async function (t) {
-  // Note: anyway will not work due peer.id ipv4 encoding
-  const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false, host: '::1' })
-  await bootstrap1.ready()
-  t.is(bootstrap1.address().host, '::1')
-
-  t.ok(await makeServerAndClient([{ host: '::1', port: bootstrap1.address().port }]))
-
-  await bootstrap1.destroy()
-})
-
-test.skip('first persistent node but binds to IPv4 localhost', async function (t) {
-  const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false, host: '127.0.0.1' })
-  await bootstrap1.ready()
-  t.is(bootstrap1.address().host, '127.0.0.1')
-
-  t.ok(await makeServerAndClient([{ host: '127.0.0.1', port: bootstrap1.address().port }]))
-
-  await bootstrap1.destroy()
-})
-
-test.skip('first persistent node with no host given but binds to local host address', async function (t) {
-  const bootstrap1 = new DHT({ bootstrap: [], ephemeral: false, firewalled: false, host: localIP() })
-  await bootstrap1.ready()
-  t.is(bootstrap1.address().host, localIP())
-
-  t.ok(await makeServerAndClient([{ host: localIP(), port: bootstrap1.address().port }]))
-
-  await bootstrap1.destroy()
-})
-
-test.skip('ephemeral node enters persistent mode, and later goes back to ephemeral', async function (t) {
-  // This should test when a node is adaptive and becomes persistent naturally
-  // but then later goes back into 'ephemeral' mode (i.e. due sleep, etc)
-  // Currently, hyperdht is not destroying the persistent class object when it goes back to eph
-})
-
 async function makeServerAndClient (bootstrap) {
   const a = new DHT({ bootstrap, ephemeral: true })
   await a.ready()
