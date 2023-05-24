@@ -232,25 +232,25 @@ If you pass any options they are forwarded to dht-rpc.
 
 ## Mutable/immutable records
 
-#### `{ hash, closestNodes } = await node.immutablePut(value, [options])`
+#### `const { hash, closestNodes } = await node.immutablePut(value, [options])`
 
 Store an immutable value in the DHT. When successful, the hash of the value is returned.
 
 If you pass any options they are forwarded to dht-rpc.
 
-#### `{ value, from } = await node.immutableGet(hash, [options])`
+#### `const { value, from } = await node.immutableGet(hash, [options])`
 
 Fetch an immutable value from the DHT. When successful, it returns the value corresponding to the hash.
 
 If you pass any options they are forwarded to dht-rpc.
 
-#### `await { publicKey, closestNodes, seq, signature } = node.mutablePut(keyPair, value, [options])`
+#### `const { publicKey, closestNodes, seq, signature } = await node.mutablePut(keyPair, value, [options])`
 
 Store a mutable value in the DHT.
 
 If you pass any options they are forwarded to dht-rpc.
 
-#### `await { value, from, seq, signature } = node.mutableGet(publicKey, [options])`
+#### `const { value, from, seq, signature } = await node.mutableGet(publicKey, [options])`
 
 Fetch a mutable value from the DHT.
 
