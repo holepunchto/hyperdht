@@ -397,10 +397,10 @@ test('server and client on same node', async function (t) {
 test('relayed connection', async function (t) {
   t.plan(2)
 
-  const { createNode } = await swarm(t)
+  const nodes = await swarm(t)
 
-  const a = createNode()
-  const b = createNode()
+  const a = nodes.createNode()
+  const b = nodes.createNode()
 
   const server = a.createServer()
   await server.listen()
@@ -422,9 +422,9 @@ test('relayed connection', async function (t) {
 test('relayed connection on same node', async function (t) {
   t.plan(4)
 
-  const { createNode } = await swarm(t)
+  const nodes = await swarm(t)
 
-  const a = createNode()
+  const a = nodes.createNode()
 
   const server = a.createServer()
   await server.listen()

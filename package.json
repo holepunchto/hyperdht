@@ -10,6 +10,7 @@
   "files": [
     "index.js",
     "browser.js",
+    "testnet.js",
     "bin.js",
     "lib/**.js"
   ],
