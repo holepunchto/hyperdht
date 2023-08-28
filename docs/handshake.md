@@ -25,7 +25,7 @@ Prior to the handshake, the client node will issue a DHT query to locate the ser
 
 Once the server node and its chosen relay node have been identified, the client node will begin the handshake by issuing a DHT query to the server relay node. The relay node forwards this query to the server node, which in turn forwards the query back to the chosen client relay node. The client relay node finally replies back to the client node with the address of the server node.
 
-Note that in the event that either of the relay nodes are also the server node, they will simply skip directly to final handshake reply and not send the intermediate handshake messages.
+Note that in the event that either of the relay nodes are also the server node, they will simply skip directly to the final handshake reply and not send the intermediate handshake messages.
 
 As a result of the handshake:
 
