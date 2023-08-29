@@ -26,6 +26,7 @@
     "hypercore-crypto": "^3.3.0",
     "noise-curve-ed": "^2.0.0",
     "noise-handshake": "^3.0.0",
+    "protomux": "^3.5.1",
     "record-cache": "^1.1.1",
     "safety-catch": "^1.0.1",
     "sodium-universal": "^4.0.0",
@@ -34,7 +35,7 @@
   "devDependencies": {
     "brittle": "^3.0.0",
     "keypear": "^1.1.1",
-    "standard": "^16.0.4"
+    "standard": "^17.1.0"
   },
   "scripts": {
     "test": "standard && node test/all.js",
