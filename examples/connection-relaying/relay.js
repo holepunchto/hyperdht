@@ -9,7 +9,9 @@ const relay = new RelayServer({
   }
 })
 
-const server = dht.createServer({ connectionRelay: true }, (socket) => {
+const server = dht.createServer({
+  shareLocalAddress: false
+}, (socket) => {
   console.log('Connection from', socket.remotePublicKey.toString('hex'))
   relay.accept(socket, { id: socket.remotePublicKey })
 })
