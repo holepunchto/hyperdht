@@ -2,12 +2,7 @@ const DHT = require('../..')
 
 const dht = new DHT()
 
-const server = dht.createServer({
-  shareLocalAddress: false,
-  holepunch () {
-    return false
-  }
-}, (socket) => {
+const server = dht.createServer({ shareLocalAddress: false }, (socket) => {
   console.log('Connection from', socket.remotePublicKey.toString('hex'))
   socket
     .on('data', (data) => console.log(data.toString()))
