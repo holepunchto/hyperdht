@@ -27,11 +27,9 @@
     "hypercore-crypto": "^3.3.0",
     "noise-curve-ed": "^2.0.0",
     "noise-handshake": "^3.0.0",
-    "protomux": "^3.5.1",
     "record-cache": "^1.1.1",
     "safety-catch": "^1.0.1",
     "sodium-universal": "^4.0.0",
-    "udx-native": "^1.7.2",
     "xache": "^1.1.0"
   },
   "devDependencies": {
