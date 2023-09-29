@@ -31,7 +31,7 @@
     "record-cache": "^1.1.1",
     "safety-catch": "^1.0.1",
     "sodium-universal": "^4.0.0",
-    "udx-native": "^1.7.1",
+    "udx-native": "^1.7.2",
     "xache": "^1.1.0"
   },
   "devDependencies": {
