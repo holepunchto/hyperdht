@@ -13,9 +13,6 @@ const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 
-const maxSize = 65536
-const maxAge = 20 * 60 * 1000
-
 class HyperDHT extends DHT {
   constructor (opts = {}) {
     const port = opts.port || 49737
@@ -23,15 +20,12 @@ class HyperDHT extends DHT {
 
     super({ ...opts, port, bootstrap, addNode })
 
-    const cacheOpts = {
-      maxSize: opts.maxSize || maxSize,
-      maxAge: opts.maxAge || maxAge
-    }
+    const cacheOpts = defaultCacheOpts(opts)
 
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
 
-    this._router = new Router(this, cacheOpts)
+    this._router = new Router(this, cacheOpts.router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
     this._rawStreams = new RawStreamSet(this)
     this._persistent = null
@@ -40,7 +34,7 @@ class HyperDHT extends DHT {
     this._debugHandshakeLatency = toRange((opts.debug && opts.debug.handshake && opts.debug.handshake.latency) || 0)
 
     this.once('persistent', () => {
-      this._persistent = new Persistent(this, cacheOpts)
+      this._persistent = new Persistent(this, cacheOpts.persistent)
     })
 
     this.on('network-change', () => {
@@ -457,4 +451,30 @@ function addNode (node) {
   // always skip these testnet nodes that got mixed in by accident, until they get updated
   return !(node.port === 49738 && (node.host === '134.209.28.98' || node.host === '167.99.142.185')) &&
     !(node.port === 9400 && node.host === '35.233.47.252') && !(node.host === '150.136.142.116')
+}
+
+const defaultMaxSize = 65536
+const defaultMaxAge = 20 * 60 * 1000 // 20 minutes
+
+function defaultCacheOpts (opts) {
+  const maxSize = opts.maxSize || defaultMaxSize
+  const maxAge = opts.maxAge || defaultMaxAge
+
+  return {
+    router: {
+      forwards: { maxSize, maxAge }
+    },
+    persistent: {
+      records: { maxSize, maxAge },
+      refreshes: { maxSize, maxAge },
+      mutables: {
+        maxSize: maxSize / 2 | 0,
+        maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
+      },
+      immutables: {
+        maxSize: maxSize / 2 | 0,
+        maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
+      }
+    }
+  }
 }
