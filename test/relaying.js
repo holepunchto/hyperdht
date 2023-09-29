@@ -1,5 +1,5 @@
 const test = require('brittle')
-const RelayServer = require('protomux-blind-relay').Server
+const RelayServer = require('blind-relay').Server
 const { swarm } = require('./helpers')
 const DHT = require('../')
 
