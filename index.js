@@ -21,12 +21,12 @@ class HyperDHT extends DHT {
 
     super({ ...opts, port, bootstrap, addNode })
 
-    const cacheOpts = defaultCacheOpts(opts)
+    const { router, persistent } = defaultCacheOpts(opts)
 
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
 
-    this._router = new Router(this, cacheOpts.router)
+    this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
     this._rawStreams = new RawStreamSet(this)
     this._persistent = null
@@ -35,7 +35,7 @@ class HyperDHT extends DHT {
     this._debugHandshakeLatency = toRange((opts.debug && opts.debug.handshake && opts.debug.handshake.latency) || 0)
 
     this.once('persistent', () => {
-      this._persistent = new Persistent(this, cacheOpts.persistent)
+      this._persistent = new Persistent(this, persistent)
     })
 
     this.on('network-change', () => {
