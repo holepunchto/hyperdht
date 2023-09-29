@@ -11,6 +11,7 @@ const connect = require('./lib/connect')
 const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
+const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 
 class HyperDHT extends DHT {
@@ -52,6 +53,10 @@ class HyperDHT extends DHT {
     const s = new Server(this, opts)
     if (onconnection) s.on('connection', onconnection)
     return s
+  }
+
+  pool () {
+    return new ConnectionPool(this)
   }
 
   async destroy ({ force } = {}) {
