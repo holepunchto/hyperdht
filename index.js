@@ -31,6 +31,9 @@ class HyperDHT extends DHT {
     this._rawStreams = new RawStreamSet(this)
     this._persistent = null
 
+    this._randomPunches = 0
+    this._randomPunchLimit = 2
+
     this._debugStream = (opts.debug && opts.debug.stream) || null
     this._debugHandshakeLatency = toRange((opts.debug && opts.debug.handshake && opts.debug.handshake.latency) || 0)
 
