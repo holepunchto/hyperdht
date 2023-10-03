@@ -100,8 +100,8 @@ class HyperDHT extends DHT {
 
       // semi terrible heuristic until we proper fix local connections by racing them to the remote...
       const promise = new Promise(resolve => {
-        sock.on('message', () => resolve({ addr, valid: true }))
-        setTimeout(() => resolve({ addr, valid: false }), 500)
+        sock.on('message', () => resolve(true))
+        setTimeout(() => resolve(false), 500)
         sock.trySend(b4a.alloc(0), sock.address().port, addr.host)
       })
 
