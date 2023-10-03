@@ -109,11 +109,8 @@ class HyperDHT extends DHT {
       waiting.push(addr)
     }
 
-    for (const sock of socks) await sock.close()
-
     for (const addr of waiting) {
       const { host } = addr
-
       if (this._validatedLocalAddresses.has(host)) {
         if (await this._validatedLocalAddresses.get(host)) {
           list.push(addr)
@@ -121,6 +118,8 @@ class HyperDHT extends DHT {
         continue
       }
     }
+
+    for (const sock of socks) await sock.close()
 
     return list
   }
