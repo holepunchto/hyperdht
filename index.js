@@ -30,6 +30,7 @@ class HyperDHT extends DHT {
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
     this._rawStreams = new RawStreamSet(this)
     this._persistent = null
+    this._validatedLocalAddresses = new Map()
 
     this._debugStream = (opts.debug && opts.debug.stream) || null
     this._debugHandshakeLatency = toRange((opts.debug && opts.debug.handshake && opts.debug.handshake.latency) || 0)
@@ -70,6 +71,58 @@ class HyperDHT extends DHT {
     await this._rawStreams.destroy()
     await this._socketPool.destroy()
     await super.destroy()
+  }
+
+  async validateLocalAddresses (addresses) {
+    const list = []
+    const socks = []
+    const waiting = []
+
+    for (const addr of addresses) {
+      const { host } = addr
+
+      if (this._validatedLocalAddresses.has(host)) {
+        if (await this._validatedLocalAddresses.get(host)) {
+          list.push(addr)
+        }
+        continue
+      }
+
+      const sock = this.udx.createSocket()
+      try {
+        sock.bind(0, host)
+      } catch {
+        this._validatedLocalAddresses.set(host, Promise.resolve(false))
+        continue
+      }
+
+      socks.push(sock)
+
+      // semi terrible heuristic until we proper fix local connections by racing them to the remote...
+      const promise = new Promise(resolve => {
+        sock.on('message', () => resolve({ addr, valid: true }))
+        setTimeout(() => resolve({ addr, valid: false }), 500)
+        sock.trySend(b4a.alloc(0), sock.address().port, addr.host)
+      })
+
+      this._validatedLocalAddresses.set(host, promise)
+      waiting.push(addr)
+    }
+
+    for (const sock of socks) await sock.close()
+
+    for (const addr of waiting) {
+      const { host } = addr
+
+      if (this._validatedLocalAddresses.has(host)) {
+        if (await this._validatedLocalAddresses.get(host)) {
+          list.push(addr)
+        }
+        continue
+      }
+    }
+
+    return list
   }
 
   findPeer (publicKey, opts = {}) {
