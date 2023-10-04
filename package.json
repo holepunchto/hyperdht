@@ -38,7 +38,7 @@
     "standard": "^17.1.0"
   },
   "scripts": {
-    "test": "standard && node test/all.js",
+    "test": "standard && node test/relaying.js",
     "test:generate": "brittle -r test/all.js test/*.js",
     "lint": "standard"
   },
