@@ -1,5 +1,8 @@
 const test = require('brittle')
 const RelayServer = require('blind-relay').Server
+const RAM = require('random-access-memory')
+const Corestore = require('corestore')
+const Hyperswarm = require('hyperswarm')
 const { swarm } = require('./helpers')
 const DHT = require('../')
 
@@ -552,4 +555,53 @@ test.skip('server does not support connection relaying', async function (t) {
   await a.destroy()
   await b.destroy()
   await c.destroy()
+})
+
+test.solo('swarm server with relay', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const a = new DHT({ bootstrap })
+  const b = new DHT({ bootstrap })
+
+  const relay = new RelayServer({
+    createStream (opts) {
+      return a.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  const aSwarm = new Hyperswarm({ dht: a })
+
+  const aStore = new Corestore(RAM.reusable(), { passive: true })
+  const aCore = aStore.get({ name: 'test' })
+  await aCore.append(['a', 'b', 'c'])
+  await aCore.close()
+
+  aSwarm.on('connection', function (socket) {
+    socket.on('error', (err) => t.comment(err.message))
+
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+
+    aStore.replicate(socket)
+  })
+
+  await aSwarm.listen()
+
+  const bSocket = b.connect(aSwarm.server.publicKey, {
+    fastOpen: false,
+    localConnection: false,
+    relayThrough: aSwarm.server.publicKey
+  })
+
+  const bStore = new Corestore(RAM)
+  bStore.replicate(bSocket)
+
+  const bCore = bStore.get({ key: aCore.key })
+  t.alike(await bCore.get(1), Buffer.from('b'))
+
+  await aStore.close()
+  await bStore.close()
+
+  await a.destroy()
+  await b.destroy()
 })
