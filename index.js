@@ -32,7 +32,7 @@ class HyperDHT extends DHT {
     this._persistent = null
 
     this._randomPunches = 0
-    this._randomPunchLimit = 2
+    this._randomPunchLimit = 1 // set to one for extra safety for now
 
     this._debugStream = (opts.debug && opts.debug.stream) || null
     this._debugHandshakeLatency = toRange((opts.debug && opts.debug.handshake && opts.debug.handshake.latency) || 0)
