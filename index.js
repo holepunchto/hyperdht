@@ -14,12 +14,14 @@ const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 
+let counter = 0
 class HyperDHT extends DHT {
   constructor (opts = {}) {
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
 
     super({ ...opts, port, bootstrap, addNode })
+    this.counter = ++counter
 
     const { router, persistent } = defaultCacheOpts(opts)
 
@@ -66,16 +68,24 @@ class HyperDHT extends DHT {
   }
 
   async destroy ({ force } = {}) {
+    console.log(this.counter, 'hyperdht destroy called')
     if (!force) {
       const closing = []
       for (const server of this.listening) closing.push(server.close())
       await Promise.allSettled(closing)
     }
+    console.log(this.counter, 'hyperdht closed all servers')
+
     this._router.destroy()
     if (this._persistent) this._persistent.destroy()
     await this._rawStreams.destroy()
+    console.log(this.counter, 'Hyperdht Closed all raw streams')
+
     await this._socketPool.destroy()
+    console.log(this.counter, 'hyperdht closed all socket pools')
+
     await super.destroy()
+    console.log(this.counter, 'hyperdht finished destroy')
   }
 
   async validateLocalAddresses (addresses) {
