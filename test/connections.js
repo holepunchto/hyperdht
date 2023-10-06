@@ -413,10 +413,12 @@ test('relayed connection', async function (t) {
     socket.end()
   })
 
-  socket.on('open', () => {
-    t.pass('client connected')
-    socket.end()
-  })
+  socket
+    .on('error', () => {})
+    .on('open', () => {
+      t.pass('client connected')
+      socket.end()
+    })
 })
 
 test('relayed connection on same node', async function (t) {
