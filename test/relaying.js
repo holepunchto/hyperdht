@@ -33,6 +33,8 @@ test('relay connections through node, client side', async function (t) {
     }
   })
 
+  t.teardown(() => relay.close())
+
   const bServer = b.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session
@@ -88,6 +90,8 @@ test('relay connections through node, client side, client aborts hole punch', as
       return b.createRawStream({ ...opts, framed: true })
     }
   })
+
+  t.teardown(() => relay.close())
 
   const bServer = b.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
@@ -145,6 +149,8 @@ test('relay connections through node, client side, server aborts hole punch', as
     }
   })
 
+  t.teardown(() => relay.close())
+
   const bServer = b.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session
@@ -186,6 +192,8 @@ test('relay connections through node, server side', async function (t) {
       return a.createRawStream({ ...opts, framed: true })
     }
   })
+
+  t.teardown(() => relay.close())
 
   const aServer = a.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
@@ -243,6 +251,8 @@ test('relay connections through node, server side, client aborts hole punch', as
     }
   })
 
+  t.teardown(() => relay.close())
+
   const aServer = a.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session
@@ -298,6 +308,8 @@ test('relay connections through node, server side, server aborts hole punch', as
       return a.createRawStream({ ...opts, framed: true })
     }
   })
+
+  t.teardown(() => relay.close())
 
   const aServer = a.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
@@ -428,6 +440,8 @@ test.skip('relay several connections through node with pool', async function (t)
       return b.createRawStream({ ...opts, framed: true })
     }
   })
+
+  t.teardown(() => relay.close())
 
   const bServer = b.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
