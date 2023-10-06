@@ -351,7 +351,7 @@ test('relay connections through node, server side, server aborts hole punch', as
   await c.destroy()
 })
 
-test.solo('relay connections through node, client and server side', async function (t) {
+test('relay connections through node, client and server side', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
