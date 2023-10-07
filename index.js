@@ -68,7 +68,12 @@ class HyperDHT extends DHT {
   }
 
   async destroy ({ force } = {}) {
-    console.log(this.counter, 'hyperdht destroy called')
+    console.log(this.counter, 'hyperdht destroy called--streams:', this._rawStreams._streams.size)
+    setTimeout(
+      () => console.log(this.counter, 'hyperdht destroy after timeout streams:', this._rawStreams._streams.size),
+      5000
+    )
+
     if (!force) {
       const closing = []
       for (const server of this.listening) closing.push(server.close())
