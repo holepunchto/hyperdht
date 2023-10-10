@@ -351,65 +351,67 @@ test('relay connections through node, server side, server aborts hole punch', as
   await c.destroy()
 })
 
-test('relay connections through node, client and server side', async function (t) {
-  const { bootstrap } = await swarm(t)
+for (let i = 0; i < 100; i++) {
+  test('relay connections through node, client and server side', async function (t) {
+    const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+    const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+    const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+    const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-  const lc = t.test('socket lifecycle')
-  lc.plan(5)
+    const lc = t.test('socket lifecycle')
+    lc.plan(5)
 
-  const relay = new RelayServer({
-    createStream (opts) {
-      return a.createRawStream({ ...opts, framed: true })
-    }
-  })
+    const relay = new RelayServer({
+      createStream (opts) {
+        return a.createRawStream({ ...opts, framed: true })
+      }
+    })
 
-  t.teardown(() => relay.close())
+    t.teardown(() => relay.close())
 
-  const aServer = a.createServer(function (socket) {
-    const session = relay.accept(socket, { id: socket.remotePublicKey })
-    session
-      .on('error', (err) => t.comment(err.message))
-  })
+    const aServer = a.createServer(function (socket) {
+      const session = relay.accept(socket, { id: socket.remotePublicKey })
+      session
+        .on('error', (err) => t.comment(err.message))
+    })
 
-  await aServer.listen()
+    await aServer.listen()
 
-  const bServer = b.createServer({
-    relayThrough: aServer.publicKey
-  }, function (socket) {
-    lc.pass('server socket opened')
-    socket
-      .on('data', (data) => {
-        lc.alike(data, Buffer.from('hello world'))
+    const bServer = b.createServer({
+      relayThrough: aServer.publicKey
+    }, function (socket) {
+      lc.pass('server socket opened')
+      socket
+        .on('data', (data) => {
+          lc.alike(data, Buffer.from('hello world'))
+        })
+        .on('close', () => {
+          lc.pass('server socket closed')
+        })
+        .end()
+    })
+
+    await bServer.listen()
+
+    const bSocket = c.connect(bServer.publicKey, { relayThrough: aServer.publicKey })
+
+    bSocket
+      .on('open', () => {
+        lc.pass('client socket opened')
       })
       .on('close', () => {
-        lc.pass('server socket closed')
+        lc.pass('client socket closed')
       })
-      .end()
+      .end('hello world')
+
+    await lc
+
+    await a.destroy()
+    await b.destroy()
+    await c.destroy()
   })
-
-  await bServer.listen()
-
-  const bSocket = c.connect(bServer.publicKey, { relayThrough: aServer.publicKey })
-
-  bSocket
-    .on('open', () => {
-      lc.pass('client socket opened')
-    })
-    .on('close', () => {
-      lc.pass('client socket closed')
-    })
-    .end('hello world')
-
-  await lc
-
-  await a.destroy()
-  await b.destroy()
-  await c.destroy()
-})
+}
 
 test.skip('relay several connections through node with pool', async function (t) {
   const { bootstrap } = await swarm(t)
