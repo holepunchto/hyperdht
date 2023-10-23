@@ -328,7 +328,7 @@ class HyperDHT extends DHT {
       }
     }
 
-    if (this._persistent === null) return false
+    if (this._persistent === null) return this.emit('request', req)
 
     switch (req.command) {
       case COMMANDS.FIND_PEER: {
@@ -365,7 +365,7 @@ class HyperDHT extends DHT {
       }
     }
 
-    return false
+    return this.emit('request', req)
   }
 
   static keyPair (seed) {
