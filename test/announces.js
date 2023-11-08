@@ -84,3 +84,21 @@ test('server listen returns server', async function (t) {
   t.ok(result.length > 0, 'has at least one result')
   t.alike(result[0].peer.publicKey, server.publicKey)
 })
+
+test('server suspends and resumes', async function (t) {
+  const [a, b] = await swarm(t)
+  const server = await a.createServer().listen()
+
+  t.ok((await toArray(b.findPeer(server.publicKey))).length > 0)
+
+  await server.suspend()
+
+  t.ok((await toArray(b.findPeer(server.publicKey))).length === 0)
+
+  server.resume()
+
+  // be nice to have an api for the next announce cycle here...
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+
+  t.ok((await toArray(b.findPeer(server.publicKey))).length > 0)
+})
