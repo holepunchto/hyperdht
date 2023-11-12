@@ -111,15 +111,50 @@ test('server announces relay addrs', async function (t) {
   await b.findNode(b.id).finished()
 
   const server = await a.createServer().listen()
-
-  const nodes = await toArray(b.findPeer(server.publicKey))
+  const q = b.findPeer(server.publicKey)
+  const nodes = await toArray(q)
 
   for (const addr of server.relayAddresses) {
     let found = false
+
     for (const node of nodes) {
       found = node.from.port === addr.port && node.from.host === addr.host
       if (found) break
     }
+
+    if (!found) {
+      const { host, port } = b.remoteAddress()
+      found = port === addr.port && host === addr.host
+    }
+
+    if (!found) {
+      const { host, port } = a.remoteAddress()
+      found = port === addr.port && host === addr.host
+    }
+
     t.ok(found, 'found addr')
+  }
+})
+
+test('connect when we relay ourself', async function (t) {
+  const testnet = await swarm(t)
+
+  const server = await testnet.nodes[1].createServer(function (sock) {
+    sock.resume()
+    sock.end()
+  }).listen()
+
+  const addr = server.relayAddresses[server.relayAddresses.length - 1]
+
+  for (const node of testnet.nodes) {
+    const { host, port } = node.remoteAddress()
+    if (addr.port === port && addr.host === host) {
+      const sock = node.connect(server.publicKey)
+      await sock.opened
+      t.pass('worked')
+      sock.end()
+      await new Promise(resolve => sock.once('close', resolve))
+      break
+    }
   }
 })
