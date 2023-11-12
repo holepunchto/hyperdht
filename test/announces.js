@@ -1,4 +1,5 @@
 const test = require('brittle')
+const b4a = require('b4a')
 const { swarm, toArray } = require('./helpers')
 const DHT = require('../')
 
@@ -101,4 +102,18 @@ test('server suspends and resumes', async function (t) {
   await new Promise((resolve) => setTimeout(resolve, 1000))
 
   t.ok((await toArray(b.findPeer(server.publicKey))).length > 0)
+})
+
+test('server announces relay addrs', async function (t) {
+  const [a, b] = await swarm(t)
+  const server = await a.createServer().listen()
+
+  const addrs = (await toArray(b.findPeer(server.publicKey))).map(n => n.from).sort(cmp)
+  const expected = server.relayAddresses.slice().sort(cmp)
+
+  t.alike(addrs, expected)
+
+  function cmp (a, b) {
+    return b4a.compare(a.id, b.id)
+  }
 })
