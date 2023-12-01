@@ -65,6 +65,21 @@ class HyperDHT extends DHT {
     return new ConnectionPool(this)
   }
 
+  async resume () {
+    await super.resume()
+    const resuming = []
+    for (const server of this.listening) resuming.push(server.resume())
+    await Promise.allSettled(resuming)
+  }
+
+  async suspend () {
+    const suspending = []
+    for (const server of this.listening) suspending.push(server.suspend())
+    await Promise.allSettled(suspending)
+    await super.suspend()
+    await this._rawStreams.clear()
+  }
+
   async destroy ({ force } = {}) {
     if (!force) {
       const closing = []
@@ -73,7 +88,7 @@ class HyperDHT extends DHT {
     }
     this._router.destroy()
     if (this._persistent) this._persistent.destroy()
-    await this._rawStreams.destroy()
+    await this._rawStreams.clear()
     await this._socketPool.destroy()
     await super.destroy()
   }
