@@ -122,7 +122,7 @@ class HyperDHT extends DHT {
       const promise = new Promise(resolve => {
         sock.on('message', () => resolve(true))
         setTimeout(() => resolve(false), 500)
-        sock.trySend(b4a.alloc(0), sock.address().port, addr.host)
+        sock.trySend(b4a.alloc(1), sock.address().port, addr.host)
       })
 
       this._validatedLocalAddresses.set(host, promise)
