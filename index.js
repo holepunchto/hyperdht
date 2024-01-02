@@ -2,6 +2,7 @@ const DHT = require('dht-rpc')
 const sodium = require('sodium-universal')
 const c = require('compact-encoding')
 const b4a = require('b4a')
+const safetyCatch = require('safety-catch')
 const m = require('./lib/messages')
 const SocketPool = require('./lib/socket-pool')
 const Persistent = require('./lib/persistent')
@@ -193,7 +194,7 @@ class HyperDHT extends DHT {
           data.token,
           data.from,
           signUnannounce
-        ).catch(noop)
+        ).catch(safetyCatch)
       )
 
       return data
