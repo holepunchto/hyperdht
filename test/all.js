@@ -11,6 +11,7 @@ async function runTests () {
   await import('./connections.js')
   await import('./holepuncher.js')
   await import('./keychain.js')
+  await import('./lifecycle.js')
   await import('./messages.js')
   await import('./nat.js')
   await import('./noncustodial.js')
