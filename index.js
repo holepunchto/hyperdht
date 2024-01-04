@@ -14,6 +14,7 @@ const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
+const { createTracer } = require('hypertrace')
 
 class HyperDHT extends DHT {
   constructor (opts = {}) {
@@ -24,6 +25,7 @@ class HyperDHT extends DHT {
 
     const { router, persistent } = defaultCacheOpts(opts)
 
+    this.tracer = createTracer(this)
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
 
@@ -51,10 +53,12 @@ class HyperDHT extends DHT {
   }
 
   connect (remotePublicKey, opts) {
+    this.tracer.trace('connect')
     return connect(this, remotePublicKey, opts)
   }
 
   createServer (opts, onconnection) {
+    this.tracer.trace('createServer')
     if (typeof opts === 'function') return this.createServer({}, opts)
     if (opts && opts.onconnection) onconnection = opts.onconnection
     const s = new Server(this, opts)
@@ -67,6 +71,7 @@ class HyperDHT extends DHT {
   }
 
   async resume () {
+    this.tracer.trace('resume')
     await super.resume()
     const resuming = []
     for (const server of this.listening) resuming.push(server.resume())
@@ -74,6 +79,7 @@ class HyperDHT extends DHT {
   }
 
   async suspend () {
+    this.tracer.trace('suspend')
     const suspending = []
     for (const server of this.listening) suspending.push(server.suspend())
     await Promise.allSettled(suspending)
@@ -146,6 +152,7 @@ class HyperDHT extends DHT {
   }
 
   findPeer (publicKey, opts = {}) {
+    this.tracer.trace('findPeer')
     const target = opts.hash === false ? publicKey : hash(publicKey)
     opts = { ...opts, map: mapFindPeer }
     return this.query({ target, command: COMMANDS.FIND_PEER, value: null }, opts)
