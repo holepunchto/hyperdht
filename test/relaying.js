@@ -422,9 +422,9 @@ test('relay connections through node, client and server side', async function (t
 
   await lc
 
-  await a.destroy()
-  await b.destroy()
   await c.destroy()
+  await b.destroy()
+  await a.destroy()
 })
 
 test.skip('relay several connections through node with pool', async function (t) {
