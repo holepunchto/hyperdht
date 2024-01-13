@@ -360,9 +360,16 @@ test('relay connections through node, client and server side', async function (t
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
+  const testRelay = t.test('relay server')
+  testRelay.plan(2) // One each for the initiator and the follower
+  const testRelayInitiator = t.test('relay initiator')
+  testRelayInitiator.plan(1)
+  const testRelayFollower = t.test('relay follower')
+  testRelayFollower.plan(1)
 
   const relay = new RelayServer({
     createStream (opts) {
+      testRelay.pass('The relay server created a relay stream')
       return a.createRawStream({ ...opts, framed: true })
     }
   })
@@ -371,6 +378,13 @@ test('relay connections through node, client and server side', async function (t
 
   const aServer = a.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('pair', (isInitiator) => {
+      if (isInitiator) {
+        testRelayInitiator.pass('The initiator paired with the relay server')
+      } else {
+        testRelayFollower.pass('The non-iniator paired with the relay server')
+      }
+    })
     session
       .on('error', (err) => t.comment(err.message))
   })
@@ -378,6 +392,8 @@ test('relay connections through node, client and server side', async function (t
   await aServer.listen()
 
   const bServer = b.createServer({
+    _noHolepunching: true, // To ensure it relies only on relaying
+    shareLocalAddress: false, // To help ensure it relies only on relaying (otherwise it can connect directly over LAN, without even trying to holepunch)
     relayThrough: aServer.publicKey
   }, function (socket) {
     lc.pass('server socket opened')
