@@ -392,7 +392,7 @@ test('relay connections through node, client and server side', async function (t
   await aServer.listen()
 
   const bServer = b.createServer({
-    _noHolepunching: true, // To ensure it relies only on relaying
+    holepunch: false, // To ensure it relies only on relaying
     shareLocalAddress: false, // To help ensure it relies only on relaying (otherwise it can connect directly over LAN, without even trying to holepunch)
     relayThrough: aServer.publicKey
   }, function (socket) {
