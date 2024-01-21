@@ -492,61 +492,63 @@ test('create raw stream from encrypted stream', async function (t) {
   await server.close()
 })
 
-test('create many connections with reusable sockets', async function (t) {
-  const [boot] = await swarm(t)
+for (let i = 0; i < 100; i++) {
+  test('create many connections with reusable sockets', async function (t) {
+    const [boot] = await swarm(t)
 
-  const bootstrap = [{ host: '127.0.0.1', port: boot.address().port }]
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+    const bootstrap = [{ host: '127.0.0.1', port: boot.address().port }]
+    const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+    const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-  await a.ready()
-  await b.ready()
+    await a.ready()
+    await b.ready()
 
-  const server = a.createServer({ reusableSocket: true })
-  await server.listen()
+    const server = a.createServer({ reusableSocket: true })
+    await server.listen()
 
-  server.on('connection', function (socket) {
-    socket.write('Hello, World!')
-    socket.end()
+    server.on('connection', function (socket) {
+      socket.write('Hello, World!')
+      socket.end()
+    })
+
+    let prev = null
+    let same = 0
+
+    for (let i = 0; i < 100; i++) {
+      const socket = b.connect(server.address().publicKey, { reusableSocket: true, localConnection: false })
+
+      socket.on('connect', function () {
+        if (prev === socket.rawStream.socket) same++
+        prev = socket.rawStream.socket
+      })
+
+      socket.resume()
+      socket.end()
+      await new Promise((resolve) => socket.once('end', resolve))
+    }
+
+    t.is(same, 99, 'reused socket')
+
+    for (let i = 0; i < 100; i++) {
+      const socket = b.connect(server.address().publicKey, { reusableSocket: false, localConnection: false })
+
+      socket.on('connect', function () {
+        if (prev === socket.rawStream.socket) same++
+        prev = socket.rawStream.socket
+      })
+
+      socket.resume()
+      socket.end()
+      await new Promise((resolve) => socket.once('end', resolve))
+    }
+
+    t.is(same, 99, 'did not reuse socket')
+
+    await server.close()
+    await a.destroy()
+    await b.destroy()
   })
-
-  let prev = null
-  let same = 0
-
-  for (let i = 0; i < 100; i++) {
-    const socket = b.connect(server.address().publicKey, { reusableSocket: true, localConnection: false })
-
-    socket.on('connect', function () {
-      if (prev === socket.rawStream.socket) same++
-      prev = socket.rawStream.socket
-    })
-
-    socket.resume()
-    socket.end()
-    await new Promise((resolve) => socket.once('end', resolve))
-  }
-
-  t.is(same, 99, 'reused socket')
-
-  for (let i = 0; i < 100; i++) {
-    const socket = b.connect(server.address().publicKey, { reusableSocket: false, localConnection: false })
-
-    socket.on('connect', function () {
-      if (prev === socket.rawStream.socket) same++
-      prev = socket.rawStream.socket
-    })
-
-    socket.resume()
-    socket.end()
-    await new Promise((resolve) => socket.once('end', resolve))
-  }
-
-  t.is(same, 99, 'did not reuse socket')
-
-  await server.close()
-  await a.destroy()
-  await b.destroy()
-})
+}
 
 test('connect using specific key', async function (t) {
   const [a, b] = await swarm(t)
