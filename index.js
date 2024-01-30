@@ -186,6 +186,10 @@ class HyperDHT extends DHT {
 
       if (!found) return data
 
+      // data.from can exist with host and port defined, but id: null
+      // Unannounce's sign logic assumes id is a buffer, so we can't unannounce
+      if (!data.from.id) return data
+
       unannounces.push(
         dht._requestUnannounce(
           keyPair,
