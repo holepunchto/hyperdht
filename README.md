@@ -168,6 +168,8 @@ Emitted when the server is fully closed.
 
 Connect to a remote server. Similar to `createServer` this performs UDP holepunching for P2P connectivity.
 
+The remote public key can be encoded as either a buffer, a hex string or a z-base32 string.
+
 Options include:
 
 ```js
