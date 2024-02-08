@@ -31,6 +31,7 @@
     "debugging-stream": "^2.0.0",
     "dht-rpc": "^6.9.0",
     "hypercore-crypto": "^3.3.0",
+    "hypertrace": "^1.2.1",
     "noise-curve-ed": "^2.0.0",
     "noise-handshake": "^3.0.0",
     "record-cache": "^1.1.1",
