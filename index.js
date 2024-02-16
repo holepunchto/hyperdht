@@ -48,6 +48,11 @@ class HyperDHT extends DHT {
     this.on('network-change', () => {
       for (const server of this.listening) server.refresh()
     })
+
+    this.on('network-update', () => {
+      if (!this.online) return
+      for (const server of this.listening) server.notifyOnline()
+    })
   }
 
   connect (remotePublicKey, opts) {
