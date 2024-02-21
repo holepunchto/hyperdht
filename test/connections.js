@@ -1,5 +1,7 @@
 const test = require('brittle')
 const { swarm } = require('./helpers')
+const { encode } = require('hypercore-id-encoding')
+const { once } = require('events')
 const DHT = require('../')
 
 test('createServer + connect - once defaults', async function (t) {
@@ -631,4 +633,57 @@ test('close connections on destroy', async function (t) {
   await b.destroy()
 
   await close
+})
+
+test('connect using id instead of buffer', async function (t) {
+  t.plan(2)
+
+  const [a, b] = await swarm(t)
+  const server = a.createServer()
+
+  await server.listen()
+
+  const id = encode(server.publicKey)
+  const socket = b.connect(id)
+  socket.on('error', () => {})
+
+  await once(socket, 'open')
+
+  t.is(id.length, 52)
+  t.pass('connects if id is given instead of buffer')
+
+  await socket.end()
+  await server.close()
+
+  await a.destroy()
+  await b.destroy()
+})
+
+test('exception if invalid id is used', async function (t) {
+  t.plan(1)
+
+  const [a] = await swarm(t)
+  const id = 'wrong-id'
+
+  try {
+    a.connect(id)
+    t.fail()
+  } catch (err) {
+    t.is(err.message, 'Invalid Hypercore key')
+    await a.destroy()
+  }
+})
+
+test('exception if null id is used', async function (t) {
+  t.plan(1)
+
+  const [a] = await swarm(t)
+
+  try {
+    a.connect(null)
+    t.fail()
+  } catch (err) {
+    t.is(err.message, 'Invalid Hypercore key')
+    await a.destroy()
+  }
 })
