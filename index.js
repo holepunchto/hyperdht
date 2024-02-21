@@ -14,6 +14,7 @@ const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
+const { isValid } = require('hypercore-id-encoding')
 
 class HyperDHT extends DHT {
   constructor (opts = {}) {
@@ -56,6 +57,10 @@ class HyperDHT extends DHT {
   }
 
   connect (remotePublicKey, opts) {
+    if (!isValid(remotePublicKey)) {
+      throw new Error('Not a valid public key')
+    }
+
     return connect(this, remotePublicKey, opts)
   }
 
