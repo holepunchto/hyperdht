@@ -89,8 +89,8 @@ class HyperDHT extends DHT {
     await this._rawStreams.clear()
   }
 
-  async destroy ({ force } = {}) {
-    this.tracer.trace('destroying')
+  async destroy ({ force = false } = {}) {
+    this.tracer.trace('destroying', { force })
     if (!force) {
       const closing = []
       for (const server of this.listening) closing.push(server.close())
