@@ -1,5 +1,6 @@
 const test = require('brittle')
 const HyperDHT = require('../')
+const Persistent = require('../lib/persistent')
 const { swarm } = require('./helpers')
 
 test('immutable put - get', async function (t) {
@@ -61,4 +62,44 @@ test('mutable put - put - get', async function (t) {
   t.is(Buffer.isBuffer(res.value), true)
   t.is(Buffer.compare(res.signature, put2.signature), 0)
   t.is(res.value.toString(), 'testing two')
+})
+
+test('mutableGet - commit on behalf of other node', async function (t) {
+  const { bootstrap, nodes } = await swarm(t, 100)
+
+  const dht = new HyperDHT({ bootstrap, seed: Buffer.alloc(32).fill('foo') })
+
+  const records = [0, 1, 2].map((seq) => {
+    const value = Buffer.from('Test-' + seq)
+
+    return {
+      seq,
+      value,
+      signature: Persistent.signMutable(seq, value, dht.defaultKeyPair)
+    }
+  })
+
+  // Storing seq 1
+  await nodes[30].mutableGet(dht.defaultKeyPair.publicKey, records[1])
+
+  let saved = await nodes[3].mutableGet(dht.defaultKeyPair.publicKey)
+  t.is(saved.seq, 1)
+
+  // Storing seq 0
+  const res = await nodes[30].mutableGet(dht.defaultKeyPair.publicKey, records[0])
+  t.is(res.seq, 1, 'should not override seq 1')
+
+  saved = await nodes[3].mutableGet(dht.defaultKeyPair.publicKey)
+  t.absent(saved.local)
+  t.is(saved.seq, 1, 'should not override seq 1')
+
+  // Storing seq 2
+  await nodes[30].mutableGet(dht.defaultKeyPair.publicKey, records[2])
+
+  saved = await nodes[3].mutableGet(dht.defaultKeyPair.publicKey)
+  t.is(saved.seq, 2)
+  t.alike(saved.value, records[2].value)
+  t.alike(saved.signature, records[2].signature)
+
+  dht.destroy()
 })
