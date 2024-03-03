@@ -19,11 +19,19 @@ test('createServer + connect - once defaults', async function (t) {
       lc.pass('server side ended')
       socket.end()
     })
+    socket.on('error', e => {
+      console.error(e)
+      t.fail('unexpected socket error')
+    })
   })
 
   await server.listen()
 
   const socket = b.connect(server.publicKey)
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
 
   socket.once('open', function () {
     lc.pass('client side opened')
@@ -64,6 +72,10 @@ test('createServer + connect - emits connect', async function (t) {
   await server.listen()
 
   const socket = b.connect(server.publicKey)
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
 
   socket.once('connect', function () {
     lc.pass('client side emitted connect')
@@ -106,6 +118,11 @@ test('createServer + connect - exchange data', { timeout: 60000 }, async functio
   await server.listen()
 
   const socket = b.connect(server.publicKey)
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
+
   const blk = Buffer.alloc(4096)
   const expected = 20 * 1024 * blk.byteLength
 
@@ -163,6 +180,10 @@ test('createServer + connect - force holepunch', async function (t) {
   await server.listen()
 
   const socket = b.connect(server.publicKey, { localConnection: false })
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
 
   socket.once('open', function () {
     lc.pass('udx client side opened')
@@ -273,6 +294,11 @@ test('udp noise, client ends, no crash', async function (t) {
   const [, node] = await swarm(t, 2)
 
   const socket = node.udx.createSocket()
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
+
   await socket.send(Buffer.from('hi'), node.address().port)
   await socket.close()
 
@@ -288,6 +314,10 @@ test('half open', async function (t) {
   await server.listen()
 
   const socket = b.connect(server.address().publicKey)
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
 
   server.on('connection', (socket) => {
     socket.on('data', (data) => {
@@ -320,6 +350,11 @@ test('server responds and immediately ends, multiple connects', async function (
 
   for (let i = n; i > 0; i--) {
     const socket = b.connect(server.publicKey)
+
+    socket.on('error', e => {
+      console.error(e)
+      t.fail('unexpected socket error')
+    })
 
     socket
       .on('close', () => {
@@ -356,6 +391,11 @@ test('dht node can host server', async function (t) {
 
   const socket = c.connect(server.publicKey)
 
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
+
   socket.once('open', function () {
     lc.pass('client side opened')
   })
@@ -384,6 +424,10 @@ test('server and client on same node', async function (t) {
   await server.listen()
 
   const socket = a.connect(server.address().publicKey)
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
 
   server.on('connection', (socket) => {
     t.pass('server connected')
@@ -435,6 +479,11 @@ test('relayed connection on same node', async function (t) {
 
   const socket = a.connect(server.address().publicKey)
 
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
+
   server.on('connection', (socket) => {
     t.pass('server connected')
     socket.end()
@@ -464,6 +513,10 @@ test('create raw stream from encrypted stream', async function (t) {
   await server.listen()
 
   const socket = b.connect(server.address().publicKey)
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
 
   const aRawStream = a.createRawStream()
   const bRawStream = b.createRawStream()
@@ -518,6 +571,11 @@ test('create many connections with reusable sockets', async function (t) {
   for (let i = 0; i < 100; i++) {
     const socket = b.connect(server.address().publicKey, { reusableSocket: true, localConnection: false })
 
+    socket.on('error', e => {
+      console.error(e)
+      t.fail('unexpected socket error')
+    })
+
     socket.on('connect', function () {
       if (prev === socket.rawStream.socket) same++
       prev = socket.rawStream.socket
@@ -532,6 +590,11 @@ test('create many connections with reusable sockets', async function (t) {
 
   for (let i = 0; i < 100; i++) {
     const socket = b.connect(server.address().publicKey, { reusableSocket: false, localConnection: false })
+
+    socket.on('error', e => {
+      console.error(e)
+      t.fail('unexpected socket error')
+    })
 
     socket.on('connect', function () {
       if (prev === socket.rawStream.socket) same++
@@ -572,6 +635,10 @@ test('connect using specific key', async function (t) {
   await server.listen()
 
   const socket = b.connect(server.publicKey, { keyPair })
+  socket.on('error', e => {
+    console.error(e)
+    t.fail('unexpected socket error')
+  })
 
   socket
     .once('open', function () {
