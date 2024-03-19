@@ -33,7 +33,7 @@ test.solo('Client use keep-alive to detect disconnect - separated by processes',
     clientSocket.setKeepAlive(5000)
     clientSocket.on('open', () => t.pass('Client connected'))
     clientSocket.on('error', err => console.log('here be error', err))
-    clientSocket.on('close', () => () => {
+    clientSocket.on('close', () => {
       console.log('on close')
       t.pass('Client discovered disconnect')
     })
