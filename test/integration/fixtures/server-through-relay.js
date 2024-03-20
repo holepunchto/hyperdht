@@ -20,7 +20,6 @@ async function main () {
       .on('open', () => console.log('socket_onopen'))
       .on('close', () => console.log('socket_onclose'))
       .on('error', err => console.log(`socket_onerror ${err.code}`))
-    setTimeout(() => socket.destroy(), 1000 + 10 * Math.random())
   })
   server.on('open', () => console.log('server_onopen'))
   server.on('error', err => console.log(`server_onerror ${err.code}`))
