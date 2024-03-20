@@ -10,7 +10,8 @@ const path = require('path')
 // client.set keep-alive
 // client - should reconnect when connection dies
 
-test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
+test.skip('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
+// test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
   t.plan(2000)
 
   const { bootstrap } = await swarm(t)
@@ -70,7 +71,13 @@ test.solo('Client connects to Server and keeps reconnectings - with relay', { ti
         t.pass('[server] Started. Now starting client')
         startClient()
       }
-      if (isSocketOpened) t.pass('[server] Socket connected')
+      if (isSocketOpened) {
+        t.pass('[server] Socket connected. Waiting 1..10 seconds, then killing server')
+        setTimeout(() => {
+          t.pass('[server] killed')
+          serverProcess.kill()
+        }, 1000 + 1000 * 10 * Math.random())
+      }
       if (isSocketClosed) t.pass('[server] Socket closed')
       if (isSocketError) console.error(data)
     })
@@ -85,7 +92,7 @@ test.solo('Client connects to Server and keeps reconnectings - with relay', { ti
       })
       .on('close', () => {
         t.pass('[client] Socket closed. reconnecting')
-        startClient()
+        startServer()
       })
       .on('error', err => console.error('[client] error', err))
   }
