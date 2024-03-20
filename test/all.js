@@ -18,6 +18,7 @@ async function runTests () {
   await import('./pool.js')
   await import('./relaying.js')
   await import('./storing.js')
+  await import('./keep-alive.js')
 
   test.resume()
 }
