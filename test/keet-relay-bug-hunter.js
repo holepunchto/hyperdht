@@ -10,14 +10,15 @@ const path = require('path')
 // client.set keep-alive
 // client - should reconnect when connection dies
 
-test.solo('Client connects to Server and keeps reconnectings - with relay', async t => {
+test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
+  t.plan(2000)
+
   const { bootstrap } = await swarm(t)
 
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-  t.plan(5)
   t.teardown(async () => {
     await a.destroy()
     await c.destroy()
@@ -27,19 +28,16 @@ test.solo('Client connects to Server and keeps reconnectings - with relay', asyn
 
   const relay = new RelayServer({
     createStream (opts) {
-      console.log('[relay] createStream()')
       return a.createRawStream({ ...opts, framed: true })
     }
   })
 
-  const relayServer = a.createServer(function (socket) {
-    console.log('[relayServer] Got connection')
-
+  const relayServer = a.createServer(socket => {
     const relaySession = relay.accept(socket, { id: socket.remotePublicKey })
 
-    relaySession.on('pair', (isInitiator) => {
-      console.log(`[relayServer] on(pair) isInitiator=${isInitiator}`)
-    })
+    // relaySession.on('pair', (isInitiator) => {
+    //   console.log(`[relayServer] on(pair) isInitiator=${isInitiator}`)
+    // })
     relaySession.on('error', (err) => t.comment(err.message))
   })
 
@@ -53,44 +51,42 @@ test.solo('Client connects to Server and keeps reconnectings - with relay', asyn
   startServer()
 
   function startServer () {
-    const serverProcess = spawn('node', [path.join(__dirname, 'fixtures/server-through-relay.js'), serverPublicKey, serverSecretKey, relayServerPublicKey])
+    const serverProcess = spawn('node', [
+      path.join(__dirname, 'fixtures/server-through-relay.js'),
+      serverPublicKey,
+      serverSecretKey,
+      relayServerPublicKey,
+      JSON.stringify(bootstrap)
+    ])
     serverProcess.stderr.on('data', () => t.fail())
     serverProcess.stdout.on('data', data => {
       data = data.toString().trim()
-      console.log(`[serverProcess] ${data}`)
+      // console.log(`[serverProcess] ${data}`)
       const isStarted = data === 'started'
-      const isSocketConnected = data === 'socket_connected'
+      const isSocketOpened = data === 'socket_onopen'
+      const isSocketClosed = data === 'socket_onclose'
+      const isSocketError = data.startsWith('socket_onerror')
       if (isStarted) {
-        t.pass('Server started. Now starting client')
-        setTimeout(() => startClient(), 1000)
+        t.pass('[server] Started. Now starting client')
+        startClient()
       }
-      if (isSocketConnected) {
-        t.pass('Client connected. Killing server process in 1 second')
-        // setTimeout(() => serverProcess.kill('SIGKILL'), 1000) // Wait a bit to make sure the handshake has happened
-        // setTimeout(() => {
-        //   timedout = true
-
-        //   t.pass('After 20 seconds the connection was still open. Closing it now')
-        //   node.destroy()
-        // }, 24000)
-      }
+      if (isSocketOpened) t.pass('[server] Socket connected')
+      if (isSocketClosed) t.pass('[server] Socket closed')
+      if (isSocketError) console.error(data)
     })
-    serverProcess.on('close', () => console.log('[serverProcess] on(close)'))
-    serverProcess.on('exit', () => console.log('[serverProcess] on(exit)'))
   }
 
   function startClient () {
-    console.log('[startClient()] serverKeyPair.publicKey', serverKeyPair.publicKey.toString('hex'))
-    console.log('[startClient()] relayServer.publicKey', relayServer.publicKey.toString('hex'))
     const client = c.connect(serverKeyPair.publicKey, { relayThrough: relayServer.publicKey })
+    client.setKeepAlive(5000)
     client
       .on('open', () => {
-        t.pass('client socket opened')
-        client.write('hello world')
+        t.pass('[client] Socket opened')
       })
       .on('close', () => {
-        t.pass('client socket closed')
+        t.pass('[client] Socket closed. reconnecting')
+        startClient()
       })
-      .on('error', err => console.error('client error', err))
+      .on('error', err => console.error('[client] error', err))
   }
 })
