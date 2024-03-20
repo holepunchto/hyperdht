@@ -19,7 +19,6 @@ test.solo('Client connects to Server and keeps reconnectings - with relay', asyn
 
   t.plan(5)
   t.teardown(async () => {
-    console.log('teardown time')
     await a.destroy()
     await c.destroy()
     await b.destroy()
@@ -35,17 +34,11 @@ test.solo('Client connects to Server and keeps reconnectings - with relay', asyn
 
   const relayServer = a.createServer(function (socket) {
     console.log('[relayServer] Got connection')
+
     const relaySession = relay.accept(socket, { id: socket.remotePublicKey })
-    // const isClient = socket.remotePublicKey.toString('hex') === client.publicKey.toString('hex')
-    // const isServer = socket.remotePublicKey.toString('hex') === server.publicKey.toString('hex')
+
     relaySession.on('pair', (isInitiator) => {
-      // console.log(`[relayServer] on(pair) isInitiator=${isInitiator} from=${isClient ? 'client' : isServer ? 'server' : 'ERROR'}`)
       console.log(`[relayServer] on(pair) isInitiator=${isInitiator}`)
-      if (isInitiator) {
-        // testRelayInitiator.pass('The initiator paired with the relay server')
-      } else {
-        // testRelayFollower.pass('The non-iniator paired with the relay server')
-      }
     })
     relaySession.on('error', (err) => t.comment(err.message))
   })
@@ -85,25 +78,6 @@ test.solo('Client connects to Server and keeps reconnectings - with relay', asyn
     serverProcess.on('close', () => console.log('[serverProcess] on(close)'))
     serverProcess.on('exit', () => console.log('[serverProcess] on(exit)'))
   }
-
-  // const server = b.createServer({
-  //   holepunch: false, // To ensure it relies only on relaying
-  //   shareLocalAddress: false, // To help ensure it relies only on relaying (otherwise it can connect directly over LAN, without even trying to holepunch)
-  //   relayThrough: relayServer.publicKey
-  // }, function (socket) {
-  //   t.pass('server socket opened')
-  //   socket
-  //     .on('data', async (data) => {
-  //       t.alike(data, Buffer.from('hello world'))
-  //       client.destroy()
-  //     })
-  //     .on('close', () => {
-  //       t.pass('server socket closed')
-  //     })
-  //     .on('error', err => t.comment('server error', err))
-  // })
-
-  // await server.listen()
 
   function startClient () {
     console.log('[startClient()] serverKeyPair.publicKey', serverKeyPair.publicKey.toString('hex'))
