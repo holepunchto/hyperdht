@@ -2,17 +2,28 @@ const test = require('brittle')
 const DHT = require('../')
 const { spawn } = require('child_process')
 const path = require('path')
+const { swarm } = require('./helpers')
 
-// Server is run in a separate proces to make sure that the client doesn't see
-// the socket is closed from being run by the same process
+// Server is run in a separate proces to make sure that the client
+// doesn't see the socket is closed.
+// If the server called `socket.destroy()` then the client would
+// see this immediately. Running it separate processes change this.
+
 test('Client use keepalive to detect disconnect - separated by processes', async t => {
   t.plan(5)
+
+  const { bootstrap } = await swarm(t)
 
   const keyPair = DHT.keyPair()
   const publicKey = keyPair.publicKey.toString('hex')
   const secretKey = keyPair.secretKey.toString('hex')
 
-  const serverProcess = spawn('node', [path.join(__dirname, 'fixtures/server.js'), publicKey, secretKey])
+  const serverProcess = spawn('node', [
+    path.join(__dirname, 'fixtures/server.js'),
+    publicKey,
+    secretKey,
+    JSON.stringify(bootstrap)
+  ])
   serverProcess.stderr.on('data', () => t.fail())
   serverProcess.stdout.on('data', data => {
     data = data.toString().trim()
@@ -29,7 +40,7 @@ test('Client use keepalive to detect disconnect - separated by processes', async
   })
 
   function startClient () {
-    const node = new DHT()
+    const node = new DHT({ bootstrap })
     const clientSocket = node.connect(publicKey)
     clientSocket.setKeepAlive(5000)
     clientSocket.on('open', () => t.pass('Client connected'))
@@ -44,11 +55,18 @@ test('Client use keepalive to detect disconnect - separated by processes', async
 test('Client not using keepalive does not detect disconnect - separated by processes', async t => {
   t.plan(4)
 
+  const { bootstrap } = await swarm(t)
+
   const keyPair = DHT.keyPair()
   const publicKey = keyPair.publicKey.toString('hex')
   const secretKey = keyPair.secretKey.toString('hex')
 
-  const serverProcess = spawn('node', [path.join(__dirname, 'fixtures/server.js'), publicKey, secretKey])
+  const serverProcess = spawn('node', [
+    path.join(__dirname, 'fixtures/server.js'),
+    publicKey,
+    secretKey,
+    JSON.stringify(bootstrap)
+  ])
   serverProcess.stderr.on('data', () => t.fail())
   serverProcess.stdout.on('data', data => {
     data = data.toString().trim()
@@ -71,7 +89,7 @@ test('Client not using keepalive does not detect disconnect - separated by proce
   })
 
   let timedout = false
-  const node = new DHT()
+  const node = new DHT({ bootstrap })
 
   function startClient () {
     const clientSocket = node.connect(publicKey)
