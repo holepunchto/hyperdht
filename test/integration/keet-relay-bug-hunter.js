@@ -1,7 +1,7 @@
 const test = require('brittle')
 const RelayServer = require('blind-relay').Server
-const { swarm } = require('./helpers')
-const DHT = require('../')
+const { swarm } = require('../helpers')
+const DHT = require('../../')
 const { spawn } = require('child_process')
 const path = require('path')
 const { Client: KHLClient } = require('keet-hypertrace-logger')
@@ -16,7 +16,7 @@ khlClient.start({
   getInitialProps: () => ({ alias: 'client' })
 })
 
-test.skip('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
+test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
 // test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
   t.plan(2000)
 
