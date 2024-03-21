@@ -1,4 +1,4 @@
-const DHT = require('../../')
+const DHT = require('../../../')
 const { Client: KHLClient } = require('keet-hypertrace-logger')
 
 const publicKey = Buffer.from(process.argv[2], 'hex')
