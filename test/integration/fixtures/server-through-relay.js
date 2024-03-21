@@ -1,10 +1,21 @@
 const DHT = require('../../')
+const { Client: KHLClient } = require('keet-hypertrace-logger')
 
 const publicKey = Buffer.from(process.argv[2], 'hex')
 const secretKey = Buffer.from(process.argv[3], 'hex')
 const relayServerPublicKey = Buffer.from(process.argv[4], 'hex')
 const bootstrap = JSON.parse(process.argv[5])
 const keyPair = { publicKey, secretKey }
+const khlClient = new KHLClient()
+khlClient.start({
+  createSocket: () => {
+    const node = new DHT({
+      keyPair
+    })
+    return node.connect(Buffer.from('17ae5b10a5abdc269e16d740c1eb762f215c05a697c7e37c996abfcc488e82f3', 'hex'))
+  },
+  getInitialProps: () => ({ alias: 'server' })
+})
 
 main()
 

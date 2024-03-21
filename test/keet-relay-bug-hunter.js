@@ -4,11 +4,17 @@ const { swarm } = require('./helpers')
 const DHT = require('../')
 const { spawn } = require('child_process')
 const path = require('path')
+const { Client: KHLClient } = require('keet-hypertrace-logger')
 
-// server.set keep-alive
-// server.on(connection, () => wait 1..10 sec, then close connection)
-// client.set keep-alive
-// client - should reconnect when connection dies
+const clientKeyPair = DHT.keyPair()
+const khlClient = new KHLClient()
+khlClient.start({
+  createSocket: () => {
+    const node = new DHT({ keyPair: clientKeyPair })
+    return node.connect(Buffer.from('17ae5b10a5abdc269e16d740c1eb762f215c05a697c7e37c996abfcc488e82f3', 'hex'))
+  },
+  getInitialProps: () => ({ alias: 'client' })
+})
 
 test.skip('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
 // test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
