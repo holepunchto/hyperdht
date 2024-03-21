@@ -18,8 +18,6 @@ async function runTests () {
   await import('./pool.js')
   await import('./relaying.js')
   await import('./storing.js')
-  // TODO: debug flakiness, then uncomment
-  // await import('./keep-alive.js')
 
   test.resume()
 }
