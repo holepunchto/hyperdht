@@ -1,4 +1,4 @@
-const DHT = require('../../')
+const DHT = require('../../../')
 
 main()
 
@@ -10,7 +10,7 @@ async function main () {
 
   const node = new DHT({ bootstrap })
   const server = node.createServer(socket => {
-    socket.on('open', () => console.log('socket_connected'))
+    console.log('socket_connected')
   })
 
   await server.listen(keyPair)

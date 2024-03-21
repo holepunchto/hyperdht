@@ -50,7 +50,8 @@
   "scripts": {
     "test": "standard && node test/all.js",
     "test:generate": "brittle -r test/all.js test/*.js",
-    "lint": "standard"
+    "lint": "standard",
+    "integration": "brittle test/integration/*.js"
   },
   "author": "Mathias Buus (@mafintosh)",
   "license": "MIT",
