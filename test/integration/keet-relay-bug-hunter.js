@@ -39,7 +39,7 @@ test.skip('Client connects to Server and keeps reconnectings - with relay', { ti
   const serverPublicKey = serverKeyPair.publicKey.toString('hex')
   const serverSecretKey = serverKeyPair.secretKey.toString('hex')
   let closedAt = 0
-  let timeoutTookTooLong
+  let timeoutTookTooLong = null
 
   startServer()
 
