@@ -11,7 +11,7 @@ test('relay connections through node, client side', async function (t) {
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(5)
+  lc.plan(7)
 
   const aServer = a.createServer(function (socket) {
     lc.pass('server socket opened')
@@ -36,6 +36,8 @@ test('relay connections through node, client side', async function (t) {
   t.teardown(() => relay.close())
 
   const bServer = b.createServer(function (socket) {
+    lc.pass('passed through relay server')
+
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session
       .on('error', (err) => t.comment(err.message))
@@ -69,7 +71,7 @@ test('relay connections through node, client side, client aborts hole punch', as
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(5)
+  lc.plan(7)
 
   const aServer = a.createServer(function (socket) {
     lc.pass('server socket opened')
@@ -94,6 +96,8 @@ test('relay connections through node, client side, client aborts hole punch', as
   t.teardown(() => relay.close())
 
   const bServer = b.createServer(function (socket) {
+    lc.pass('passed through relay server')
+
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session
       .on('error', (err) => t.comment(err.message))
@@ -127,7 +131,7 @@ test('relay connections through node, client side, server aborts hole punch', as
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(5)
+  lc.plan(7)
 
   const aServer = a.createServer({ holepunch: () => false }, function (socket) {
     lc.pass('server socket opened')
@@ -152,6 +156,8 @@ test('relay connections through node, client side, server aborts hole punch', as
   t.teardown(() => relay.close())
 
   const bServer = b.createServer(function (socket) {
+    lc.pass('passed through relay server')
+
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session
       .on('error', (err) => t.comment(err.message))
@@ -185,7 +191,7 @@ test('relay connections through node, server side', async function (t) {
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(5)
+  lc.plan(7)
 
   const relay = new RelayServer({
     createStream (opts) {
@@ -196,6 +202,8 @@ test('relay connections through node, server side', async function (t) {
   t.teardown(() => relay.close())
 
   const aServer = a.createServer(function (socket) {
+    lc.pass('passed through relay server')
+
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session
       .on('error', (err) => t.comment(err.message))
@@ -243,7 +251,7 @@ test('relay connections through node, server side, client aborts hole punch', as
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(5)
+  lc.plan(7)
 
   const relay = new RelayServer({
     createStream (opts) {
@@ -254,6 +262,8 @@ test('relay connections through node, server side, client aborts hole punch', as
   t.teardown(() => relay.close())
 
   const aServer = a.createServer(function (socket) {
+    lc.pass('passed through relay server')
+
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session
       .on('error', (err) => t.comment(err.message))
@@ -301,7 +311,7 @@ test('relay connections through node, server side, server aborts hole punch', as
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(5)
+  lc.plan(7)
 
   const relay = new RelayServer({
     createStream (opts) {
@@ -312,6 +322,8 @@ test('relay connections through node, server side, server aborts hole punch', as
   t.teardown(() => relay.close())
 
   const aServer = a.createServer(function (socket) {
+    lc.pass('passed through relay server')
+
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session
       .on('error', (err) => t.comment(err.message))
