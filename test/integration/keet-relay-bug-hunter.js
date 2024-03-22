@@ -1,15 +1,17 @@
 const test = require('brittle')
-const RelayServer = require('blind-relay').Server
 const { swarm, spawnFixture } = require('../helpers')
 const DHT = require('../../')
 const path = require('path')
 const { Client: KHLClient } = require('keet-hypertrace-logger')
 
+const KEEPALIVE = 5000
 const clientKeyPair = DHT.keyPair()
 const khlClient = new KHLClient()
 khlClient.start({
   createSocket: () => {
-    const node = new DHT()
+    const node = new DHT({
+      holepunch: false // To ensure it relies only on relaying
+    })
     return node.connect(Buffer.from('17ae5b10a5abdc269e16d740c1eb762f215c05a697c7e37c996abfcc488e82f3', 'hex'), {
       keyPair: clientKeyPair
     })
@@ -19,35 +21,24 @@ khlClient.start({
 
 test.skip('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
 // test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
-  t.plan(20)
+  t.plan(2000)
 
   const { bootstrap } = await swarm(t)
-  const relayNode = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const clientNode = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientNode = new DHT({
+    bootstrap,
+    // quickFirewall: false, // if uncommented, then "HOLEPUNCH_ABORTED" error is thrown in the client
+    ephemeral: true
+  })
 
   t.teardown(async () => {
-    await relayNode.destroy()
     await clientNode.destroy()
-    relay.close()
   })
-
-  const relay = new RelayServer({
-    createStream (opts) {
-      return relayNode.createRawStream({ ...opts, framed: true })
-    }
-  })
-
-  const relayServer = relayNode.createServer(socket => {
-    const relaySession = relay.accept(socket, { id: socket.remotePublicKey })
-    relaySession.on('error', (err) => t.fail(err))
-  })
-
-  await relayServer.listen()
 
   const serverKeyPair = DHT.keyPair()
   const serverPublicKey = serverKeyPair.publicKey.toString('hex')
   const serverSecretKey = serverKeyPair.secretKey.toString('hex')
-  const relayServerPublicKey = relayServer.publicKey.toString('hex')
+  let closedAt = 0
+  let timeoutTookTooLong
 
   startServer()
 
@@ -59,40 +50,56 @@ test.skip('Client connects to Server and keeps reconnectings - with relay', { ti
         path.join(__dirname, 'fixtures/server-through-relay.js'),
         serverPublicKey,
         serverSecretKey,
-        relayServerPublicKey,
         JSON.stringify(bootstrap)
       ]
 
       for await (const [kill, data] of spawnFixture(serverTest, args)) {
+        // console.log(`[server] on(data): ${data}`)
+
+        if (data === 'socket_ondata hello') {
+          const waitTime = Math.floor(1000 + 1000 * 9 * Math.random())
+          serverTest.pass(`Received "hello" from client. Waiting ${waitTime} ms, then killing server`)
+          setTimeout(kill, waitTime)
+        }
+
         if (data === 'started') {
           serverTest.pass('Started. Now starting new client')
           startClient()
         }
-
-        if (data === 'socket_onopen') {
-          serverTest.pass('Socket connected. Waiting 1..10 seconds, then killing server')
-          setTimeout(kill, 1000 + 1000 * 10 * Math.random())
-        }
       }
 
-      serverTest.pass('Process died')
+      serverTest.pass('Server process killed. Waiting for client to detect')
+      closedAt = Date.now()
+
+      const waitTimeUntilClientShouldHaveDetected = 4 * KEEPALIVE
+      timeoutTookTooLong = setTimeout(() => {
+        console.error('THE BUG OCCURED 🥳')
+        console.log('Client did not detect that the socket was destroyed in time')
+        console.log(`Waited ${waitTimeUntilClientShouldHaveDetected} ms after the server had been killed`)
+        process.exit(1)
+      }, waitTimeUntilClientShouldHaveDetected)
     })
   }
 
   function startClient () {
     t.test('client', clientTest => {
-      clientTest.plan(3)
+      clientTest.plan(2)
 
       const client = clientNode.connect(serverKeyPair.publicKey, {
         keyPair: clientKeyPair,
-        relayThrough: relayServer.publicKey
+        relayThrough: ['45ae429318f146326dddb27168532c7c6b21cacfdd4a43d539e06bd518a7893a', '26eb24c97e53f94d392842b3c0b3fddcb903a0883ac5691e67e4c9d369ef2332', '5c4ee2d0140670b433c0f844fe38264c022842cd9b76b5d28767b462531dfeb2', '8e2a691a6e0b0ede66bd45752b0165514fbec8844721eb038fbcc412af0eb691', '74bd888061f419745bd011367710e0ba98e0db0a2fb12ae1a21ba2d13d75a30c', '1dffaffb7cfe080b15aefae5fa18c2b7ad43facc8882b5d614fd45262f33e9c9', 'f1154be6dcc4f98f38ab4dbfe751457907b14dac3c76d1ed654aa65c690c2968']
       })
       client.setKeepAlive(5000)
       client
-        .on('error', err => clientTest.is(err.code, 'ETIMEDOUT'))
-        .on('open', () => clientTest.pass('Socket opened'))
+        .on('error', err => console.log('[client] error:', err)) // clientTest.is(err.code, 'ETIMEDOUT'))
+        .on('open', () => {
+          clientTest.pass('Socket opened. Now sending "hello"')
+          client.write('hello')
+        })
         .on('close', () => {
-          clientTest.pass('Socket closed. Now starting new server')
+          const time = Date.now() - closedAt
+          clientTest.pass(`Socket closed. Took ${time} ms to detect. Now starting new server`)
+          clearTimeout(timeoutTookTooLong)
           startServer()
         })
     })
