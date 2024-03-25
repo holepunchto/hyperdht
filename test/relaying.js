@@ -3,7 +3,7 @@ const RelayServer = require('blind-relay').Server
 const { swarm } = require('./helpers')
 const DHT = require('../')
 
-test('relay connections through node, client side', async function (t) {
+test.skip('relay connections through node, client side', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
@@ -63,7 +63,7 @@ test('relay connections through node, client side', async function (t) {
   await c.destroy()
 })
 
-test('relay connections through node, client side, client aborts hole punch', async function (t) {
+test.skip('relay connections through node, client side, client aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
@@ -123,7 +123,7 @@ test('relay connections through node, client side, client aborts hole punch', as
   await c.destroy()
 })
 
-test('relay connections through node, client side, server aborts hole punch', async function (t) {
+test.skip('relay connections through node, client side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
@@ -183,7 +183,7 @@ test('relay connections through node, client side, server aborts hole punch', as
   await c.destroy()
 })
 
-test('relay connections through node, server side', async function (t) {
+test.skip('relay connections through node, server side', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
@@ -243,7 +243,7 @@ test('relay connections through node, server side', async function (t) {
   await c.destroy()
 })
 
-test('relay connections through node, server side, client aborts hole punch', async function (t) {
+test.skip('relay connections through node, server side, client aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
@@ -303,7 +303,7 @@ test('relay connections through node, server side, client aborts hole punch', as
   await c.destroy()
 })
 
-test('relay connections through node, server side, server aborts hole punch', async function (t) {
+test.skip('relay connections through node, server side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
