@@ -71,7 +71,7 @@ test.skip('Client connects to Server and keeps reconnectings - with relay', { ti
       serverTest.pass('Server process killed. Waiting for client to detect')
       closedAt = Date.now()
 
-      const waitTimeUntilClientShouldHaveDetected = 4 * KEEPALIVE
+      const waitTimeUntilClientShouldHaveDetected = 10 * KEEPALIVE
       timeoutTookTooLong = setTimeout(() => {
         console.error('THE BUG OCCURED 🥳')
         console.log('Client did not detect that the socket was destroyed in time')
