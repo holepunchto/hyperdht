@@ -19,8 +19,8 @@ const clientKeyPair = DHT.keyPair()
 //   getInitialProps: () => ({ alias: 'client' })
 // })
 
-// test.skip('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
-test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
+test.skip('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
+// test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
   t.plan(2000)
 
   const clientNode = new DHT()
