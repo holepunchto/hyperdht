@@ -9,8 +9,9 @@ const relay = new RelayServer({
   }
 })
 
-const server = dht.createServer({ shareLocalAddress: false }, (socket) => {
-  console.log('Connection from', socket.remotePublicKey.toString('hex'))
+const server = dht.createServer(function (socket) {
+  console.log('Connection from', socket.remotePublicKey.toString('hex'), socket.rawStream.remoteHost)
+
   const session = relay.accept(socket, { id: socket.remotePublicKey })
   session
     .on('pair', (isInitiator, token, stream, remoteId) => {
