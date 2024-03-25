@@ -4,23 +4,23 @@ const {
 } = require('../helpers')
 const DHT = require('../../')
 const path = require('path')
-const { Client: KHLClient } = require('keet-hypertrace-logger')
+// const { Client: KHLClient } = require('keet-hypertrace-logger')
 
 const KEEPALIVE = 5000
 const clientKeyPair = DHT.keyPair()
-const khlClient = new KHLClient()
-khlClient.start({
-  createSocket: () => {
-    const node = new DHT()
-    return node.connect(Buffer.from('17ae5b10a5abdc269e16d740c1eb762f215c05a697c7e37c996abfcc488e82f3', 'hex'), {
-      keyPair: clientKeyPair
-    })
-  },
-  getInitialProps: () => ({ alias: 'client' })
-})
+// const khlClient = new KHLClient()
+// khlClient.start({
+//   createSocket: () => {
+//     const node = new DHT()
+//     return node.connect(Buffer.from('17ae5b10a5abdc269e16d740c1eb762f215c05a697c7e37c996abfcc488e82f3', 'hex'), {
+//       keyPair: clientKeyPair
+//     })
+//   },
+//   getInitialProps: () => ({ alias: 'client' })
+// })
 
-test.skip('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
-// test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
+// test.skip('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
+test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
   t.plan(2000)
 
   const clientNode = new DHT()
@@ -48,7 +48,7 @@ test.skip('Client connects to Server and keeps reconnectings - with relay', { ti
       ]
 
       for await (const [kill, data] of spawnFixture(serverTest, args)) {
-        // console.log(`[server] on(data): ${data}`)
+        console.log(`[server] on(data): ${data}`)
 
         if (data.startsWith('socket_onopen ')) {
           const ip = data.split(' ').pop()
