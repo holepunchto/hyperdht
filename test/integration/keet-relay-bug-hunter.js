@@ -4,6 +4,7 @@ const {
 } = require('../helpers')
 const DHT = require('../../')
 const path = require('path')
+const hic = require('hypercore-id-encoding')
 // const { Client: KHLClient } = require('keet-hypertrace-logger')
 
 const KEEPALIVE = 5000
@@ -19,9 +20,9 @@ const clientKeyPair = DHT.keyPair()
 //   getInitialProps: () => ({ alias: 'client' })
 // })
 
-test.skip('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
-// test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
-  t.plan(2000)
+// test.skip('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
+test.solo('Client connects to Server and keeps reconnectings - with relay', { timeout: 0 }, async t => {
+  t.plan(10000)
 
   const clientNode = new DHT()
 
@@ -48,27 +49,31 @@ test.skip('Client connects to Server and keeps reconnectings - with relay', { ti
       ]
 
       for await (const [kill, data] of spawnFixture(serverTest, args)) {
-        console.log(`[server] on(data): ${data}`)
+        console.log(`[server] output: ${data}`)
 
+        if (data === 'started') {
+          console.log('test1')
+          serverTest.pass('[1/5] Started. Now starting new client')
+          startClient()
+        }
         if (data.startsWith('socket_onopen ')) {
           const ip = data.split(' ').pop()
-          serverTest.ok(!ip.startsWith('127.'))
-          serverTest.ok(!ip.startsWith('10.'))
+          console.log('test2')
+          serverTest.ok(!ip.startsWith('127.'), '[2/5] Not local ip')
+          console.log('test3')
+          serverTest.ok(!ip.startsWith('10.'), '[3/5] Not local ip')
           console.log(`[server] Connection from ${ip}`)
         }
         if (data === 'socket_ondata hello') {
           const waitTime = Math.floor(1000 + 1000 * 9 * Math.random())
-          serverTest.pass(`Received "hello" from client. Waiting ${waitTime} ms, then killing server`)
+          console.log('test4')
+          serverTest.pass(`[4/5] Received "hello" from client. Sending "world" back, then wait ${waitTime} ms and kill server`)
           setTimeout(kill, waitTime)
-        }
-
-        if (data === 'started') {
-          serverTest.pass('Started. Now starting new client')
-          startClient()
         }
       }
 
-      serverTest.pass('Server process killed. Waiting for client to detect')
+      console.log('test5')
+      serverTest.pass('[5/5] Server process killed. Waiting for client to detect')
       closedAt = Date.now()
 
       const waitTimeUntilClientShouldHaveDetected = 10 * KEEPALIVE
@@ -83,10 +88,15 @@ test.skip('Client connects to Server and keeps reconnectings - with relay', { ti
 
   function startClient () {
     t.test('client', clientTest => {
-      clientTest.plan(2)
+      clientTest.plan(3)
 
       const client = clientNode.connect(serverKeyPair.publicKey, {
         keyPair: clientKeyPair, // To ensure same client keyPair on each connection
+        // relayKeepAlive: 100,
+        // relayThrough: [
+        //   // hic.decode('8684i4hjjcjqxh6or7kxnidwzqej8z8mi91tuw54k6j548gto7ky')
+        //   hic.decode('okyufaztgzc3143c3hmxt35bj63bitnrxtszn4bi36ykn3a1qbqy')
+        // ]
         relayThrough: [
           Buffer.from('45ae429318f146326dddb27168532c7c6b21cacfdd4a43d539e06bd518a7893a', 'hex'),
           Buffer.from('26eb24c97e53f94d392842b3c0b3fddcb903a0883ac5691e67e4c9d369ef2332', 'hex'),
@@ -97,16 +107,20 @@ test.skip('Client connects to Server and keeps reconnectings - with relay', { ti
           Buffer.from('f1154be6dcc4f98f38ab4dbfe751457907b14dac3c76d1ed654aa65c690c2968', 'hex')
         ]
       })
-      client.setKeepAlive(5000)
+      client.setKeepAlive(KEEPALIVE)
       client
         .on('error', err => console.log('[client] error:', err)) // clientTest.is(err.code, 'ETIMEDOUT'))
         .on('open', () => {
-          clientTest.pass('Socket opened. Now sending "hello"')
+          clientTest.pass('[1/3] Socket opened. Now sending "hello"')
           client.write('hello')
+        })
+        .on('data', data => {
+          data = data.toString()
+          if (data === 'world') clientTest.pass('[2/3] Received "world" from server')
         })
         .on('close', () => {
           const time = Date.now() - closedAt
-          clientTest.pass(`Socket closed. Took ${time} ms to detect. Now starting new server`)
+          clientTest.pass(`[3/3] Socket closed. Took ${time} ms to detect. Now starting new server`)
           clearTimeout(timeoutTookTooLong)
           startServer()
         })

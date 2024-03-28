@@ -1,4 +1,5 @@
 const DHT = require('../../../')
+const hic = require('hypercore-id-encoding')
 // const { Client: KHLClient } = require('keet-hypertrace-logger')
 
 const publicKey = Buffer.from(process.argv[2], 'hex')
@@ -22,6 +23,11 @@ async function main () {
   const server = node.createServer({
     holepunch: false, // To ensure it relies only on relaying
     shareLocalAddress: false, // To help ensure it relies only on relaying (otherwise it can connect directly over LAN, without even trying to holepunch)
+    // relayKeepAlive: 100,
+    // relayThrough: [
+    //   // hic.decode('8684i4hjjcjqxh6or7kxnidwzqej8z8mi91tuw54k6j548gto7ky')
+    //   hic.decode('okyufaztgzc3143c3hmxt35bj63bitnrxtszn4bi36ykn3a1qbqy')
+    // ]
     relayThrough: [
       Buffer.from('45ae429318f146326dddb27168532c7c6b21cacfdd4a43d539e06bd518a7893a', 'hex'),
       Buffer.from('26eb24c97e53f94d392842b3c0b3fddcb903a0883ac5691e67e4c9d369ef2332', 'hex'),
@@ -34,15 +40,19 @@ async function main () {
   }, socket => {
     socket.setKeepAlive(5000)
     socket
-      .on('data', data => console.log(`socket_ondata ${data.toString()}`))
-      .on('open', () => console.log(`socket_onopen ${socket.rawStream.remoteHost}`))
+      .on('data', data => {
+        console.log(`socket_ondata ${data.toString()}`)
+        socket.write('world')
+      })
+      .on('open', () => console.log(`socket_onopen ${socket.rawStream.remoteHost}:${socket.rawStream.remotePort}`))
       .on('close', () => console.log('socket_onclose'))
       .on('error', err => console.log(`socket_onerror ${err.code}`))
   })
   server.on('open', () => console.log('server_onopen'))
   server.on('error', err => console.log(`server_onerror ${err.code}`))
   server.on('close', () => console.log('server_onclose'))
-
+  console.log('prelistening')
   await server.listen(keyPair)
+  console.log('postlistening')
   console.log('started')
 }
