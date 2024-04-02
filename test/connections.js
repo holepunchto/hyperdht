@@ -699,20 +699,23 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
 
   const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, connectionKeepAlive: 10 })
-  const b = new DHT({ bootstrap, connectionKeepAlive: 20 })
+  const a = new DHT({ bootstrap, connectionKeepAlive: 10000 })
+  const b = new DHT({ bootstrap, connectionKeepAlive: 20000 })
 
   // TODO: replace _keepAliveMs with keepAliveMs once https://github.com/holepunchto/hyperswarm-secret-stream/pull/30 is released
   const server = a.createServer(async function (socket) {
-    allChecks.is(socket._keepAliveMs, 10, 'keepAlive set for server')
+    allChecks.is(socket._keepAliveMs, 10000, 'keepAlive set for server')
   })
 
   await server.listen()
 
   const socket = b.connect(server.publicKey)
-  allChecks.is(socket._keepAliveMs, 20, 'keepAlive set for connection')
+  allChecks.is(socket._keepAliveMs, 20000, 'keepAlive set for connection')
 
   await allChecks
+  await socket.end()
+  await server.close()
+
   await a.destroy()
   await b.destroy()
 })
