@@ -704,12 +704,15 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
 
   // TODO: replace _keepAliveMs with keepAliveMs once https://github.com/holepunchto/hyperswarm-secret-stream/pull/30 is released
   const server = a.createServer(async function (socket) {
+    socket.on('error', () => {})
     allChecks.is(socket._keepAliveMs, 10000, 'keepAlive set for server')
   })
 
   await server.listen()
 
   const socket = b.connect(server.publicKey)
+  socket.on('error', () => {})
+
   allChecks.is(socket._keepAliveMs, 20000, 'keepAlive set for connection')
 
   await allChecks
