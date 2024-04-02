@@ -66,8 +66,6 @@ class HyperDHT extends DHT {
   createServer (opts, onconnection) {
     if (typeof opts === 'function') return this.createServer({}, opts)
     if (opts && opts.onconnection) onconnection = opts.onconnection
-    opts = { connectionKeepAlive: this.connectionKeepAlive, ...opts }
-
     const s = new Server(this, opts)
     if (onconnection) s.on('connection', onconnection)
     return s
