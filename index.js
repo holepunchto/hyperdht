@@ -29,6 +29,7 @@ class HyperDHT extends DHT {
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
     this.tracer = createTracer(this)
+    this.connectionKeepAlive = opts.connectionKeepAlive || 0
 
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
@@ -65,6 +66,8 @@ class HyperDHT extends DHT {
   createServer (opts, onconnection) {
     if (typeof opts === 'function') return this.createServer({}, opts)
     if (opts && opts.onconnection) onconnection = opts.onconnection
+    opts = { connectionKeepAlive: this.connectionKeepAlive, ...opts }
+
     const s = new Server(this, opts)
     if (onconnection) s.on('connection', onconnection)
     return s

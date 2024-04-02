@@ -687,3 +687,32 @@ test('exception if null id is used', async function (t) {
     await a.destroy()
   }
 })
+
+test('connectionKeepAlive defaults to 0', async function (t) {
+  const [a] = await swarm(t)
+  t.is(a.connectionKeepAlive, 0)
+})
+
+test('connectionKeepAlive passed to server and connection', async function (t) {
+  const allChecks = t.test('all') // hack so we can await plan
+  allChecks.plan(2)
+
+  const { bootstrap } = await swarm(t)
+
+  const a = new DHT({ bootstrap, connectionKeepAlive: 10 })
+  const b = new DHT({ bootstrap, connectionKeepAlive: 20 })
+
+  // TODO: replace _keepAliveMs with keepAliveMs once https://github.com/holepunchto/hyperswarm-secret-stream/pull/30 is released
+  const server = a.createServer(async function (socket) {
+    allChecks.is(socket._keepAliveMs, 10, 'keepAlive set for server')
+  })
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey)
+  allChecks.is(socket._keepAliveMs, 20, 'keepAlive set for connection')
+
+  await allChecks
+  await a.destroy()
+  await b.destroy()
+})
