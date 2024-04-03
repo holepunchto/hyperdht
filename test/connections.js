@@ -687,3 +687,37 @@ test('exception if null id is used', async function (t) {
     await a.destroy()
   }
 })
+
+test('connectionKeepAlive defaults to 0', async function (t) {
+  const [a] = await swarm(t)
+  t.is(a.connectionKeepAlive, 0)
+})
+
+test('connectionKeepAlive passed to server and connection', async function (t) {
+  const allChecks = t.test('all') // hack so we can await plan
+  allChecks.plan(2)
+
+  const { bootstrap } = await swarm(t)
+
+  const a = new DHT({ bootstrap, connectionKeepAlive: 10000 })
+  const b = new DHT({ bootstrap, connectionKeepAlive: 20000 })
+
+  const server = a.createServer(async function (socket) {
+    socket.on('error', () => {})
+    allChecks.is(socket.keepAlive, 10000, 'keepAlive set for server')
+  })
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey)
+  socket.on('error', () => {})
+
+  allChecks.is(socket.keepAlive, 20000, 'keepAlive set for connection')
+
+  await allChecks
+  await socket.end()
+  await server.close()
+
+  await a.destroy()
+  await b.destroy()
+})
