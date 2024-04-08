@@ -45,7 +45,6 @@
   "devDependencies": {
     "brittle": "^3.0.0",
     "graceful-goodbye": "^1.3.0",
-    "keypear": "^1.1.1",
     "newline-decoder": "^1.0.2",
     "standard": "^17.1.0"
   },
