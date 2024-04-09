@@ -2,6 +2,7 @@ const test = require('brittle')
 const DHT = require('../../')
 const path = require('path')
 const { swarm, spawnFixture } = require('../helpers')
+const b4a = require('b4a')
 
 // Server is run in a separate proces to make sure that we can forcefully close it.
 // If the server called `socket.destroy()` that would send an unacked packet back
@@ -16,8 +17,8 @@ test('Client use keepalive to detect disconnect - separated by processes', async
   const { bootstrap } = await swarm(t)
   const node = new DHT({ bootstrap })
   const keyPair = DHT.keyPair()
-  const publicKey = keyPair.publicKey.toString('hex')
-  const secretKey = keyPair.secretKey.toString('hex')
+  const publicKey = b4a.toString(keyPair.publicKey, 'hex')
+  const secretKey = b4a.toString(keyPair.secretKey, 'hex')
 
   clientTest.plan(3)
 
@@ -63,8 +64,8 @@ test('Client not using keepalive does not detect disconnect - separated by proce
   const { bootstrap } = await swarm(t)
   const node = new DHT({ bootstrap })
   const keyPair = DHT.keyPair()
-  const publicKey = keyPair.publicKey.toString('hex')
-  const secretKey = keyPair.secretKey.toString('hex')
+  const publicKey = b4a.toString(keyPair.publicKey, 'hex')
+  const secretKey = b4a.toString(keyPair.secretKey, 'hex')
   let timedout = false
 
   clientTest.plan(2)

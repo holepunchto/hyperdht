@@ -3,6 +3,7 @@ const { spawnFixture } = require('../helpers')
 const { Server: RelayServer } = require('blind-relay')
 const DHT = require('../../')
 const path = require('path')
+const b4a = require('b4a')
 
 /*
   When a peer connects to a relay server, there's two sockets established. One for data (between two peers)
@@ -31,8 +32,8 @@ test('When Server is killed, Client should detect this - through relay', async t
   const relayNode = new DHT()
   const relayKeyPair = DHT.keyPair()
   const serverKeyPair = DHT.keyPair()
-  const serverPublicKey = serverKeyPair.publicKey.toString('hex')
-  const serverSecretKey = serverKeyPair.secretKey.toString('hex')
+  const serverPublicKey = b4a.toString(serverKeyPair.publicKey, 'hex')
+  const serverSecretKey = b4a.toString(serverKeyPair.secretKey, 'hex')
   let hasClientDetectedThatServerDied = false
   let didClientNotDetectThatServerDiedTimer
   let didClientNotDetectThatServerDiedTimerFired = false
@@ -85,7 +86,7 @@ test('When Server is killed, Client should detect this - through relay', async t
       path.join(__dirname, 'fixtures/server-through-relay.js'),
       serverPublicKey,
       serverSecretKey,
-      relayKeyPair.publicKey.toString('hex'),
+      b4a.toString(relayKeyPair.publicKey, 'hex'),
       SOCKET_KEEPALIVE,
       RELAY_KEEPALIVE
     ]

@@ -1,8 +1,9 @@
 const DHT = require('../../../')
+const b4a = require('b4a')
 
-const publicKey = Buffer.from(process.argv[2], 'hex')
-const secretKey = Buffer.from(process.argv[3], 'hex')
-const relayServer = Buffer.from(process.argv[4], 'hex')
+const publicKey = b4a.from(process.argv[2], 'hex')
+const secretKey = b4a.from(process.argv[3], 'hex')
+const relayServer = b4a.from(process.argv[4], 'hex')
 const socketKeepAlive = Number(process.argv[5] || 5000)
 const relayKeepAlive = Number(process.argv[6] || 5000)
 const keyPair = { publicKey, secretKey }
