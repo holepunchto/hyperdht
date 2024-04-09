@@ -11,9 +11,11 @@ console.log('[server] i am alive')
 async function run () {
   const node = new DHT()
   const server = node.createServer(() => { })
-  const aliveInterval = setInterval(() => console.log('[server] i am alive'), 1000)
+  const aliveInterval = setInterval(() => console.log('[server] i am alive'), 500)
   aliveInterval.unref()
+  console.log('[server] ready to listen')
   await server.listen()
+  console.log('[server] after await server.listen()')
 }
 
 run()

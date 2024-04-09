@@ -11,10 +11,13 @@ test.skip(`Start a server ${COUNT} times`, { timeout: 0 }, async t => {
 
   for (let i = 0; i < COUNT; i++) {
     const startTime = Date.now()
+    console.log(1)
     await t.test(async serverTest => {
+      console.log(2)
       serverTest.plan(1)
 
       await new Promise((resolve, reject) => {
+        console.log(3)
         const process = spawn('node', ['fixtures/start-server.js', i])
         process.stdout.on('data', data => {
           if (data.toString().includes('_update') || data.toString().includes('[server]')) {
