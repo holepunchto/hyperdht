@@ -6,9 +6,13 @@ const DHT = require('../../../')
   It will hang if, for some reason, `await server.listen()` never returns [TBC: this is the bug I am hunting]
 */
 
+console.log('[server] i am alive')
+
 async function run () {
   const node = new DHT()
   const server = node.createServer(() => { })
+  const aliveInterval = setInterval(() => console.log('[server] i am alive'), 1000)
+  aliveInterval.unref()
   await server.listen()
 }
 
