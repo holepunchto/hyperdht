@@ -44,7 +44,7 @@ test('When Server is killed, Client should detect this - through relay', async t
   })
 
   await startRelayServer()
-  startServer()
+  await startServer()
 
   async function startRelayServer () {
     const relay = new RelayServer({
