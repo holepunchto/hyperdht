@@ -18,11 +18,11 @@ test('When Server is killed, Client should detect this - through relay', async t
   t.plan(3)
 
   const relayTest = t.test('relay')
-  relayTest.plan(3)
+  relayTest.plan(5)
   const clientTest = t.test('client')
   clientTest.plan(3)
   const serverTest = t.test('server')
-  serverTest.plan(3)
+  serverTest.plan(4)
 
   const RELAY_KEEPALIVE = 500
   const SOCKET_KEEPALIVE = 10 * RELAY_KEEPALIVE
@@ -39,6 +39,7 @@ test('When Server is killed, Client should detect this - through relay', async t
   let didClientNotDetectThatServerDiedTimerFired = false
 
   t.teardown(async () => {
+    console.log('teardown started')
     await clientNode.destroy()
     await relayNode.destroy()
   })
@@ -78,7 +79,9 @@ test('When Server is killed, Client should detect this - through relay', async t
       session.on('error', () => { })
     })
 
+    relayTest.pass(`Ready to start relay server. publicKey=${b4a.toString(relayKeyPair.publicKey, 'hex')}`)
     await relayServer.listen(relayKeyPair)
+    relayTest.pass('Started relay server')
   }
 
   async function startServer () {
@@ -90,6 +93,8 @@ test('When Server is killed, Client should detect this - through relay', async t
       SOCKET_KEEPALIVE,
       RELAY_KEEPALIVE
     ]
+
+    serverTest.pass('Ready to start server')
 
     for await (const [kill, data] of spawnFixture(serverTest, args)) {
       if (data === 'started') {
