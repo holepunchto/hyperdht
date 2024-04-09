@@ -21,7 +21,7 @@ async function main () {
     socket.setKeepAlive(socketKeepAlive)
     socket
       .on('data', data => {
-        console.log(`socket_ondata ${data.toString()}`)
+        console.log(`socket_ondata ${b4a.toString(data)}`)
         socket.write('world')
       })
       .on('open', () => console.log(`socket_onopen ${socket.rawStream.remoteHost}:${socket.rawStream.remotePort}`))

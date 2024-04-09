@@ -124,7 +124,7 @@ test('When Server is killed, Client should detect this - through relay', async t
         client.write('hello')
       })
       .on('data', data => {
-        data = data.toString()
+        data = b4a.toString(data)
 
         if (data === 'world') {
           clientTest.pass('Received "world" from server')
