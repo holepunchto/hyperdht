@@ -1,4 +1,6 @@
 const DHT = require('../../../')
+const repl = require('repl-swarm')
+const fs = require('fs')
 
 /*
   This test is put into a fixture to make sure that each run is its own.
@@ -6,23 +8,33 @@ const DHT = require('../../../')
   It will hang if, for some reason, `await server.listen()` never returns [TBC: this is the bug I am hunting]
 */
 
-console.log('[server] i am alive')
+log(`[server] i am alive. pid=${process.pid}`)
 
 async function run () {
   const node = new DHT()
   const server = node.createServer(() => { })
-  const aliveInterval = setInterval(() => console.log('[server] i am alive'), 500)
+  repl({ data: { node, server } })
+  const aliveInterval = setInterval(() => log('[server] i am still alive'), 500)
   aliveInterval.unref()
-  console.log('[server] ready to listen')
+  log('[server] ready to listen')
   await server.listen()
-  console.log('[server] after await server.listen()')
+  log('[server] after await server.listen()')
 }
 
 run()
   .then(() => {
+    log('[server] should do exit 0')
     process.exit(0)
   })
   .catch(err => {
-    console.error(err)
+    log('[server] should do exit 1')
+    log(`[server] error: ${err.message}`)
+    error(err)
     process.exit(1)
   })
+
+function log (str) {
+  // Not doing appendFileSync at the moment, to not change the timing too much
+  fs.appendFile('./log.log', `[${new Date().toISOString()}] [${process.pid}] ${str}\n`, () => { })
+  console.log(str)
+}

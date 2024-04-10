@@ -1,8 +1,5 @@
 const { spawn } = require('child_process')
 const test = require('brittle')
-const repl = require('repl-swarm')
-
-repl({ data: { i: 'am exposed in the repl' }, foo: 'anything in this map is exposed to the repl' })
 
 const COUNT = 10000
 
@@ -26,8 +23,15 @@ test.skip(`Start a server ${COUNT} times`, { timeout: 0 }, async t => {
           }
           serverTest.fail(data.toString())
         })
-        process.stderr.on('data', data => serverTest.fail(data.toString()))
+        process.stderr.on('data', data => {
+          if (data.toString().includes('repl-swarm')) {
+            console.log(data.toString().trim())
+            return
+          }
+          serverTest.fail(data.toString())
+        })
         process.on('exit', (code) => {
+          console.log('exit', code)
           if (code === 0) {
             serverTest.pass(`Took ${Date.now() - startTime} ms`)
             resolve()
