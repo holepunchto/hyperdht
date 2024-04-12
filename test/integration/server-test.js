@@ -17,18 +17,10 @@ test.skip(`Start a server ${COUNT} times`, { timeout: 0 }, async t => {
         console.log(3)
         const process = spawn('node', ['fixtures/start-server.js', i])
         process.stdout.on('data', data => {
-          if (data.toString().includes('_update') || data.toString().includes('[server]')) {
-            console.log(data.toString().trim())
-            return
-          }
-          serverTest.fail(data.toString())
+          console.log(data.toString().trim())
         })
         process.stderr.on('data', data => {
-          if (data.toString().includes('repl-swarm')) {
-            console.log(data.toString().trim())
-            return
-          }
-          serverTest.fail(data.toString())
+          console.log(data.toString().trim())
         })
         process.on('exit', (code) => {
           console.log('exit', code)
@@ -37,7 +29,7 @@ test.skip(`Start a server ${COUNT} times`, { timeout: 0 }, async t => {
             resolve()
           } else {
             serverTest.fail(`Test ${i} failed with code ${code}`)
-            reject()
+            reject(new Error(`Test ${i} failed with code ${code}`))
           }
         })
       })
