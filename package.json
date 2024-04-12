@@ -52,7 +52,8 @@
     "test": "standard && node test/all.js",
     "test:generate": "brittle -r test/all.js test/*.js",
     "lint": "standard",
-    "integration": "brittle test/integration/*.js"
+    "integration": "brittle test/integration/*.js",
+    "end-to-end": "brittle test/end-to-end/*.js"
   },
   "author": "Mathias Buus (@mafintosh)",
   "license": "MIT",
