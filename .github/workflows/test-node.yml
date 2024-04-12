@@ -27,7 +27,6 @@ jobs:
       - run: npm install
       - run: npm test
       - run: npm run integration
-      - run: npm run end-to-end # Some (rare) flakiness expected with these tests--rerun on failure, and worry only if it fails twice
   trigger_canary:
     if: startsWith(github.ref, 'refs/tags/') # Only run when a new package is published (detects when a new tag is pushed)
     runs-on: ubuntu-latest

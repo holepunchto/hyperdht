@@ -3,5 +3,4 @@ Since they depend on outside services (like the prod DHT) they can be flaky.
 This means that a single failure of an end-to-end test is no cause for alarm.
 However, repeated failures when the service depended upon is available is a red flag.
 
-These tests are intended to be run on new PR's to indicate potential issues with the PR,
-but not daily as part of our canary tests.
+Because of their flakiness, they should not be added to automated runs (like the CI)
