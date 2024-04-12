@@ -1,5 +1,5 @@
 const test = require('brittle')
-const { spawnFixture } = require('../helpers')
+const { swarm, spawnFixture } = require('../helpers')
 const { Server: RelayServer } = require('blind-relay')
 const DHT = require('../../')
 const path = require('path')
@@ -27,9 +27,11 @@ test('When Server is killed, Client should detect this - through relay', async t
   const RELAY_KEEPALIVE = 500
   const SOCKET_KEEPALIVE = 10 * RELAY_KEEPALIVE
 
+  const { bootstrap } = await swarm(t) // Causes ECONNRESET
+  // const bootstrap = null // Causes ETIMEDOUT
+  const clientNode = new DHT({ bootstrap })
+  const relayNode = new DHT({ bootstrap })
   const clientKeyPair = DHT.keyPair()
-  const clientNode = new DHT()
-  const relayNode = new DHT()
   const relayKeyPair = DHT.keyPair()
   const serverKeyPair = DHT.keyPair()
   const serverPublicKey = b4a.toString(serverKeyPair.publicKey, 'hex')
@@ -58,6 +60,7 @@ test('When Server is killed, Client should detect this - through relay', async t
       socket.setKeepAlive(RELAY_KEEPALIVE)
 
       socket.on('error', err => {
+        console.log(err)
         // when error is ETIMEDOUT it's the server connection that has broken
         // not so long after that, the client should have detected that the connection is gone
         if (err.code === 'ETIMEDOUT') {
@@ -88,7 +91,8 @@ test('When Server is killed, Client should detect this - through relay', async t
       serverSecretKey,
       b4a.toString(relayKeyPair.publicKey, 'hex'),
       SOCKET_KEEPALIVE,
-      RELAY_KEEPALIVE
+      RELAY_KEEPALIVE,
+      JSON.stringify(bootstrap)
     ]
 
     for await (const [kill, data] of spawnFixture(serverTest, args)) {

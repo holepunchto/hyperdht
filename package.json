@@ -40,6 +40,7 @@
     "signal-promise": "^1.0.3",
     "sodium-universal": "^4.0.0",
     "streamx": "^2.16.1",
+    "udx-native": "^1.8.8",
     "xache": "^1.1.0"
   },
   "devDependencies": {

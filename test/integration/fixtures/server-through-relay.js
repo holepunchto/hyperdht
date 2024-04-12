@@ -6,12 +6,13 @@ const secretKey = b4a.from(process.argv[3], 'hex')
 const relayServer = b4a.from(process.argv[4], 'hex')
 const socketKeepAlive = Number(process.argv[5] || 5000)
 const relayKeepAlive = Number(process.argv[6] || 5000)
+const bootstrap = JSON.parse(process.argv[7])
 const keyPair = { publicKey, secretKey }
 
 main()
 
 async function main () {
-  const node = new DHT()
+  const node = new DHT({ bootstrap })
   const server = node.createServer({
     holepunch: false, // To ensure it relies only on relaying
     shareLocalAddress: false, // To help ensure it relies only on relaying (otherwise it can connect directly over LAN, without even trying to holepunch)
