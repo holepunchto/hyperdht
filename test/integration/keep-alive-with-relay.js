@@ -14,7 +14,7 @@ const b4a = require('b4a')
   A bug that occured with udx-native < 1.8.9 is that the relay server had detected the control socket had bad been destroyed,
   but didn't fully clean up internally. That meant that this information was never fully relayed to the other peer.
 */
-test('When Server is killed, Client should detect this - through relay', async t => {
+test.solo('When Server is killed, Client should detect this - through relay', async t => {
   t.plan(3)
 
   const relayTest = t.test('relay')
