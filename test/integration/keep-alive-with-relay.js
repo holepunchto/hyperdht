@@ -18,7 +18,7 @@ test.solo('When Server is killed, Client should detect this - through relay', as
   t.plan(3)
 
   const relayTest = t.test('relay')
-  relayTest.plan(3)
+  relayTest.plan(5)
   const clientTest = t.test('client')
   clientTest.plan(3)
   const serverTest = t.test('server')
@@ -51,6 +51,7 @@ test.solo('When Server is killed, Client should detect this - through relay', as
   async function startRelayServer () {
     const relay = new RelayServer({
       createStream (opts) {
+        relayTest.pass('createStream')
         return relayNode.createRawStream({ ...opts, framed: true })
       }
     })
