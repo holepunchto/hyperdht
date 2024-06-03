@@ -30,6 +30,7 @@ class HyperDHT extends DHT {
     this.listening = new Set()
     this.tracer = createTracer(this)
     this.connectionKeepAlive = opts.connectionKeepAlive || 0
+    this.stats = { punches: { consistent: 0, random: 0, open: 0 } }
 
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
