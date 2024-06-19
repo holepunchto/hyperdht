@@ -15,7 +15,7 @@ test('basic noise payload', function (t) {
     udx: null,
     secretStream: null,
     relayThrough: null,
-    invalidateStream: -1
+    invalidateStream: null
   }
 
   m.noisePayload.preencode(state, c)
@@ -58,7 +58,7 @@ test('noise payload with holepunch and addresses', function (t) {
     udx: null,
     secretStream: null,
     relayThrough: null,
-    invalidateStream: -1
+    invalidateStream: null
   }
 
   m.noisePayload.preencode(state, c)
@@ -90,7 +90,7 @@ test('noise payload only addresses', function (t) {
     udx: null,
     secretStream: null,
     relayThrough: null,
-    invalidateStream: -1
+    invalidateStream: null
   }
 
   m.noisePayload.preencode(state, c)
@@ -122,7 +122,7 @@ test('noise payload ipv6', function (t) {
     udx: null,
     secretStream: null,
     relayThrough: null,
-    invalidateStream: -1
+    invalidateStream: null
   }
 
   m.noisePayload.preencode(state, c)
@@ -155,7 +155,7 @@ test('noise payload newer version', function (t) {
     udx: null,
     secretStream: null,
     relayThrough: null,
-    invalidateStream: -1
+    invalidateStream: null
   })
 })
 
@@ -172,7 +172,7 @@ test('noise payload invalidate prev stream', function (t) {
     udx: null,
     secretStream: null,
     relayThrough: null,
-    invalidateStream: 100
+    invalidateStream: b4a.allocUnsafe(32).fill(2)
   }
 
   m.noisePayload.preencode(state, c)
