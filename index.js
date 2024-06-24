@@ -66,6 +66,7 @@ class HyperDHT extends DHT {
     return connect(this, decode(remotePublicKey), opts)
   }
 
+  /** @returns {Server} */
   createServer (opts, onconnection) {
     if (typeof opts === 'function') return this.createServer({}, opts)
     if (opts && opts.onconnection) onconnection = opts.onconnection
