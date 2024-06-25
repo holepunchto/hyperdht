@@ -14,7 +14,8 @@ test('basic noise payload', function (t) {
     addresses6: [],
     udx: null,
     secretStream: null,
-    relayThrough: null
+    relayThrough: null,
+    timestamp: -1
   }
 
   m.noisePayload.preencode(state, c)
@@ -56,7 +57,8 @@ test('noise payload with holepunch and addresses', function (t) {
     addresses6: [],
     udx: null,
     secretStream: null,
-    relayThrough: null
+    relayThrough: null,
+    timestamp: -1
   }
 
   m.noisePayload.preencode(state, c)
@@ -87,7 +89,8 @@ test('noise payload only addresses', function (t) {
     addresses6: [],
     udx: null,
     secretStream: null,
-    relayThrough: null
+    relayThrough: null,
+    timestamp: -1
   }
 
   m.noisePayload.preencode(state, c)
@@ -118,7 +121,8 @@ test('noise payload ipv6', function (t) {
     }],
     udx: null,
     secretStream: null,
-    relayThrough: null
+    relayThrough: null,
+    timestamp: -1
   }
 
   m.noisePayload.preencode(state, c)
@@ -150,8 +154,38 @@ test('noise payload newer version', function (t) {
     addresses6: [],
     udx: null,
     secretStream: null,
-    relayThrough: null
+    relayThrough: null,
+    timestamp: -1
   })
+})
+
+test('noise payload timestamp', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const c = {
+    version: 1,
+    error: 0,
+    firewall: 2,
+    holepunch: null,
+    addresses4: [],
+    addresses6: [],
+    udx: null,
+    secretStream: null,
+    relayThrough: null,
+    timestamp: Date.now()
+  }
+
+  m.noisePayload.preencode(state, c)
+
+  state.buffer = b4a.allocUnsafe(state.end)
+  m.noisePayload.encode(state, c)
+
+  state.start = 0
+
+  const d = m.noisePayload.decode(state)
+
+  t.is(state.start, state.end)
+  t.alike(d, c)
 })
 
 test('basic holepunch payload', function (t) {
