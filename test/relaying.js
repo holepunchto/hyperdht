@@ -379,7 +379,7 @@ test('relay connections through node, client and server side', async function (t
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(6)
+  lc.plan(10)
   const testRelay = t.test('relay server')
   testRelay.plan(2) // One each for the initiator and the follower
   const testRelayInitiator = t.test('relay initiator')
@@ -432,8 +432,12 @@ test('relay connections through node, client and server side', async function (t
   const bSocket = c.connect(bServer.publicKey, { relayThrough: aServer.publicKey })
 
   bSocket
-    .on('relay', () => {
+    .on('relay', (data) => {
       lc.pass('client socket is being relayed')
+      lc.is(data.relaying, true)
+      lc.is(data.relayPaired, true)
+      lc.alike(data.relayThrough, aServer.publicKey)
+      lc.alike(data.remotePublicKey, bServer.publicKey)
     })
     .on('relay-aborted', (data) => {
       lc.fail('client relay aborted')
