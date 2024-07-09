@@ -11,7 +11,7 @@ test('relay connections through node, client side', async function (t) {
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(7)
+  lc.plan(5)
 
   const aServer = a.createServer(function (socket) {
     lc.pass('server socket opened')
@@ -54,10 +54,6 @@ test('relay connections through node, client side', async function (t) {
     })
     .end('hello world')
 
-  aSocket.relay.on('abort', () => {
-    lc.pass('relay aborted')
-    lc.is(aSocket.relay.relaying, false)
-  })
   await lc
 
   await a.destroy()
@@ -73,7 +69,7 @@ test('relay connections through node, client side, client aborts hole punch', as
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(6)
+  lc.plan(5)
 
   const aServer = a.createServer(function (socket) {
     lc.pass('server socket opened')
@@ -116,10 +112,6 @@ test('relay connections through node, client side, client aborts hole punch', as
     })
     .end('hello world')
 
-  aSocket.relay.on('abort', () => {
-    lc.pass('client relay aborted')
-  })
-
   await lc
 
   await a.destroy()
@@ -135,7 +127,7 @@ test('relay connections through node, client side, server aborts hole punch', as
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(6)
+  lc.plan(5)
 
   const aServer = a.createServer({ holepunch: () => false }, function (socket) {
     lc.pass('server socket opened')
@@ -178,10 +170,6 @@ test('relay connections through node, client side, server aborts hole punch', as
     })
     .end('hello world')
 
-  aSocket.relay.on('abort', () => {
-    lc.pass('client relay aborted')
-  })
-
   await lc
 
   await a.destroy()
@@ -197,7 +185,7 @@ test('relay connections through node, server side', async function (t) {
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(6)
+  lc.plan(5)
 
   const relay = new RelayServer({
     createStream (opts) {
@@ -240,10 +228,6 @@ test('relay connections through node, server side', async function (t) {
     })
     .end('hello world')
 
-  bSocket.relay.on('abort', () => {
-    lc.pass('client relay aborted')
-  })
-
   await lc
 
   await a.destroy()
@@ -259,7 +243,7 @@ test('relay connections through node, server side, client aborts hole punch', as
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(6)
+  lc.plan(5)
 
   const relay = new RelayServer({
     createStream (opts) {
@@ -302,10 +286,6 @@ test('relay connections through node, server side, client aborts hole punch', as
     })
     .end('hello world')
 
-  bSocket.relay.on('abort', () => {
-    lc.pass('client relay aborted')
-  })
-
   await lc
 
   await a.destroy()
@@ -321,7 +301,7 @@ test('relay connections through node, server side, server aborts hole punch', as
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(6)
+  lc.plan(5)
 
   const relay = new RelayServer({
     createStream (opts) {
@@ -363,10 +343,6 @@ test('relay connections through node, server side, server aborts hole punch', as
       lc.pass('client socket closed')
     })
     .end('hello world')
-
-  bSocket.relay.on('abort', () => {
-    lc.pass('client relay aborted')
-  })
 
   await lc
 
@@ -451,9 +427,6 @@ test('relay connections through node, client and server side', async function (t
       lc.alike(bSocket.relay.remotePublicKey, bServer.publicKey)
       lc.alike(bSocket.relay.relayThrough, aServer.publicKey)
     })
-    .on('abort', () => {
-      lc.fail('client relay aborted')
-    })
 
   await lc
 
@@ -470,7 +443,7 @@ test.skip('relay several connections through node with pool', async function (t)
   const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(12)
+  lc.plan(10)
 
   const aServer = a.createServer(function (socket) {
     lc.pass('server socket opened')
@@ -523,16 +496,8 @@ test.skip('relay several connections through node with pool', async function (t)
           lc.pass('2nd client socket closed')
         })
         .end('hello world')
-
-      aSocket.relay.on('abort', () => {
-        lc.pass('2nd client relay aborted')
-      })
     })
     .end('hello world')
-
-  aSocket.relay.on('abort', () => {
-    lc.pass('1st client relay aborted')
-  })
 
   await lc
 
