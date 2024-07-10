@@ -1,6 +1,6 @@
 {
   "name": "hyperdht",
-  "version": "6.15.3",
+  "version": "6.15.4",
   "description": "The DHT powering Hyperswarm",
   "main": "index.js",
   "browser": "browser.js",
