@@ -29,7 +29,9 @@ class HyperDHT extends DHT {
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
     this.tracer = createTracer(this)
-    this.connectionKeepAlive = opts.connectionKeepAlive || 0
+    this.connectionKeepAlive = opts.connectionKeepAlive == null
+      ? 5000
+      : opts.connectionKeepAlive
 
     // stats is inherited from dht-rpc so fwd the ones from there
     this.stats = { punches: { consistent: 0, random: 0, open: 0 }, ...this.stats }

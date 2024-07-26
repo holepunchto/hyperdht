@@ -688,9 +688,24 @@ test('exception if null id is used', async function (t) {
   }
 })
 
-test('connectionKeepAlive defaults to 0', async function (t) {
-  const [a] = await swarm(t)
-  t.is(a.connectionKeepAlive, 0)
+test('connectionKeepAlive defaults to 5000', async function (t) {
+  t.plan(4)
+
+  const [a, b] = await swarm(t)
+  t.is(a.connectionKeepAlive, 5000, 'sanity check: connectionKeepAlive set to 5000')
+  t.is(b.connectionKeepAlive, 5000, 'sanity check: connectionKeepAlive set to 5000')
+
+  const server = a.createServer((socket) => {
+    socket.on('error', () => {})
+    t.is(socket.keepAlive, 5000, 'keepAlive set for server socket')
+  })
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey)
+  socket.on('error', () => {})
+
+  t.is(socket.keepAlive, 5000, 'keepAlive set for client socket')
 })
 
 test('connectionKeepAlive passed to server and connection', async function (t) {
