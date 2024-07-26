@@ -62,7 +62,7 @@ test('Client not using keepalive does not detect disconnect - separated by proce
 
   const clientTest = t.test('client')
   const { bootstrap } = await swarm(t)
-  const node = new DHT({ bootstrap, connectionKeepAlive: 0 })
+  const node = new DHT({ bootstrap, connectionKeepAlive: false })
   const keyPair = DHT.keyPair()
   const publicKey = b4a.toString(keyPair.publicKey, 'hex')
   const secretKey = b4a.toString(keyPair.secretKey, 'hex')

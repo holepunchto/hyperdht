@@ -72,7 +72,7 @@ Options include:
   // Defaults to ['node1.hyperdht.org:49737', 'node2.hyperdht.org:49737', 'node3.hyperdht.org:49737']
   bootstrap: ['host:port'],
   keyPair, // set the default key pair to use for server.listen and connect
-  connectionKeepAlive // set a default keep-alive (in ms) on all opened sockets. Defaults to 0 (no keep-alive).
+  connectionKeepAlive // set a default keep-alive (in ms) on all opened sockets. Defaults to 5000. Set false to turn off (advanced usage).
 }
 ```
 

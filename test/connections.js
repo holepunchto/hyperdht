@@ -708,6 +708,34 @@ test('connectionKeepAlive defaults to 5000', async function (t) {
   t.is(socket.keepAlive, 5000, 'keepAlive set for client socket')
 })
 
+test('connectionKeepAlive can be turned off', async function (t) {
+  t.plan(4)
+
+  const { bootstrap } = await swarm(t)
+
+  const a = new DHT({ bootstrap, connectionKeepAlive: false })
+  const b = new DHT({ bootstrap, connectionKeepAlive: false })
+  t.teardown(async () => {
+    await a.destroy()
+    await b.destroy()
+  })
+
+  t.is(a.connectionKeepAlive, 0, 'sanity check')
+  t.is(b.connectionKeepAlive, 0, 'sanity check')
+
+  const server = a.createServer((socket) => {
+    socket.on('error', () => {})
+    t.is(socket.keepAlive, 0, 'keepAlive not set for server socket')
+  })
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey)
+  socket.on('error', () => {})
+
+  t.is(socket.keepAlive, 0, 'keepAlive not set for client socket')
+})
+
 test('connectionKeepAlive passed to server and connection', async function (t) {
   const allChecks = t.test('all') // hack so we can await plan
   allChecks.plan(2)
