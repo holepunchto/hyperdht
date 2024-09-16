@@ -764,3 +764,27 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
   await a.destroy()
   await b.destroy()
 })
+
+test('bootstrap with suggested-IP', async function (t) {
+  const [boot] = await swarm(t, 1)
+  const bootstrap = ['127.0.0.1@invalid:' + boot.address().port]
+  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: false })
+  await a.ready()
+
+  t.alike(boot.toArray(), [{ host: '127.0.0.1', port: a.address().port }])
+
+  await a.destroy()
+})
+
+test('fail to bootstrap completely', async function (t) {
+  const [boot] = await swarm(t, 1)
+  const bootstrap = ['invalid:49737']
+  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: false })
+  await a.ready()
+
+  const empty = []
+  t.alike(a.toArray(), empty)
+  t.alike(boot.toArray(), empty)
+
+  await a.destroy()
+})
