@@ -22,7 +22,7 @@ class HyperDHT extends DHT {
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
 
-    super({ ...opts, port, bootstrap, shouldAddNode })
+    super({ ...opts, port, bootstrap, addNode: shouldAddNode })
 
     if (Array.isArray(global?.Pear?.config?.dht)) {
       global.Pear.config.dht.forEach(node => {
