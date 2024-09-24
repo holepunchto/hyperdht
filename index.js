@@ -22,7 +22,13 @@ class HyperDHT extends DHT {
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
 
-    super({ ...opts, port, bootstrap, addNode })
+    super({ ...opts, port, bootstrap, shouldAddNode })
+
+    if (Array.isArray(global?.Pear?.config?.dht)) {
+      global.Pear.config.dht.forEach(node => {
+        this.addNode(node)
+      })
+    }
 
     const { router, persistent } = defaultCacheOpts(opts)
 
@@ -543,7 +549,7 @@ function toRange (n) {
   return typeof n === 'number' ? [n, n] : n
 }
 
-function addNode (node) {
+function shouldAddNode (node) {
   // always skip these testnet nodes that got mixed in by accident, until they get updated
   return !(node.port === 49738 && (node.host === '134.209.28.98' || node.host === '167.99.142.185')) &&
     !(node.port === 9400 && node.host === '35.233.47.252') && !(node.host === '150.136.142.116')

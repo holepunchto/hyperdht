@@ -788,3 +788,25 @@ test('fail to bootstrap completely', async function (t) {
 
   await a.destroy()
 })
+
+test('Populate DHT with available nodes from Pear.config.dht', async function (t) {
+  const a = new DHT({ bootstrap: [] })
+  await a.ready()
+
+  global.Pear = {
+    config: {
+      dht: [
+        { host: '127.0.0.1', port: a.address().port }
+      ]
+    }
+  }
+
+  const b = new DHT({ bootstrap: [] })
+  await b.ready()
+
+  t.alike(b.toArray(), [{ host: '127.0.0.1', port: a.address().port }])
+
+  a.destroy()
+  b.destroy()
+  delete global.Pear
+})
