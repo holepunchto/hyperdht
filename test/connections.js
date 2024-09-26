@@ -788,3 +788,18 @@ test('fail to bootstrap completely', async function (t) {
 
   await a.destroy()
 })
+
+test('Populate DHT with options.knownNodes', async function (t) {
+  const a = new DHT({ bootstrap: [] })
+  await a.ready()
+  const knownNodes = [{ host: '127.0.0.1', port: a.address().port }]
+
+  const b = new DHT({ knownNodes, bootstrap: [] })
+  await b.ready()
+
+  t.alike(b.toArray(), [{ host: '127.0.0.1', port: a.address().port }])
+
+  a.destroy()
+  b.destroy()
+  delete global.Pear
+})

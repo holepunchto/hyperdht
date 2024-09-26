@@ -9,7 +9,7 @@ const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
+const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const { decode } = require('hypercore-id-encoding')
 const RawStreamSet = require('./lib/raw-stream-set')
@@ -21,8 +21,11 @@ class HyperDHT extends DHT {
   constructor (opts = {}) {
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
+    const knownNodes = opts.knownNodes || KNOWN_NODES
 
-    super({ ...opts, port, bootstrap, addNode })
+    super({ ...opts, port, bootstrap, filterNode })
+
+    for (const node of knownNodes) this.addNode(node)
 
     const { router, persistent } = defaultCacheOpts(opts)
 
@@ -543,7 +546,7 @@ function toRange (n) {
   return typeof n === 'number' ? [n, n] : n
 }
 
-function addNode (node) {
+function filterNode (node) {
   // always skip these testnet nodes that got mixed in by accident, until they get updated
   return !(node.port === 49738 && (node.host === '134.209.28.98' || node.host === '167.99.142.185')) &&
     !(node.port === 9400 && node.host === '35.233.47.252') && !(node.host === '150.136.142.116')
