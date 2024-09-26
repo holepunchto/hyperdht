@@ -9,7 +9,7 @@ const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
+const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const { decode } = require('hypercore-id-encoding')
 const RawStreamSet = require('./lib/raw-stream-set')
@@ -24,11 +24,7 @@ class HyperDHT extends DHT {
 
     super({ ...opts, port, bootstrap, filterNode })
 
-    if (Array.isArray(global?.Pear?.config?.dht)) {
-      global.Pear.config.dht.forEach(node => {
-        this.addNode(node)
-      })
-    }
+    for (const node of KNOWN_NODES) this.addNode(node)
 
     const { router, persistent } = defaultCacheOpts(opts)
 
