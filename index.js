@@ -15,7 +15,6 @@ const { decode } = require('hypercore-id-encoding')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
-const { createTracer } = require('hypertrace')
 
 class HyperDHT extends DHT {
   constructor (opts = {}) {
@@ -31,7 +30,6 @@ class HyperDHT extends DHT {
 
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
-    this.tracer = createTracer(this)
     this.connectionKeepAlive = opts.connectionKeepAlive === false
       ? 0
       : opts.connectionKeepAlive || 5000
@@ -99,7 +97,6 @@ class HyperDHT extends DHT {
   }
 
   async destroy ({ force = false } = {}) {
-    this.tracer.trace('destroying', { force })
     if (!force) {
       const closing = []
       for (const server of this.listening) closing.push(server.close())
@@ -110,7 +107,6 @@ class HyperDHT extends DHT {
     await this._rawStreams.clear()
     await this._socketPool.destroy()
     await super.destroy()
-    this.tracer.trace('destroy')
   }
 
   async validateLocalAddresses (addresses) {
