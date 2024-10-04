@@ -801,5 +801,4 @@ test('Populate DHT with options.knownNodes', async function (t) {
 
   a.destroy()
   b.destroy()
-  delete global.Pear
 })
