@@ -20,9 +20,9 @@ class HyperDHT extends DHT {
   constructor (opts = {}) {
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
-    const knownNodes = opts.knownNodes || KNOWN_NODES
+    const nodes = opts.knownNodes || KNOWN_NODES
 
-    super({ ...opts, port, bootstrap, filterNode, nodes: knownNodes })
+    super({ ...opts, port, bootstrap, nodes, filterNode })
 
     const { router, persistent } = defaultCacheOpts(opts)
 
