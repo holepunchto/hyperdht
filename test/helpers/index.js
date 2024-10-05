@@ -2,8 +2,9 @@ const createTestnet = require('../../testnet')
 const NewlineDecoder = require('newline-decoder')
 const { spawn } = require('child_process')
 const goodbye = require('graceful-goodbye')
+const DHT = require('../../')
 
-module.exports = { swarm, toArray, spawnFixture }
+module.exports = { swarm, toArray, spawnFixture, createDHT }
 
 async function toArray (iterable) {
   const result = []
@@ -28,4 +29,8 @@ async function * spawnFixture (t, args) {
   }
 
   unregisterExitHandlers()
+}
+
+function createDHT (opts) {
+  return new DHT({ ...opts, host: '127.0.0.1' })
 }

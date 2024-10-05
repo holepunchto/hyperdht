@@ -1,5 +1,5 @@
 const test = require('brittle')
-const { swarm } = require('./helpers')
+const { swarm, createDHT } = require('./helpers')
 const { encode } = require('hypercore-id-encoding')
 const { once } = require('events')
 const DHT = require('../')
@@ -766,17 +766,12 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
 })
 
 test('bootstrap with suggested-IP', async function (t) {
-  const [boot, b] = await swarm(t, 2) // cant assert against first node as its the bootstrap so too recursive
+  const [boot] = await swarm(t, 1)
   const bootstrap = ['127.0.0.1@invalid:' + boot.address().port]
   const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: false })
   await a.fullyBootstrapped()
 
-  for await (const node of a._resolveBootstrapNodes()) {
-    console.log('node', node)
-  }
-  console.log('done', a.bootstrapNodes, a.address().port, b.address().port, boot.address().port, bootstrap)
-
-  t.alike(a.toArray(), [{ host: '127.0.0.1', port: b.address().port }])
+  t.alike(boot.toArray(), [{ host: '127.0.0.1', port: a.address().port }])
 
   await a.destroy()
 })
@@ -794,7 +789,3 @@ test('Populate DHT with options.nodes', async function (t) {
   a.destroy()
   b.destroy()
 })
-
-function createDHT (opts) {
-  return new DHT({ ...opts, host: '127.0.0.1' })
-}
