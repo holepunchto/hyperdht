@@ -765,11 +765,16 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
   await b.destroy()
 })
 
-test('bootstrap with suggested-IP', async function (t) {
+test.solo('bootstrap with suggested-IP', async function (t) {
   const [boot, b] = await swarm(t, 2) // cant assert against first node as its the bootstrap so too recursive
   const bootstrap = ['127.0.0.1@invalid:' + boot.address().port]
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: false })
   await a.fullyBootstrapped()
+
+  for await (const node of a._resolveBootstrapNodes()) {
+    console.log('node', node)
+  }
+  console.log('done', a.bootstrapNodes)
 
   t.alike(a.toArray(), [{ host: '127.0.0.1', port: b.address().port }])
 
