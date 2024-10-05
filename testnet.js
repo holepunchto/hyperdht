@@ -6,6 +6,7 @@ module.exports = async function createTestnet (size = 10, opts = {}) {
   const host = opts.host || '127.0.0.1'
   const port = opts.port || 0
   const bootstrap = opts.bootstrap ? [...opts.bootstrap] : []
+  const bindHost = host === '127.0.0.1' ? '127.0.0.1' : '0.0.0.0'
 
   if (size === 0) return new Testnet(swarm)
 
@@ -13,7 +14,8 @@ module.exports = async function createTestnet (size = 10, opts = {}) {
     ephemeral: false,
     firewalled: false,
     bootstrap,
-    port
+    port,
+    host: bindHost
   })
 
   await first.ready()
@@ -26,7 +28,8 @@ module.exports = async function createTestnet (size = 10, opts = {}) {
     const node = new DHT({
       ephemeral: false,
       firewalled: false,
-      bootstrap
+      bootstrap,
+      host: bindHost
     })
 
     await node.ready()
@@ -50,6 +53,7 @@ class Testnet {
     const node = new DHT({
       ephemeral: true,
       bootstrap: this.bootstrap,
+      host: '127.0.0.1',
       ...opts
     })
 
