@@ -18,7 +18,7 @@ module.exports = async function createTestnet (size = 10, opts = {}) {
     host: bindHost
   })
 
-  await first.ready()
+  await first.fullyBootstrapped()
 
   if (bootstrap.length === 0) bootstrap.push({ host, port: first.address().port })
 
@@ -32,7 +32,7 @@ module.exports = async function createTestnet (size = 10, opts = {}) {
       host: bindHost
     })
 
-    await node.ready()
+    await node.fullyBootstrapped()
     swarm.push(node)
   }
 

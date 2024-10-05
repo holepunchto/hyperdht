@@ -145,8 +145,8 @@ test('createServer + connect - force holepunch', async function (t) {
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-  await a.ready()
-  await b.ready()
+  await a.fullyBootstrapped()
+  await b.fullyBootstrapped()
 
   const lc = t.test('socket lifecycle')
   lc.plan(4)
@@ -188,8 +188,8 @@ test('server choosing to abort holepunch', async function (t) {
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-  await a.ready()
-  await b.ready()
+  await a.fullyBootstrapped()
+  await b.fullyBootstrapped()
 
   const lc = t.test('socket lifecycle')
   lc.plan(2)
@@ -233,8 +233,8 @@ test('client choosing to abort holepunch', async function (t) {
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-  await a.ready()
-  await b.ready()
+  await a.fullyBootstrapped()
+  await b.fullyBootstrapped()
 
   const lc = t.test('socket lifecycle')
   lc.plan(2)
@@ -501,8 +501,8 @@ test('create many connections with reusable sockets', async function (t) {
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-  await a.ready()
-  await b.ready()
+  await a.fullyBootstrapped()
+  await b.fullyBootstrapped()
 
   const server = a.createServer({ reusableSocket: true })
   await server.listen()
@@ -769,7 +769,7 @@ test('bootstrap with suggested-IP', async function (t) {
   const [boot] = await swarm(t, 1)
   const bootstrap = ['127.0.0.1@invalid:' + boot.address().port]
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: false })
-  await a.ready()
+  await a.fullyBootstrapped()
 
   t.alike(boot.toArray(), [{ host: '127.0.0.1', port: a.address().port }])
 
@@ -780,7 +780,7 @@ test('fail to bootstrap completely', async function (t) {
   const [boot] = await swarm(t, 1)
   const bootstrap = ['invalid:49737']
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: false })
-  await a.ready()
+  await a.fullyBootstrapped()
 
   const empty = []
   t.alike(a.toArray(), empty)
@@ -791,11 +791,11 @@ test('fail to bootstrap completely', async function (t) {
 
 test('Populate DHT with options.knownNodes', async function (t) {
   const a = new DHT({ bootstrap: [] })
-  await a.ready()
+  await a.fullyBootstrapped()
   const nodes = [{ host: '127.0.0.1', port: a.address().port }]
 
   const b = new DHT({ nodes, bootstrap: [] })
-  await b.ready()
+  await b.fullyBootstrapped()
 
   t.alike(b.toArray(), [{ host: '127.0.0.1', port: a.address().port }])
 

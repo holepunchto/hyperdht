@@ -6,7 +6,7 @@ const MY_PUBLIC_IP = '67.205.140.151' // If you're on a local machine then use '
 
 // Inside that server, to create our first bootstrap node:
 const bootstrap1 = DHT.bootstrapper(49737, MY_PUBLIC_IP)
-await bootstrap1.ready()
+await bootstrap1.fullyBootstrapped()
 // Your bootstrap node is now running at 67.205.140.151:49737 and it's globally accessible for anyone to use it.
 
 // This would be the list of bootstrap nodes:
@@ -42,7 +42,7 @@ const bootstrap = [{ host: MY_PUBLIC_IP, port: bootstrap1.address().port }]
 
 // Inside the same server, create a new persistent node:
 const persistent1 = new DHT({ bootstrap, ephemeral: false })
-await persistent1.ready()
+await persistent1.fullyBootstrapped()
 // CAUTION:
 // As we're the ones creating the network, we provide at least one persistent node, this is for the network to be fully operational.
 // From now on, nobody uses the {ephemeral:false} option to create nodes, otherwise you could damage the network health.
@@ -54,8 +54,8 @@ await persistent1.ready()
 const node1 = new DHT({ bootstrap })
 const node2 = new DHT({ bootstrap })
 
-await node1.ready()
-await node2.ready()
+await node1.fullyBootstrapped()
+await node2.fullyBootstrapped()
 
 const server = node1.createServer(function (socket) {
   console.log('server connection')

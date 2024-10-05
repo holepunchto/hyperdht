@@ -30,7 +30,7 @@ process.once('SIGINT', async function () {
 })
 
 async function printInfo () {
-  await node.ready()
+  await node.fullyBootstrapped()
 
   console.log('DHT node info:')
   console.log('- host: ' + node.host)
