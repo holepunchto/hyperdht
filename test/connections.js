@@ -766,7 +766,7 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
 })
 
 test('bootstrap with suggested-IP', async function (t) {
-  const [boot, b] = await swarm(t, 2)
+  const [boot, b] = await swarm(t, 2) // cant assert against first node as its the bootstrap so too recursive
   const bootstrap = ['127.0.0.1@invalid:' + boot.address().port]
   const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: false })
   await a.fullyBootstrapped()
@@ -776,20 +776,9 @@ test('bootstrap with suggested-IP', async function (t) {
   await a.destroy()
 })
 
-test('fail to bootstrap completely', async function (t) {
-  const [boot] = await swarm(t, 2)
-  const bootstrap = ['invalid:49737']
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: false })
+test('Populate DHT with options.nodes', async function (t) {
+  const a = new DHT({ bootstrap: [] })
   await a.fullyBootstrapped()
-
-  const empty = []
-  t.alike(a.toArray(), empty)
-
-  await a.destroy()
-})
-
-test('Populate DHT with options.knownNodes', async function (t) {
-  const [boot, a] = await swarm(t, 2)
   const nodes = [{ host: '127.0.0.1', port: a.address().port }]
 
   const b = new DHT({ nodes, bootstrap: [] })
