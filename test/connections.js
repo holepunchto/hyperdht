@@ -774,7 +774,7 @@ test.solo('bootstrap with suggested-IP', async function (t) {
   for await (const node of a._resolveBootstrapNodes()) {
     console.log('node', node)
   }
-  console.log('done', a.bootstrapNodes)
+  console.log('done', a.bootstrapNodes, a.address().port, b.address().port, boot.address().port, bootstrap)
 
   t.alike(a.toArray(), [{ host: '127.0.0.1', port: b.address().port }])
 
