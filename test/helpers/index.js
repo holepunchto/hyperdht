@@ -36,6 +36,9 @@ function createDHT (opts) {
 }
 
 async function endAndCloseSocket (socket) {
+  // We wait on the other side to end the stream too
+  // So make sure a handler was added like
+  //  socket.on('end', () => socket.end())
   socket.end()
   if (socket.destroyed) return
   await new Promise(resolve => socket.on('close', resolve))

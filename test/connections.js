@@ -640,6 +640,9 @@ test('connect using id instead of buffer', async function (t) {
 
   const [a, b] = await swarm(t)
   const server = a.createServer()
+  server.on('connection', conn => {
+    conn.on('end', () => conn.end())
+  })
 
   await server.listen()
 
@@ -744,8 +747,8 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
   const a = createDHT({ bootstrap, connectionKeepAlive: 10000 })
   const b = createDHT({ bootstrap, connectionKeepAlive: 20000 })
 
-  const server = a.createServer(async function (socket) {
-    // No errors expected, so no handler
+  const server = a.createServer((socket) => {
+    socket.on('end', () => socket.end())
     allChecks.is(socket.keepAlive, 10000, 'keepAlive set for server')
   })
 
