@@ -1,5 +1,5 @@
 const test = require('brittle')
-const { swarm, createDHT } = require('./helpers')
+const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 const { encode } = require('hypercore-id-encoding')
 const { once } = require('events')
 const DHT = require('../')
@@ -651,9 +651,7 @@ test('connect using id instead of buffer', async function (t) {
   t.is(id.length, 52)
   t.pass('connects if id is given instead of buffer')
 
-  // ignore errors during teardown
-  socket.on('error', () => {})
-
+  await endAndCloseSocket(socket)
   await server.close()
 
   await a.destroy()
@@ -759,8 +757,7 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
 
   await allChecks
 
-  // ignore errors during teardown
-  socket.on('error', () => {})
+  await endAndCloseSocket(socket)
 
   await server.close()
 
