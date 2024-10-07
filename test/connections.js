@@ -645,12 +645,14 @@ test('connect using id instead of buffer', async function (t) {
 
   const id = encode(server.publicKey)
   const socket = b.connect(id)
-  socket.on('error', () => {})
 
   await once(socket, 'open')
 
   t.is(id.length, 52)
   t.pass('connects if id is given instead of buffer')
+
+  // ignore errors during teardown
+  socket.on('error', () => {})
 
   await server.close()
 
@@ -745,18 +747,21 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
   const b = createDHT({ bootstrap, connectionKeepAlive: 20000 })
 
   const server = a.createServer(async function (socket) {
-    socket.on('error', () => {})
+    // No errors expected, so no handler
     allChecks.is(socket.keepAlive, 10000, 'keepAlive set for server')
   })
 
   await server.listen()
 
   const socket = b.connect(server.publicKey)
-  socket.on('error', () => {})
 
   allChecks.is(socket.keepAlive, 20000, 'keepAlive set for connection')
 
   await allChecks
+
+  // ignore errors during teardown
+  socket.on('error', () => {})
+
   await server.close()
 
   await a.destroy()
