@@ -1,14 +1,13 @@
 const test = require('brittle')
 const RelayServer = require('blind-relay').Server
-const { swarm } = require('./helpers')
-const DHT = require('../')
+const { swarm, createDHT } = require('./helpers')
 
 test('relay connections through node, client side', async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
@@ -64,9 +63,9 @@ test('relay connections through node, client side', async function (t) {
 test('relay connections through node, client side, client aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
@@ -122,9 +121,9 @@ test('relay connections through node, client side, client aborts hole punch', as
 test('relay connections through node, client side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
@@ -180,9 +179,9 @@ test('relay connections through node, client side, server aborts hole punch', as
 test('relay connections through node, server side', async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
@@ -238,9 +237,9 @@ test('relay connections through node, server side', async function (t) {
 test('relay connections through node, server side, client aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
@@ -296,9 +295,9 @@ test('relay connections through node, server side, client aborts hole punch', as
 test('relay connections through node, server side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
@@ -354,9 +353,9 @@ test('relay connections through node, server side, server aborts hole punch', as
 test('relay connections through node, client and server side', async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
@@ -430,9 +429,9 @@ test('relay connections through node, client and server side', async function (t
 test.skip('relay several connections through node with pool', async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
   lc.plan(10)
@@ -501,9 +500,9 @@ test.skip('relay several connections through node with pool', async function (t)
 test.skip('server does not support connection relaying', async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
   lc.plan(4)
