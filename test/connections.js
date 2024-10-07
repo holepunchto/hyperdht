@@ -652,7 +652,7 @@ test('connect using id instead of buffer', async function (t) {
   t.is(id.length, 52)
   t.pass('connects if id is given instead of buffer')
 
-  await socket.end()
+  socket.end()
   await server.close()
 
   await a.destroy()
@@ -758,7 +758,7 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
   allChecks.is(socket.keepAlive, 20000, 'keepAlive set for connection')
 
   await allChecks
-  await socket.end()
+  socket.end()
   await server.close()
 
   await a.destroy()
