@@ -53,7 +53,7 @@ class Testnet {
     const node = new DHT({
       ephemeral: true,
       bootstrap: this.bootstrap,
-      // host: '127.0.0.1', (causes a test to fail, prop just cause it wants to use lan)
+      host: '127.0.0.1',
       ...opts
     })
 
