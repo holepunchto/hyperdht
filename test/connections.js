@@ -1,5 +1,5 @@
 const test = require('brittle')
-const { swarm, createDHT } = require('./helpers')
+const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 const { encode } = require('hypercore-id-encoding')
 const { once } = require('events')
 const DHT = require('../')
@@ -640,19 +640,21 @@ test('connect using id instead of buffer', async function (t) {
 
   const [a, b] = await swarm(t)
   const server = a.createServer()
+  server.on('connection', conn => {
+    conn.on('end', () => conn.end())
+  })
 
   await server.listen()
 
   const id = encode(server.publicKey)
   const socket = b.connect(id)
-  socket.on('error', () => {})
 
   await once(socket, 'open')
 
   t.is(id.length, 52)
   t.pass('connects if id is given instead of buffer')
 
-  await socket.end()
+  await endAndCloseSocket(socket)
   await server.close()
 
   await a.destroy()
@@ -745,20 +747,21 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
   const a = createDHT({ bootstrap, connectionKeepAlive: 10000 })
   const b = createDHT({ bootstrap, connectionKeepAlive: 20000 })
 
-  const server = a.createServer(async function (socket) {
-    socket.on('error', () => {})
+  const server = a.createServer((socket) => {
+    socket.on('end', () => socket.end())
     allChecks.is(socket.keepAlive, 10000, 'keepAlive set for server')
   })
 
   await server.listen()
 
   const socket = b.connect(server.publicKey)
-  socket.on('error', () => {})
 
   allChecks.is(socket.keepAlive, 20000, 'keepAlive set for connection')
 
   await allChecks
-  await socket.end()
+
+  await endAndCloseSocket(socket)
+
   await server.close()
 
   await a.destroy()

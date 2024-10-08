@@ -4,7 +4,7 @@ const { spawn } = require('child_process')
 const goodbye = require('graceful-goodbye')
 const DHT = require('../../')
 
-module.exports = { swarm, toArray, spawnFixture, createDHT }
+module.exports = { swarm, toArray, spawnFixture, createDHT, endAndCloseSocket }
 
 async function toArray (iterable) {
   const result = []
@@ -33,4 +33,13 @@ async function * spawnFixture (t, args) {
 
 function createDHT (opts) {
   return new DHT({ ...opts, host: '127.0.0.1' })
+}
+
+async function endAndCloseSocket (socket) {
+  // We wait on the other side to end the stream too
+  // So make sure a handler was added like
+  //  socket.on('end', () => socket.end())
+  socket.end()
+  if (socket.destroyed) return
+  await new Promise(resolve => socket.on('close', resolve))
 }
