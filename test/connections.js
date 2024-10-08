@@ -410,17 +410,13 @@ test('relayed connection', async function (t) {
   const socket = b.connect(server.address().publicKey)
 
   server.on('connection', (socket) => {
-    socket.on('error', () => {})
     t.pass('server connected')
-    socket.end()
+    socket.once('end', () => { socket.end() })
   })
 
-  socket
-    .on('error', () => {})
-    .on('open', () => {
-      t.pass('client connected')
-      socket.end()
-    })
+  await once(socket, 'open')
+  t.pass('client connected')
+  await endAndCloseSocket(socket)
 })
 
 test('relayed connection on same node', async function (t) {
@@ -469,8 +465,7 @@ test('create raw stream from encrypted stream', async function (t) {
   const bRawStream = b.createRawStream()
 
   server.on('connection', (socket) => {
-    socket.on('error', () => {})
-
+    socket.once('end', () => { socket.end() })
     DHT.connectRawStream(socket, aRawStream, bRawStream.id)
 
     aRawStream.write('hello')
@@ -481,12 +476,11 @@ test('create raw stream from encrypted stream', async function (t) {
 
     bRawStream.on('data', (data) => {
       msg.alike(data, Buffer.from('hello'))
-
-      socket.destroy()
     })
   })
 
   await msg
+  await endAndCloseSocket(socket)
 
   aRawStream.destroy()
   bRawStream.destroy()
@@ -641,7 +635,7 @@ test('connect using id instead of buffer', async function (t) {
   const [a, b] = await swarm(t)
   const server = a.createServer()
   server.on('connection', conn => {
-    conn.on('end', () => conn.end())
+    conn.once('end', () => { conn.end() })
   })
 
   await server.listen()
@@ -698,16 +692,16 @@ test('connectionKeepAlive defaults to 5000', async function (t) {
   t.is(b.connectionKeepAlive, 5000, 'sanity check: connectionKeepAlive set to 5000')
 
   const server = a.createServer((socket) => {
-    socket.on('error', () => {})
+    socket.once('end', () => { socket.end() })
     t.is(socket.keepAlive, 5000, 'keepAlive set for server socket')
   })
 
   await server.listen()
 
   const socket = b.connect(server.publicKey)
-  socket.on('error', () => {})
 
   t.is(socket.keepAlive, 5000, 'keepAlive set for client socket')
+  await endAndCloseSocket(socket)
 })
 
 test('connectionKeepAlive can be turned off', async function (t) {
@@ -726,16 +720,16 @@ test('connectionKeepAlive can be turned off', async function (t) {
   t.is(b.connectionKeepAlive, 0, 'sanity check')
 
   const server = a.createServer((socket) => {
-    socket.on('error', () => {})
+    socket.once('end', () => { socket.end() })
     t.is(socket.keepAlive, 0, 'keepAlive not set for server socket')
   })
 
   await server.listen()
 
   const socket = b.connect(server.publicKey)
-  socket.on('error', () => {})
 
   t.is(socket.keepAlive, 0, 'keepAlive not set for client socket')
+  await endAndCloseSocket(socket)
 })
 
 test('connectionKeepAlive passed to server and connection', async function (t) {
@@ -748,7 +742,7 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
   const b = createDHT({ bootstrap, connectionKeepAlive: 20000 })
 
   const server = a.createServer((socket) => {
-    socket.on('end', () => socket.end())
+    socket.once('end', () => { socket.end() })
     allChecks.is(socket.keepAlive, 10000, 'keepAlive set for server')
   })
 
