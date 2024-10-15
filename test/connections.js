@@ -690,7 +690,7 @@ test('exception if null id is used', async function (t) {
   }
 })
 
-test('connectionKeepAlive defaults to 5000', async function (t) {
+test.solo('connectionKeepAlive defaults to 5000', async function (t) {
   t.plan(4)
 
   const [a, b] = await swarm(t)
