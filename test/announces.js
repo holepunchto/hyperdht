@@ -177,13 +177,13 @@ test('announcer background does not over-trigger', async function (t) {
   // give some time for possible background spam
   await new Promise(resolve => setTimeout(resolve, 500))
 
-  const requestsSent = initTid > 65536 - 50
+  const requestsSent = initTid > a.io._tid // it wrapped?
     ? a.io._tid // close enough for this test (ignoring those before wrapping)
     : a.io._tid - initTid
 
   t.ok(
     requestsSent < 50,
-    'No background spam of ping requests'
+    `No background spam of ping requests (saw ${requestsSent})`
   )
 
   await a.destroy()
