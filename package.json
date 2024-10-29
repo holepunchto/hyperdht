@@ -1,7 +1,7 @@
 {
-  "name": "hyperdht",
-  "version": "6.19.0",
-  "description": "The DHT powering Hyperswarm",
+  "name": "hyperdht-hugin",
+  "version": "1.0.0",
+  "description": "The DHT powering Hyperswarm for Hugin.",
   "main": "index.js",
   "browser": "browser.js",
   "bin": {

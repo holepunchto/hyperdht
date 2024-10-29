@@ -17,7 +17,7 @@ const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 
 class HyperDHT extends DHT {
-  constructor (opts = {}) {
+  constructor (opts, sig, dht_keys, keychain = {}) {
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
     const nodes = opts.nodes || KNOWN_NODES
@@ -26,7 +26,11 @@ class HyperDHT extends DHT {
 
     const { router, persistent } = defaultCacheOpts(opts)
 
-    this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
+    this.checkedSigs = [sig]
+    this.sig = sig
+    this.keychain = keychain
+    this.dht_keys = dht_keys
+    this.defaultKeyPair = dht_keys || createKeyPair(opts.seed)
     this.listening = new Set()
     this.connectionKeepAlive = opts.connectionKeepAlive === false
       ? 0
@@ -34,7 +38,7 @@ class HyperDHT extends DHT {
 
     // stats is inherited from dht-rpc so fwd the ones from there
     this.stats = { punches: { consistent: 0, random: 0, open: 0 }, ...this.stats }
-
+    
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
     this._rawStreams = new RawStreamSet(this)
