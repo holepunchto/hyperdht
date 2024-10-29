@@ -54,7 +54,7 @@
     "integration": "brittle test/integration/*.js",
     "end-to-end": "brittle test/end-to-end/*.js"
   },
-  "author": "Mathias Buus (@mafintosh)",
+  "author": "n9lsjr",
   "license": "MIT",
   "directories": {
     "lib": "lib",
