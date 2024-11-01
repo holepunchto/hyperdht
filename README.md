@@ -69,7 +69,7 @@ Options include:
 ```js
 {
   // Optionally overwrite the default bootstrap servers, just need to be an array of any known dht node(s)
-  // Defaults to ['88.99.3.86@node1.hyperdht.org:49737', '142.93.90.113@node2.hyperdht.org:49737', '138.68.147.8@node3.hyperdht.org:49737']
+  // Defaults to Pear.config.dht.bootstrap in a Pear app or ['88.99.3.86@node1.hyperdht.org:49737', '142.93.90.113@node2.hyperdht.org:49737', '138.68.147.8@node3.hyperdht.org:49737'] elsewhere
   // Supports suggested-IP to avoid DNS calls: [suggested-IP@]<host>:<port>
   bootstrap: ['host:port'],
   keyPair, // set the default key pair to use for server.listen and connect
