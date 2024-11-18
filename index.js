@@ -42,7 +42,7 @@ class HyperDHT extends DHT {
     this._validatedLocalAddresses = new Map()
 
     this._lastRandomPunch = 0
-    this._randomPunchInterval = 20000 // min 20s between random punches...
+    this._randomPunchInterval = opts.randomPunchInterval || 20000 // min 20s between random punches...
     this._randomPunches = 0
     this._randomPunchLimit = 1 // set to one for extra safety for now
 
