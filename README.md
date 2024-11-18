@@ -73,7 +73,9 @@ Options include:
   // Supports suggested-IP to avoid DNS calls: [suggested-IP@]<host>:<port>
   bootstrap: ['host:port'],
   keyPair, // set the default key pair to use for server.listen and connect
-  connectionKeepAlive // set a default keep-alive (in ms) on all opened sockets. Defaults to 5000. Set false to turn off (advanced usage).
+  connectionKeepAlive, // set a default keep-alive (in ms) on all opened sockets. Defaults to 5000. Set false to turn off (advanced usage).
+  randomPunchInterval: 20000 // set a default time for interval between punches (in ms). Defaults to 20000.  
+  
 }
 ```
 
