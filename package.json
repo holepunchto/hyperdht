@@ -28,7 +28,7 @@
     "bogon": "^1.0.0",
     "compact-encoding": "^2.4.1",
     "compact-encoding-net": "^1.0.1",
-    "dht-rpc": "^6.15.1",
+    "dht-rpc": "holepunchto/dht-rpc#port-range",
     "hypercore-crypto": "^3.3.0",
     "hypercore-id-encoding": "^1.2.0",
     "noise-curve-ed": "^2.0.0",

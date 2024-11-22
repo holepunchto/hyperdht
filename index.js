@@ -18,7 +18,7 @@ const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 
 class HyperDHT extends DHT {
   constructor (opts = {}) {
-    const port = opts.port || 49737
+    const port = opts.port || [49737, 49737 + 5]
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
     const nodes = opts.nodes || KNOWN_NODES
 
