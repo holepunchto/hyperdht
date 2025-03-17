@@ -18,6 +18,10 @@
     "events": {
       "bare": "bare-events",
       "default": "events"
+    },
+    "child_process": {
+      "bare": "bare-node-child-process",
+      "default": "child_process"
     }
   },
   "dependencies": {
@@ -42,6 +46,7 @@
     "xache": "^1.1.0"
   },
   "devDependencies": {
+    "bare-node-child-process": "^1.0.1",
     "brittle": "^3.0.0",
     "graceful-goodbye": "^1.3.0",
     "newline-decoder": "^1.0.2",
@@ -49,6 +54,7 @@
   },
   "scripts": {
     "test": "standard && node test/all.js",
+    "test:bare": "bare test/all.js",
     "test:generate": "brittle -r test/all.js test/*.js",
     "lint": "standard",
     "integration": "brittle test/integration/*.js",
