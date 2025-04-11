@@ -42,6 +42,7 @@ class HyperDHT extends DHT {
     this._validatedLocalAddresses = new Map()
 
     this._lastRandomPunch = 0
+    this._connectable = true
     this._randomPunchInterval = opts.randomPunchInterval || 20000 // min 20s between random punches...
     this._randomPunches = 0
     this._randomPunchLimit = 1 // set to one for extra safety for now
@@ -76,19 +77,29 @@ class HyperDHT extends DHT {
     return new ConnectionPool(this)
   }
 
-  async resume () {
-    await super.resume()
+  async resume ({ log = noop } = {}) {
+    await super.resume({ log })
     const resuming = []
     for (const server of this.listening) resuming.push(server.resume())
+    log('Resuming hyperdht servers')
     await Promise.allSettled(resuming)
+    log('Done, hyperdht fully resumed')
   }
 
-  async suspend () {
+  async suspend ({ log = noop } = {}) {
+    this._connectable = false // just so nothing gets connected during suspension
     const suspending = []
     for (const server of this.listening) suspending.push(server.suspend())
+    log('Suspending all hyperdht servers')
     await Promise.allSettled(suspending)
-    await super.suspend()
+    log('Done, clearing all raw streams')
     await this._rawStreams.clear()
+    log('Done, suspending dht-rpc')
+    await super.suspend({ log })
+    log('Done, clearing raw streams again')
+    await this._rawStreams.clear()
+    log('Done, hyperdht fully suspended')
+    this._connectable = true
   }
 
   async destroy ({ force = false } = {}) {
