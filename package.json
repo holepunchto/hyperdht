@@ -36,7 +36,7 @@
     "hypercore-crypto": "^3.3.0",
     "hypercore-id-encoding": "^1.2.0",
     "noise-curve-ed": "^2.0.0",
-    "noise-handshake": "^3.0.0",
+    "noise-handshake": "^4.0.0",
     "record-cache": "^1.1.1",
     "safety-catch": "^1.0.1",
     "signal-promise": "^1.0.3",
