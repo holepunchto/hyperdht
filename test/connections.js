@@ -792,3 +792,16 @@ test('Populate DHT with options.nodes', async function (t) {
   a.destroy()
   b.destroy()
 })
+
+test('create server with handshakeClearWait opt', async function (t) {
+  const [a] = await swarm(t)
+
+  {
+    const server = a.createServer({ handshakeClearWait: 123 })
+    t.is(server.handshakeClearWait, 123)
+  }
+  {
+    const server = a.createServer({})
+    t.is(server.handshakeClearWait, 10000, 'expected default')
+  }
+})
