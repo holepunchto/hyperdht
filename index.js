@@ -65,11 +65,12 @@ class HyperDHT extends DHT {
     return connect(this, decode(remotePublicKey), opts)
   }
 
-  createServer (opts, onconnection) {
-    if (typeof opts === 'function') return this.createServer({}, opts)
+  createServer (opts, onconnection, onfirewall) {
+    if (typeof opts === 'function') return this.createServer({}, opts, onconnection)
     if (opts && opts.onconnection) onconnection = opts.onconnection
     const s = new Server(this, opts)
     if (onconnection) s.on('connection', onconnection)
+    if (onfirewall) s.on('firewall', onfirewall)
     return s
   }
 

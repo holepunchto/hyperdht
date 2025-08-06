@@ -792,3 +792,38 @@ test('Populate DHT with options.nodes', async function (t) {
   a.destroy()
   b.destroy()
 })
+
+test('create server with handshakeClearWait opt', async function (t) {
+  const [a] = await swarm(t)
+
+  {
+    const server = a.createServer({ handshakeClearWait: 123 })
+    t.is(server.handshakeClearWait, 123)
+  }
+  {
+    const server = a.createServer({})
+    t.is(server.handshakeClearWait, 10000, 'expected default')
+  }
+})
+
+test('onfirewall called when server rejects connection because of firewall', async function (t) {
+  t.plan(1)
+
+  const [a, b] = await swarm(t)
+  const server = a.createServer(
+    { firewall: () => true }, // always reject
+    function () {
+      t.fail('firewalled so should not connect')
+    },
+    function (remotePublicKey) {
+      t.alike(remotePublicKey, b.defaultKeyPair.publicKey, 'correct arg')
+    }
+  )
+  t.teardown(async () => {
+    await server.close()
+  })
+
+  await server.listen()
+  const socket = b.connect(server.publicKey)
+  socket.on('error', () => {})
+})
