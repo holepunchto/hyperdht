@@ -41,7 +41,8 @@ class HyperDHT extends DHT {
     this._persistent = null
     this._validatedLocalAddresses = new Map()
 
-    this._lastRandomPunch = 0
+    this._deferRandomPunch = !!opts.deferRandomPunch
+    this._lastRandomPunch = this._deferRandomPunch ? Date.now() : 0
     this._connectable = true
     this._randomPunchInterval = opts.randomPunchInterval || 20000 // min 20s between random punches...
     this._randomPunches = 0
@@ -78,6 +79,7 @@ class HyperDHT extends DHT {
   }
 
   async resume ({ log = noop } = {}) {
+    if (this._deferRandomPunch) this._lastRandomPunch = Date.now()
     await super.resume({ log })
     const resuming = []
     for (const server of this.listening) resuming.push(server.resume())
