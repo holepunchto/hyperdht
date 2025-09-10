@@ -34,10 +34,10 @@ class HyperDHT extends DHT {
 
     // stats is inherited from dht-rpc so fwd the ones from there
     this.stats = { punches: { consistent: 0, random: 0, open: 0 }, ...this.stats }
+    this.rawStreams = new RawStreamSet(this)
 
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
-    this._rawStreams = new RawStreamSet(this)
     this._persistent = null
     this._validatedLocalAddresses = new Map()
 
@@ -95,11 +95,11 @@ class HyperDHT extends DHT {
     log('Suspending all hyperdht servers')
     await Promise.allSettled(suspending)
     log('Done, clearing all raw streams')
-    await this._rawStreams.clear()
+    await this.rawStreams.clear()
     log('Done, suspending dht-rpc')
     await super.suspend({ log })
     log('Done, clearing raw streams again')
-    await this._rawStreams.clear()
+    await this.rawStreams.clear()
     log('Done, hyperdht fully suspended')
     this._connectable = true
   }
@@ -112,7 +112,7 @@ class HyperDHT extends DHT {
     }
     this._router.destroy()
     if (this._persistent) this._persistent.destroy()
-    await this._rawStreams.clear()
+    await this.rawStreams.clear()
     await this._socketPool.destroy()
     await super.destroy()
   }
@@ -431,7 +431,7 @@ class HyperDHT extends DHT {
   }
 
   createRawStream (opts) {
-    return this._rawStreams.add(opts)
+    return this.rawStreams.add(opts)
   }
 
   async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign) {
