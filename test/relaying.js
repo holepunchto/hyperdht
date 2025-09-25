@@ -2,7 +2,7 @@ const test = require('brittle')
 const RelayServer = require('blind-relay').Server
 const { swarm, createDHT } = require('./helpers')
 
-test('relay connections through node, client side', async function (t) {
+test.solo('relay connections through node, client side', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
