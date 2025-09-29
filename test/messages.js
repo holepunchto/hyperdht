@@ -319,7 +319,8 @@ test('announce', function (t) {
       relayAddresses: []
     },
     refresh: null,
-    signature: null
+    signature: null,
+    bump: 0
   }
 
   m.announce.preencode(state, ann)
@@ -343,7 +344,8 @@ test('announce with signature', function (t) {
       relayAddresses: []
     },
     refresh: null,
-    signature: Buffer.alloc(64).fill('signature')
+    signature: Buffer.alloc(64).fill('signature'),
+    bump: 0
   }
 
   m.announce.preencode(state, ann)
@@ -367,7 +369,8 @@ test('announce with refresh', function (t) {
       relayAddresses: []
     },
     refresh: Buffer.alloc(32).fill('refresh'),
-    signature: null
+    signature: null,
+    bump: 0
   }
 
   m.announce.preencode(state, ann)

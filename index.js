@@ -486,12 +486,15 @@ module.exports = HyperDHT
 function mapLookup (node) {
   if (!node.value) return null
 
+  const l = c.decode(m.lookupRawReply, node.value)
+
   try {
     return {
       token: node.token,
       from: node.from,
       to: node.to,
-      peers: c.decode(m.peers, node.value)
+      peers: l.peers,
+      bump: l.bump
     }
   } catch {
     return null
@@ -572,7 +575,8 @@ function defaultCacheOpts (opts) {
       immutables: {
         maxSize: maxSize / 2 | 0,
         maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
-      }
+      },
+      bumps: { maxSize, maxAge }
     }
   }
 }
