@@ -232,6 +232,7 @@ class HyperDHT extends DHT {
 
   announce (target, keyPair, relayAddresses, opts = {}) {
     const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
+    const bump = opts.bump || 0
 
     opts = { ...opts, commit }
 
@@ -247,7 +248,8 @@ class HyperDHT extends DHT {
         reply.token,
         reply.from,
         relayAddresses,
-        signAnnounce
+        signAnnounce,
+        bump
       )
     }
   }
@@ -434,14 +436,15 @@ class HyperDHT extends DHT {
     return this.rawStreams.add(opts)
   }
 
-  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign) {
+  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign, bump) {
     const ann = {
       peer: {
         publicKey: keyPair.publicKey,
         relayAddresses: relayAddresses || []
       },
       refresh: null,
-      signature: null
+      signature: null,
+      bump
     }
 
     ann.signature = await sign(target, token, from.id, ann, keyPair)
@@ -486,12 +489,15 @@ module.exports = HyperDHT
 function mapLookup (node) {
   if (!node.value) return null
 
+  const l = c.decode(m.lookupRawReply, node.value)
+
   try {
     return {
       token: node.token,
       from: node.from,
       to: node.to,
-      peers: c.decode(m.peers, node.value)
+      peers: l.peers,
+      bump: l.bump
     }
   } catch {
     return null
@@ -572,7 +578,8 @@ function defaultCacheOpts (opts) {
       immutables: {
         maxSize: maxSize / 2 | 0,
         maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
-      }
+      },
+      bumps: { maxSize, maxAge }
     }
   }
 }
