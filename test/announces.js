@@ -71,7 +71,6 @@ test('announce to group and lookup', async function (t) {
 test('announce to group and bump and lookup', async function (t) {
   const [a, b] = await swarm(t)
   const keyPair1 = DHT.keyPair()
-  const keyPair2 = DHT.keyPair()
   const target = DHT.hash(Buffer.from('testing...'))
 
   await a.announce(target, keyPair1, [], { bump: 1 }).finished()
