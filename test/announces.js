@@ -105,7 +105,15 @@ test('announce to group and bump and lookup', async function (t) {
   {
     const result = await toArray(b.lookup(target))
     t.ok(result.length > 0, 'has at least one result')
-    t.ok(result[0].bump < futureBump && result[0].bump >= now, 'is capped')
+    t.is(result[0].bump, 2, 'was ignored')
+  }
+
+  await a.announce(target, keyPair1, [], { bump: now }).finished()
+
+  {
+    const result = await toArray(b.lookup(target))
+    t.ok(result.length > 0, 'has at least one result')
+    t.is(result[0].bump, now, 'was applied')
   }
 })
 
