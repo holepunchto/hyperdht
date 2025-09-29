@@ -68,6 +68,48 @@ test('announce to group and lookup', async function (t) {
   }
 })
 
+test('announce to group and bump and lookup', async function (t) {
+  const [a, b] = await swarm(t)
+  const keyPair1 = DHT.keyPair()
+  const keyPair2 = DHT.keyPair()
+  const target = DHT.hash(Buffer.from('testing...'))
+
+  await a.announce(target, keyPair1, [], { bump: 1 }).finished()
+
+  {
+    const result = await toArray(b.lookup(target))
+    t.ok(result.length > 0, 'has at least one result')
+    t.is(result[0].bump, 1, 'expected bump')
+  }
+
+  await a.announce(target, keyPair1, [], { bump: 2 }).finished()
+
+  {
+    const result = await toArray(b.lookup(target))
+    t.ok(result.length > 0, 'has at least one result')
+    t.is(result[0].bump, 2, 'expected bump')
+  }
+
+  await a.announce(target, keyPair1, [], { bump: 1 }).finished()
+
+  {
+    const result = await toArray(b.lookup(target))
+    t.ok(result.length > 0, 'has at least one result')
+    t.is(result[0].bump, 2, 'bump is monotonic')
+  }
+
+  const now = Date.now()
+  const futureBump = now + 24 * 3600 * 1000
+
+  await a.announce(target, keyPair1, [], { bump: futureBump }).finished()
+
+  {
+    const result = await toArray(b.lookup(target))
+    t.ok(result.length > 0, 'has at least one result')
+    t.ok(result[0].bump < futureBump && result[0].bump >= now, 'is capped')
+  }
+})
+
 test('announce null relay addresses', async function (t) {
   const [a] = await swarm(t)
   const keyPair = DHT.keyPair()

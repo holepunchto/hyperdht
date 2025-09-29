@@ -232,6 +232,7 @@ class HyperDHT extends DHT {
 
   announce (target, keyPair, relayAddresses, opts = {}) {
     const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
+    const bump = opts.bump || 0
 
     opts = { ...opts, commit }
 
@@ -247,7 +248,8 @@ class HyperDHT extends DHT {
         reply.token,
         reply.from,
         relayAddresses,
-        signAnnounce
+        signAnnounce,
+        bump
       )
     }
   }
@@ -434,14 +436,15 @@ class HyperDHT extends DHT {
     return this.rawStreams.add(opts)
   }
 
-  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign) {
+  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign, bump) {
     const ann = {
       peer: {
         publicKey: keyPair.publicKey,
         relayAddresses: relayAddresses || []
       },
       refresh: null,
-      signature: null
+      signature: null,
+      bump
     }
 
     ann.signature = await sign(target, token, from.id, ann, keyPair)
