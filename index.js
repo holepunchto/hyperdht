@@ -33,7 +33,11 @@ class HyperDHT extends DHT {
       : opts.connectionKeepAlive || 5000
 
     // stats is inherited from dht-rpc so fwd the ones from there
-    this.stats = { punches: { consistent: 0, random: 0, open: 0 }, ...this.stats }
+    this.stats = {
+      punches: { consistent: 0, random: 0, open: 0 },
+      relaying: { attempts: 0, successes: 0, aborts: 0 },
+      ...this.stats
+    }
     this.rawStreams = new RawStreamSet(this)
 
     this._router = new Router(this, router)
