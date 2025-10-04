@@ -29,13 +29,16 @@ test('createServer + connect - external secret key', async (t) => {
       })
   })
 
-  await server.listen({
-    // Only pass the public key to the server
-    publicKey: serverKeyPair.publicKey
-  }, {
-    signAnnounce: signAnnounce(serverKeyPair),
-    signUnannounce: signUnannounce(serverKeyPair)
-  })
+  await server.listen(
+    {
+      // Only pass the public key to the server
+      publicKey: serverKeyPair.publicKey
+    },
+    {
+      signAnnounce: signAnnounce(serverKeyPair),
+      signUnannounce: signUnannounce(serverKeyPair)
+    }
+  )
 
   const clientKeyPair = DHT.keyPair()
 
@@ -58,29 +61,30 @@ test('createServer + connect - external secret key', async (t) => {
 // secret stream, and sign announces/unannounces without any sensitive data
 // being exposed to the relaying DHT node.
 
-function createHandshake (keyPair) {
-  return (_, remotePublicKey) => new class extends NoiseWrap {
-    final () {
-      const { hash, rx, tx, ...rest } = super.final()
+function createHandshake(keyPair) {
+  return (_, remotePublicKey) =>
+    new (class extends NoiseWrap {
+      final() {
+        const { hash, rx, tx, ...rest } = super.final()
 
-      return {
-        ...rest,
+        return {
+          ...rest,
 
-        // This is obviously security by obscurity, don't actually do this!
-        $secret: { hash, rx, tx }
+          // This is obviously security by obscurity, don't actually do this!
+          $secret: { hash, rx, tx }
+        }
       }
-    }
-  }(keyPair, remotePublicKey)
+    })(keyPair, remotePublicKey)
 }
 
-function createSecretStream (isInitiator, rawSocket, opts) {
+function createSecretStream(isInitiator, rawSocket, opts) {
   if (opts.handshake) {
     const { $secret, ...rest } = opts.handshake
     opts = { ...opts, handshake: { ...rest, ...$secret } }
   }
 
-  return new class extends NoiseSecretStream {
-    start (rawSocket, opts) {
+  return new (class extends NoiseSecretStream {
+    start(rawSocket, opts) {
       if (opts.handshake) {
         const { $secret, ...rest } = opts.handshake
         opts = { ...opts, handshake: { ...rest, ...$secret } }
@@ -88,15 +92,15 @@ function createSecretStream (isInitiator, rawSocket, opts) {
 
       return super.start(rawSocket, opts)
     }
-  }(isInitiator, rawSocket, opts)
+  })(isInitiator, rawSocket, opts)
 }
 
-function signAnnounce (keyPair) {
+function signAnnounce(keyPair) {
   return (target, token, id, data) =>
     Persistent.signAnnounce(target, token, id, data, keyPair.secretKey)
 }
 
-function signUnannounce (keyPair) {
+function signUnannounce(keyPair) {
   return (target, token, id, data) =>
     Persistent.signUnannounce(target, token, id, data, keyPair.secretKey)
 }

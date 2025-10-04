@@ -5,7 +5,8 @@ const HyperDHT = require('./')
 const bootstrap = arg('bootstrap')
 const nodes = arg('node') ? '' : arg('nodes')
 
-const isBootstrap = bootstrap === '' || (bootstrap !== null && bootstrap.startsWith('--'))
+const isBootstrap =
+  bootstrap === '' || (bootstrap !== null && bootstrap.startsWith('--'))
 
 if (isBootstrap) {
   const port = Number(arg('port') || '0') || 49737
@@ -16,13 +17,13 @@ if (isBootstrap) {
   startNodes(Number(nodes) || 1, bootstrap ? bootstrap.split(',') : undefined)
 }
 
-function arg (name) {
+function arg(name) {
   const i = process.argv.indexOf('--' + name)
   if (i === -1) return null
   return i < process.argv.length - 1 ? process.argv[i + 1] : ''
 }
 
-async function startBootstrapNode (port, host) {
+async function startBootstrapNode(port, host) {
   console.log('Starting DHT bootstrap node...')
 
   const node = HyperDHT.bootstrapper(port, host)
@@ -40,14 +41,15 @@ async function startBootstrapNode (port, host) {
   })
 }
 
-async function startNodes (cnt, bootstrap) {
+async function startNodes(cnt, bootstrap) {
   console.log('Booting DHT nodes...')
 
   const port = Number(arg('port') || '0') || 0
   const host = arg('host') || undefined
   const all = []
 
-  if (port && cnt !== 1) throw new Error('--port is only valid when running a single node')
+  if (port && cnt !== 1)
+    throw new Error('--port is only valid when running a single node')
 
   while (all.length < cnt) {
     const node = new HyperDHT({ host, port, anyPort: !port, bootstrap })
@@ -63,7 +65,10 @@ async function startNodes (cnt, bootstrap) {
     })
 
     node.on('persistent', function () {
-      console.log('Node #' + id + ' is persistent, joining remote routing tables', node.address())
+      console.log(
+        'Node #' + id + ' is persistent, joining remote routing tables',
+        node.address()
+      )
     })
 
     node.on('close', function () {
@@ -71,7 +76,9 @@ async function startNodes (cnt, bootstrap) {
     })
   }
 
-  console.log('Fully started ' + cnt + ' Hyperswarm DHT node' + (cnt === 1 ? '' : 's'))
+  console.log(
+    'Fully started ' + cnt + ' Hyperswarm DHT node' + (cnt === 1 ? '' : 's')
+  )
 
   process.once('SIGINT', function () {
     console.log('Shutting down nodes...')

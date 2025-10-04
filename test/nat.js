@@ -73,7 +73,10 @@ test('firewall - consistent with another sample', function (t) {
   nat.add({ host: '127.0.0.1', port: 8080 }, { host: '127.0.0.1', port: 8083 })
   t.is(nat.sampled, 4)
   t.is(nat.firewall, FIREWALL.CONSISTENT)
-  t.alike(nat.addresses, [{ host: '127.0.0.1', port: 8080, hits: 3 }, { host: '127.0.0.1', port: 8081, hits: 1 }])
+  t.alike(nat.addresses, [
+    { host: '127.0.0.1', port: 8080, hits: 3 },
+    { host: '127.0.0.1', port: 8081, hits: 1 }
+  ])
 })
 
 test('firewall - double consistent', function (t) {
@@ -97,7 +100,10 @@ test('firewall - double consistent', function (t) {
   nat.add({ host: '127.0.0.2', port: 8081 }, { host: '127.0.0.1', port: 8083 })
   t.is(nat.sampled, 4)
   t.is(nat.firewall, FIREWALL.CONSISTENT)
-  t.alike(nat.addresses, [{ host: '127.0.0.1', port: 8080, hits: 2 }, { host: '127.0.0.2', port: 8081, hits: 2 }])
+  t.alike(nat.addresses, [
+    { host: '127.0.0.1', port: 8080, hits: 2 },
+    { host: '127.0.0.2', port: 8081, hits: 2 }
+  ])
 })
 
 test('firewall - not quite consistent', function (t) {

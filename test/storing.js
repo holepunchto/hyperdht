@@ -50,7 +50,9 @@ test('mutable put - put - get', async function (t) {
   t.is(put.signature.length, 64)
   t.is(put.seq, 0)
 
-  const put2 = await nodes[25].mutablePut(keyPair, Buffer.from('testing two'), { seq: 2 })
+  const put2 = await nodes[25].mutablePut(keyPair, Buffer.from('testing two'), {
+    seq: 2
+  })
 
   t.is(put2.signature.length, 64)
   t.is(put2.seq, 2)

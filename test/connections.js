@@ -84,59 +84,63 @@ test('createServer + connect - emits connect', async function (t) {
   await server.close()
 })
 
-test('createServer + connect - exchange data', { timeout: 60000 }, async function (t) {
-  const [a, b] = await swarm(t)
-  const lc = t.test('socket lifecycle')
+test(
+  'createServer + connect - exchange data',
+  { timeout: 60000 },
+  async function (t) {
+    const [a, b] = await swarm(t)
+    const lc = t.test('socket lifecycle')
 
-  lc.plan(5)
+    lc.plan(5)
 
-  const server = a.createServer(function (socket) {
-    lc.pass('server side opened')
+    const server = a.createServer(function (socket) {
+      lc.pass('server side opened')
+
+      socket.on('data', function (data) {
+        socket.write(data)
+      })
+
+      socket.once('end', function () {
+        lc.pass('server side ended')
+        socket.end()
+      })
+    })
+
+    await server.listen()
+
+    const socket = b.connect(server.publicKey)
+    const blk = Buffer.alloc(4096)
+    const expected = 20 * 1024 * blk.byteLength
+
+    let sent = 0
+    let recv = 0
+
+    for (let i = 0; i < 10; i++) send()
+
+    function send() {
+      sent += blk.byteLength
+      socket.write(blk)
+    }
 
     socket.on('data', function (data) {
-      socket.write(data)
+      recv += data.byteLength
+      if (recv === expected) {
+        lc.is(sent, expected, 'client sent all data')
+        lc.is(recv, expected, 'client received all data')
+        socket.end()
+      } else if (sent < expected) {
+        send()
+      }
     })
 
     socket.once('end', function () {
-      lc.pass('server side ended')
-      socket.end()
+      lc.pass('client side ended')
     })
-  })
 
-  await server.listen()
-
-  const socket = b.connect(server.publicKey)
-  const blk = Buffer.alloc(4096)
-  const expected = 20 * 1024 * blk.byteLength
-
-  let sent = 0
-  let recv = 0
-
-  for (let i = 0; i < 10; i++) send()
-
-  function send () {
-    sent += blk.byteLength
-    socket.write(blk)
+    await lc
+    await server.close()
   }
-
-  socket.on('data', function (data) {
-    recv += data.byteLength
-    if (recv === expected) {
-      lc.is(sent, expected, 'client sent all data')
-      lc.is(recv, expected, 'client received all data')
-      socket.end()
-    } else if (sent < expected) {
-      send()
-    }
-  })
-
-  socket.once('end', function () {
-    lc.pass('client side ended')
-  })
-
-  await lc
-  await server.close()
-})
+)
 
 test('createServer + connect - force holepunch', async function (t) {
   const [boot] = await swarm(t)
@@ -151,14 +155,17 @@ test('createServer + connect - force holepunch', async function (t) {
   const lc = t.test('socket lifecycle')
   lc.plan(4)
 
-  const server = a.createServer({ shareLocalAddress: false }, function (socket) {
-    lc.pass('udx server side opened')
+  const server = a.createServer(
+    { shareLocalAddress: false },
+    function (socket) {
+      lc.pass('udx server side opened')
 
-    socket.once('end', function () {
-      lc.pass('udx server side ended')
-      socket.end()
-    })
-  })
+      socket.once('end', function () {
+        lc.pass('udx server side ended')
+        socket.end()
+      })
+    }
+  )
 
   await server.listen()
 
@@ -194,15 +201,18 @@ test('server choosing to abort holepunch', async function (t) {
   const lc = t.test('socket lifecycle')
   lc.plan(2)
 
-  const server = a.createServer({
-    shareLocalAddress: false,
-    holepunch () {
-      lc.pass('server should trigger holepuncher hook')
-      return false
+  const server = a.createServer(
+    {
+      shareLocalAddress: false,
+      holepunch() {
+        lc.pass('server should trigger holepuncher hook')
+        return false
+      }
+    },
+    function (socket) {
+      lc.fail('server should not make a connection')
     }
-  }, function (socket) {
-    lc.fail('server should not make a connection')
-  })
+  )
 
   await server.listen()
 
@@ -239,16 +249,19 @@ test('client choosing to abort holepunch', async function (t) {
   const lc = t.test('socket lifecycle')
   lc.plan(2)
 
-  const server = a.createServer({ shareLocalAddress: false }, function (socket) {
-    lc.fail('server should not make a connection')
-  })
+  const server = a.createServer(
+    { shareLocalAddress: false },
+    function (socket) {
+      lc.fail('server should not make a connection')
+    }
+  )
 
   await server.listen()
 
   const socket = b.connect(server.publicKey, {
     fastOpen: false,
     localConnection: false,
-    holepunch () {
+    holepunch() {
       lc.pass('client is aborting')
       return false
     }
@@ -516,7 +529,10 @@ test('create many connections with reusable sockets', async function (t) {
   let same = 0
 
   for (let i = 0; i < 100; i++) {
-    const socket = b.connect(server.address().publicKey, { reusableSocket: true, localConnection: false })
+    const socket = b.connect(server.address().publicKey, {
+      reusableSocket: true,
+      localConnection: false
+    })
 
     socket.on('connect', function () {
       if (prev === socket.rawStream.socket) same++
@@ -531,7 +547,10 @@ test('create many connections with reusable sockets', async function (t) {
   t.is(same, 99, 'reused socket')
 
   for (let i = 0; i < 100; i++) {
-    const socket = b.connect(server.address().publicKey, { reusableSocket: false, localConnection: false })
+    const socket = b.connect(server.address().publicKey, {
+      reusableSocket: false,
+      localConnection: false
+    })
 
     socket.on('connect', function () {
       if (prev === socket.rawStream.socket) same++
@@ -640,7 +659,7 @@ test('connect using id instead of buffer', async function (t) {
 
   const [a, b] = await swarm(t)
   const server = a.createServer()
-  server.on('connection', conn => {
+  server.on('connection', (conn) => {
     conn.on('end', () => conn.end())
   })
 
@@ -694,8 +713,16 @@ test('connectionKeepAlive defaults to 5000', async function (t) {
   t.plan(4)
 
   const [a, b] = await swarm(t)
-  t.is(a.connectionKeepAlive, 5000, 'sanity check: connectionKeepAlive set to 5000')
-  t.is(b.connectionKeepAlive, 5000, 'sanity check: connectionKeepAlive set to 5000')
+  t.is(
+    a.connectionKeepAlive,
+    5000,
+    'sanity check: connectionKeepAlive set to 5000'
+  )
+  t.is(
+    b.connectionKeepAlive,
+    5000,
+    'sanity check: connectionKeepAlive set to 5000'
+  )
 
   const server = a.createServer((socket) => {
     socket.on('error', () => {})

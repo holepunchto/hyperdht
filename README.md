@@ -17,7 +17,7 @@ and is mainly used to facilitate finding and connecting to peers using end to en
 
 To try it out, first instantiate a DHT instance
 
-``` js
+```js
 import DHT from 'hyperdht'
 
 const node = new DHT()
@@ -25,7 +25,7 @@ const node = new DHT()
 
 Then on one computer listen for connections
 
-``` js
+```js
 // create a server to listen for secure connections
 const server = node.createServer()
 
@@ -46,7 +46,7 @@ await server.listen(keyPair)
 
 Then on another connect to the computer using the public key of the key-pair it is listening on
 
-``` js
+```js
 // publicKey here is keyPair.publicKey from above
 const socket = anotherNode.connect(publicKey)
 
@@ -74,14 +74,14 @@ Options include:
   bootstrap: ['host:port'],
   keyPair, // set the default key pair to use for server.listen and connect
   connectionKeepAlive, // set a default keep-alive (in ms) on all opened sockets. Defaults to 5000. Set false to turn off (advanced usage).
-  randomPunchInterval: 20000 // set a default time for interval between punches (in ms). Defaults to 20000.  
-  
+  randomPunchInterval: 20000 // set a default time for interval between punches (in ms). Defaults to 20000.
+
 }
 ```
 
 See [dht-rpc](https://github.com/mafintosh/dht-rpc) for more options as HyperDHT inherits from that.
 
-*Note:* The default bootstrap servers are publicly served on behalf of the commons. To run a fully isolated DHT, start one or more dht nodes with an empty bootstrap array (`new DHT({bootstrap:[]})`) and then use the addresses of those nodes as the `bootstrap` option in all other dht nodes. You'll need at least one persistent node for the network to be completely operational.
+_Note:_ The default bootstrap servers are publicly served on behalf of the commons. To run a fully isolated DHT, start one or more dht nodes with an empty bootstrap array (`new DHT({bootstrap:[]})`) and then use the addresses of those nodes as the `bootstrap` option in all other dht nodes. You'll need at least one persistent node for the network to be completely operational.
 
 #### `keyPair = DHT.keyPair([seed])`
 
@@ -150,9 +150,9 @@ Returns an object containing the address of the server:
 
 ```js
 {
-  host, // external IP of the server,
-  port, // external port of the server if predictable,
-  publicKey // public key of the server
+  ;(host, // external IP of the server,
+    port, // external port of the server if predictable,
+    publicKey) // public key of the server
 }
 ```
 
@@ -262,8 +262,8 @@ Fetch a mutable value from the DHT.
 
 Options:
 
-* `seq` - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
-* `latest` - OPTIONAL - default `false`, a boolean indicating whether the query should try to find the highest seq before returning, or just the first verified value larger than `options.seq` it sees.
+- `seq` - OPTIONAL, default `0`, a number which will only return values with corresponding `seq` values that are greater than or equal to the supplied `seq` option.
+- `latest` - OPTIONAL - default `false`, a boolean indicating whether the query should try to find the highest seq before returning, or just the first verified value larger than `options.seq` it sees.
 
 Any additional options you pass are forwarded to dht-rpc.
 
@@ -280,11 +280,13 @@ npm install -g hyperdht
 ```
 
 Run a DHT node:
+
 ```sh
 hyperdht # [--port 0] [--host 0.0.0.0] [--bootstrap <comma separated list of ip:port>]
 ```
 
 Or run multiple nodes:
+
 ```sh
 hyperdht --nodes 5 # [--host 0.0.0.0] [--bootstrap <list>]
 ```
@@ -295,7 +297,8 @@ Note: by default it uses the [mainnet bootstrap nodes](lib/constants.js).
 
 To create your own DHT network is as follows:
 
-1) Run your first bootstrap node:
+1. Run your first bootstrap node:
+
 ```sh
 hyperdht --bootstrap --host (server-ip) # [--port 49737]
 ```
@@ -303,6 +306,7 @@ hyperdht --bootstrap --host (server-ip) # [--port 49737]
 Important: it requires the port to be open.
 
 Now your bootstrap node is ready to use at `(server-ip):49737`, for example:
+
 ```js
 const dht = new DHT({ bootstrap: ['(server-ip):49737'] })
 ```
@@ -311,7 +315,7 @@ Note: You could configure some DNS for the bootstrap IP addresses.
 
 For the network to be fully operational it needs at least one persistent node.
 
-2) Provide the first node by using your own bootstrap values:
+2. Provide the first node by using your own bootstrap values:
 
 ```sh
 hyperdht --port 49738 --bootstrap (server-ip):49737
