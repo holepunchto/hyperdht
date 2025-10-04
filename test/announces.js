@@ -43,15 +43,23 @@ test('announce to group and lookup', async function (t) {
     t.alike(result[0].peers[0].publicKey, keyPair1.publicKey)
   }
 
-  await a.announce(target, keyPair2, [{ host: '1.2.3.4', port: 1234 }]).finished()
+  await a
+    .announce(target, keyPair2, [{ host: '1.2.3.4', port: 1234 }])
+    .finished()
 
   {
     const result = await toArray(b.lookup(target))
     t.ok(result.length > 0, 'has at least one result')
     t.alike(result[0].peers.length, 2, 'two peers')
-    t.alike([result[0].peers[0].publicKey, result[0].peers[1].publicKey].sort(), [keyPair1.publicKey, keyPair2.publicKey].sort())
+    t.alike(
+      [result[0].peers[0].publicKey, result[0].peers[1].publicKey].sort(),
+      [keyPair1.publicKey, keyPair2.publicKey].sort()
+    )
 
-    const latest = result[0].peers[result[0].peers[0].publicKey.equals(keyPair2.publicKey) ? 0 : 1]
+    const latest =
+      result[0].peers[
+        result[0].peers[0].publicKey.equals(keyPair2.publicKey) ? 0 : 1
+      ]
 
     t.is(latest.relayAddresses.length, 1, 'announced one relay')
     t.alike(latest.relayAddresses[0], { host: '1.2.3.4', port: 1234 })
@@ -189,10 +197,12 @@ test('server announces relay addrs', async function (t) {
 test('connect when we relay ourself', async function (t) {
   const testnet = await swarm(t)
 
-  const server = await testnet.nodes[1].createServer(function (sock) {
-    sock.resume()
-    sock.end()
-  }).listen()
+  const server = await testnet.nodes[1]
+    .createServer(function (sock) {
+      sock.resume()
+      sock.end()
+    })
+    .listen()
 
   const addr = server.relayAddresses[server.relayAddresses.length - 1]
 
@@ -203,7 +213,7 @@ test('connect when we relay ourself', async function (t) {
       await sock.opened
       t.pass('worked')
       sock.end()
-      await new Promise(resolve => sock.once('close', resolve))
+      await new Promise((resolve) => sock.once('close', resolve))
       break
     }
   }
@@ -224,11 +234,12 @@ test('announcer background does not over-trigger', async function (t) {
   await server.listen()
 
   // give some time for possible background spam
-  await new Promise(resolve => setTimeout(resolve, 500))
+  await new Promise((resolve) => setTimeout(resolve, 500))
 
-  const requestsSent = initTid > a.io._tid // it wrapped?
-    ? a.io._tid // close enough for this test (ignoring those before wrapping)
-    : a.io._tid - initTid
+  const requestsSent =
+    initTid > a.io._tid // it wrapped?
+      ? a.io._tid // close enough for this test (ignoring those before wrapping)
+      : a.io._tid - initTid
 
   t.ok(
     requestsSent < 50,

@@ -6,9 +6,11 @@ const node = new DHT()
 printInfo()
 
 // Obvs no security implied here!
-const serverKeyPair = DHT.keyPair(Buffer.alloc(32).fill('basic-connectivity-server'))
+const serverKeyPair = DHT.keyPair(
+  Buffer.alloc(32).fill('basic-connectivity-server')
+)
 
-function firewall (pub, remotePayload, addr) {
+function firewall(pub, remotePayload, addr) {
   console.log('Should firewall?', pub, remotePayload, addr)
   return false
 }
@@ -29,7 +31,7 @@ process.once('SIGINT', async function () {
   process.exit(0)
 })
 
-async function printInfo () {
+async function printInfo() {
   await node.fullyBootstrapped()
 
   console.log('DHT node info:')

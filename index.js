@@ -9,7 +9,12 @@ const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS } = require('./lib/constants')
+const {
+  FIREWALL,
+  BOOTSTRAP_NODES,
+  KNOWN_NODES,
+  COMMANDS
+} = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const { decode } = require('hypercore-id-encoding')
 const RawStreamSet = require('./lib/raw-stream-set')
@@ -17,7 +22,7 @@ const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 
 class HyperDHT extends DHT {
-  constructor (opts = {}) {
+  constructor(opts = {}) {
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
     const nodes = opts.nodes || KNOWN_NODES
@@ -28,9 +33,8 @@ class HyperDHT extends DHT {
 
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
-    this.connectionKeepAlive = opts.connectionKeepAlive === false
-      ? 0
-      : opts.connectionKeepAlive || 5000
+    this.connectionKeepAlive =
+      opts.connectionKeepAlive === false ? 0 : opts.connectionKeepAlive || 5000
 
     // stats is inherited from dht-rpc so fwd the ones from there
     this.stats = {
@@ -66,11 +70,11 @@ class HyperDHT extends DHT {
     })
   }
 
-  connect (remotePublicKey, opts) {
+  connect(remotePublicKey, opts) {
     return connect(this, decode(remotePublicKey), opts)
   }
 
-  createServer (opts, onconnection) {
+  createServer(opts, onconnection) {
     if (typeof opts === 'function') return this.createServer({}, opts)
     if (opts && opts.onconnection) onconnection = opts.onconnection
     const s = new Server(this, opts)
@@ -78,11 +82,11 @@ class HyperDHT extends DHT {
     return s
   }
 
-  pool () {
+  pool() {
     return new ConnectionPool(this)
   }
 
-  async resume ({ log = noop } = {}) {
+  async resume({ log = noop } = {}) {
     if (this._deferRandomPunch) this._lastRandomPunch = Date.now()
     await super.resume({ log })
     const resuming = []
@@ -92,7 +96,7 @@ class HyperDHT extends DHT {
     log('Done, hyperdht fully resumed')
   }
 
-  async suspend ({ log = noop } = {}) {
+  async suspend({ log = noop } = {}) {
     this._connectable = false // just so nothing gets connected during suspension
     const suspending = []
     for (const server of this.listening) suspending.push(server.suspend())
@@ -108,7 +112,7 @@ class HyperDHT extends DHT {
     this._connectable = true
   }
 
-  async destroy ({ force = false } = {}) {
+  async destroy({ force = false } = {}) {
     if (!force) {
       const closing = []
       for (const server of this.listening) closing.push(server.close())
@@ -121,7 +125,7 @@ class HyperDHT extends DHT {
     await super.destroy()
   }
 
-  async validateLocalAddresses (addresses) {
+  async validateLocalAddresses(addresses) {
     const list = []
     const socks = []
     const waiting = []
@@ -147,7 +151,7 @@ class HyperDHT extends DHT {
       socks.push(sock)
 
       // semi terrible heuristic until we proper fix local connections by racing them to the remote...
-      const promise = new Promise(resolve => {
+      const promise = new Promise((resolve) => {
         sock.on('message', () => resolve(true))
         setTimeout(() => resolve(false), 500)
         sock.trySend(b4a.alloc(1), sock.address().port, addr.host)
@@ -172,36 +176,40 @@ class HyperDHT extends DHT {
     return list
   }
 
-  findPeer (publicKey, opts = {}) {
+  findPeer(publicKey, opts = {}) {
     const target = opts.hash === false ? publicKey : hash(publicKey)
     opts = { ...opts, map: mapFindPeer }
-    return this.query({ target, command: COMMANDS.FIND_PEER, value: null }, opts)
+    return this.query(
+      { target, command: COMMANDS.FIND_PEER, value: null },
+      opts
+    )
   }
 
-  lookup (target, opts = {}) {
+  lookup(target, opts = {}) {
     opts = { ...opts, map: mapLookup }
     return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
   }
 
-  lookupAndUnannounce (target, keyPair, opts = {}) {
+  lookupAndUnannounce(target, keyPair, opts = {}) {
     const unannounces = []
     const dht = this
     const userCommit = opts.commit || noop
     const signUnannounce = opts.signUnannounce || Persistent.signUnannounce
 
-    if (this._persistent !== null) { // unlink self
+    if (this._persistent !== null) {
+      // unlink self
       this._persistent.unannounce(target, keyPair.publicKey)
     }
 
     opts = { ...opts, map, commit }
     return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
 
-    async function commit (reply, dht, query) {
+    async function commit(reply, dht, query) {
       await Promise.all(unannounces) // can never fail, caught below
       return userCommit(reply, dht, query)
     }
 
-    function map (reply) {
+    function map(reply) {
       const data = mapLookup(reply)
 
       if (!data || !data.token) return data
@@ -216,25 +224,27 @@ class HyperDHT extends DHT {
       if (!data.from.id) return data
 
       unannounces.push(
-        dht._requestUnannounce(
-          keyPair,
-          dht,
-          target,
-          data.token,
-          data.from,
-          signUnannounce
-        ).catch(safetyCatch)
+        dht
+          ._requestUnannounce(
+            keyPair,
+            dht,
+            target,
+            data.token,
+            data.from,
+            signUnannounce
+          )
+          .catch(safetyCatch)
       )
 
       return data
     }
   }
 
-  unannounce (target, keyPair, opts = {}) {
+  unannounce(target, keyPair, opts = {}) {
     return this.lookupAndUnannounce(target, keyPair, opts).finished()
   }
 
-  announce (target, keyPair, relayAddresses, opts = {}) {
+  announce(target, keyPair, relayAddresses, opts = {}) {
     const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
     const bump = opts.bump || 0
 
@@ -244,7 +254,7 @@ class HyperDHT extends DHT {
       ? this.lookupAndUnannounce(target, keyPair, opts)
       : this.lookup(target, opts)
 
-    function commit (reply, dht) {
+    function commit(reply, dht) {
       return dht._requestAnnounce(
         keyPair,
         dht,
@@ -258,10 +268,13 @@ class HyperDHT extends DHT {
     }
   }
 
-  async immutableGet (target, opts = {}) {
+  async immutableGet(target, opts = {}) {
     opts = { ...opts, map: mapImmutable }
 
-    const query = this.query({ target, command: COMMANDS.IMMUTABLE_GET, value: null }, opts)
+    const query = this.query(
+      { target, command: COMMANDS.IMMUTABLE_GET, value: null },
+      opts
+    )
     const check = b4a.allocUnsafe(32)
 
     for await (const node of query) {
@@ -273,25 +286,36 @@ class HyperDHT extends DHT {
     return null
   }
 
-  async immutablePut (value, opts = {}) {
+  async immutablePut(value, opts = {}) {
     const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, value)
 
     opts = {
       ...opts,
       map: mapImmutable,
-      commit (reply, dht) {
-        return dht.request({ token: reply.token, target, command: COMMANDS.IMMUTABLE_PUT, value }, reply.from)
+      commit(reply, dht) {
+        return dht.request(
+          {
+            token: reply.token,
+            target,
+            command: COMMANDS.IMMUTABLE_PUT,
+            value
+          },
+          reply.from
+        )
       }
     }
 
-    const query = this.query({ target, command: COMMANDS.IMMUTABLE_GET, value: null }, opts)
+    const query = this.query(
+      { target, command: COMMANDS.IMMUTABLE_GET, value: null },
+      opts
+    )
     await query.finished()
 
     return { hash: target, closestNodes: query.closestNodes }
   }
 
-  async mutableGet (publicKey, opts = {}) {
+  async mutableGet(publicKey, opts = {}) {
     let refresh = opts.refresh || null
     let signed = null
     let result = null
@@ -302,19 +326,35 @@ class HyperDHT extends DHT {
     sodium.crypto_generichash(target, publicKey)
 
     const userSeq = opts.seq || 0
-    const query = this.query({ target, command: COMMANDS.MUTABLE_GET, value: c.encode(c.uint, userSeq) }, opts)
+    const query = this.query(
+      {
+        target,
+        command: COMMANDS.MUTABLE_GET,
+        value: c.encode(c.uint, userSeq)
+      },
+      opts
+    )
     const latest = opts.latest !== false
 
     for await (const node of query) {
       if (result && node.seq <= result.seq) continue
-      if (node.seq < userSeq || !Persistent.verifyMutable(node.signature, node.seq, node.value, publicKey)) continue
+      if (
+        node.seq < userSeq ||
+        !Persistent.verifyMutable(
+          node.signature,
+          node.seq,
+          node.value,
+          publicKey
+        )
+      )
+        continue
       if (!latest) return node
       if (!result || node.seq > result.seq) result = node
     }
 
     return result
 
-    function commit (reply, dht) {
+    function commit(reply, dht) {
       if (!signed && result && refresh) {
         if (refresh(result)) {
           signed = c.encode(m.mutablePutRequest, {
@@ -328,11 +368,21 @@ class HyperDHT extends DHT {
         }
       }
 
-      return signed ? dht.request({ token: reply.token, target, command: COMMANDS.MUTABLE_PUT, value: signed }, reply.from) : Promise.resolve(null)
+      return signed
+        ? dht.request(
+            {
+              token: reply.token,
+              target,
+              command: COMMANDS.MUTABLE_PUT,
+              value: signed
+            },
+            reply.from
+          )
+        : Promise.resolve(null)
     }
   }
 
-  async mutablePut (keyPair, value, opts = {}) {
+  async mutablePut(keyPair, value, opts = {}) {
     const signMutable = opts.signMutable || Persistent.signMutable
 
     const target = b4a.allocUnsafe(32)
@@ -351,19 +401,35 @@ class HyperDHT extends DHT {
     opts = {
       ...opts,
       map: mapMutable,
-      commit (reply, dht) {
-        return dht.request({ token: reply.token, target, command: COMMANDS.MUTABLE_PUT, value: signed }, reply.from)
+      commit(reply, dht) {
+        return dht.request(
+          {
+            token: reply.token,
+            target,
+            command: COMMANDS.MUTABLE_PUT,
+            value: signed
+          },
+          reply.from
+        )
       }
     }
 
     // use seq = 0, for the query part here, as we don't care about the actual values
-    const query = this.query({ target, command: COMMANDS.MUTABLE_GET, value: c.encode(c.uint, 0) }, opts)
+    const query = this.query(
+      { target, command: COMMANDS.MUTABLE_GET, value: c.encode(c.uint, 0) },
+      opts
+    )
     await query.finished()
 
-    return { publicKey: keyPair.publicKey, closestNodes: query.closestNodes, seq, signature }
+    return {
+      publicKey: keyPair.publicKey,
+      closestNodes: query.closestNodes,
+      seq,
+      signature
+    }
   }
 
-  onrequest (req) {
+  onrequest(req) {
     switch (req.command) {
       case COMMANDS.PEER_HANDSHAKE: {
         this._router.onpeerhandshake(req)
@@ -415,15 +481,15 @@ class HyperDHT extends DHT {
     return false
   }
 
-  static keyPair (seed) {
+  static keyPair(seed) {
     return createKeyPair(seed)
   }
 
-  static hash (data) {
+  static hash(data) {
     return hash(data)
   }
 
-  static connectRawStream (encryptedStream, rawStream, remoteId) {
+  static connectRawStream(encryptedStream, rawStream, remoteId) {
     const stream = encryptedStream.rawStream
 
     if (!stream.connected) throw STREAM_NOT_CONNECTED()
@@ -436,11 +502,20 @@ class HyperDHT extends DHT {
     )
   }
 
-  createRawStream (opts) {
+  createRawStream(opts) {
     return this.rawStreams.add(opts)
   }
 
-  async _requestAnnounce (keyPair, dht, target, token, from, relayAddresses, sign, bump) {
+  async _requestAnnounce(
+    keyPair,
+    dht,
+    target,
+    token,
+    from,
+    relayAddresses,
+    sign,
+    bump
+  ) {
     const ann = {
       peer: {
         publicKey: keyPair.publicKey,
@@ -455,15 +530,18 @@ class HyperDHT extends DHT {
 
     const value = c.encode(m.announce, ann)
 
-    return dht.request({
-      token,
-      target,
-      command: COMMANDS.ANNOUNCE,
-      value
-    }, from)
+    return dht.request(
+      {
+        token,
+        target,
+        command: COMMANDS.ANNOUNCE,
+        value
+      },
+      from
+    )
   }
 
-  async _requestUnannounce (keyPair, dht, target, token, from, sign) {
+  async _requestUnannounce(keyPair, dht, target, token, from, sign) {
     const unann = {
       peer: {
         publicKey: keyPair.publicKey,
@@ -476,12 +554,15 @@ class HyperDHT extends DHT {
 
     const value = c.encode(m.announce, unann)
 
-    return dht.request({
-      token,
-      target,
-      command: COMMANDS.UNANNOUNCE,
-      value
-    }, from)
+    return dht.request(
+      {
+        token,
+        target,
+        command: COMMANDS.UNANNOUNCE,
+        value
+      },
+      from
+    )
   }
 }
 
@@ -490,7 +571,7 @@ HyperDHT.FIREWALL = FIREWALL
 
 module.exports = HyperDHT
 
-function mapLookup (node) {
+function mapLookup(node) {
   if (!node.value) return null
 
   const l = c.decode(m.lookupRawReply, node.value)
@@ -508,7 +589,7 @@ function mapLookup (node) {
   }
 }
 
-function mapFindPeer (node) {
+function mapFindPeer(node) {
   if (!node.value) return null
 
   try {
@@ -523,7 +604,7 @@ function mapFindPeer (node) {
   }
 }
 
-function mapImmutable (node) {
+function mapImmutable(node) {
   if (!node.value) return null
 
   return {
@@ -534,7 +615,7 @@ function mapImmutable (node) {
   }
 }
 
-function mapMutable (node) {
+function mapMutable(node) {
   if (!node.value) return null
 
   try {
@@ -553,18 +634,24 @@ function mapMutable (node) {
   }
 }
 
-function noop () {}
+function noop() {}
 
-function filterNode (node) {
+function filterNode(node) {
   // always skip these testnet nodes that got mixed in by accident, until they get updated
-  return !(node.port === 49738 && (node.host === '134.209.28.98' || node.host === '167.99.142.185')) &&
-    !(node.port === 9400 && node.host === '35.233.47.252') && !(node.host === '150.136.142.116')
+  return (
+    !(
+      node.port === 49738 &&
+      (node.host === '134.209.28.98' || node.host === '167.99.142.185')
+    ) &&
+    !(node.port === 9400 && node.host === '35.233.47.252') &&
+    !(node.host === '150.136.142.116')
+  )
 }
 
 const defaultMaxSize = 65536
 const defaultMaxAge = 20 * 60 * 1000 // 20 minutes
 
-function defaultCacheOpts (opts) {
+function defaultCacheOpts(opts) {
   const maxSize = opts.maxSize || defaultMaxSize
   const maxAge = opts.maxAge || defaultMaxAge
 
@@ -576,11 +663,11 @@ function defaultCacheOpts (opts) {
       records: { maxSize, maxAge },
       refreshes: { maxSize, maxAge },
       mutables: {
-        maxSize: maxSize / 2 | 0,
+        maxSize: (maxSize / 2) | 0,
         maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
       },
       immutables: {
-        maxSize: maxSize / 2 | 0,
+        maxSize: (maxSize / 2) | 0,
         maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
       },
       bumps: { maxSize, maxAge }

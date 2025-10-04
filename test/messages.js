@@ -49,10 +49,12 @@ test('noise payload with holepunch and addresses', function (t) {
         }
       ]
     },
-    addresses4: [{
-      host: '127.0.0.1',
-      port: 10240
-    }],
+    addresses4: [
+      {
+        host: '127.0.0.1',
+        port: 10240
+      }
+    ],
     addresses6: [],
     udx: null,
     secretStream: null,
@@ -80,10 +82,12 @@ test('noise payload only addresses', function (t) {
     error: 0,
     firewall: 2,
     holepunch: null,
-    addresses4: [{
-      host: '127.0.0.1',
-      port: 10241
-    }],
+    addresses4: [
+      {
+        host: '127.0.0.1',
+        port: 10241
+      }
+    ],
     addresses6: [],
     udx: null,
     secretStream: null,
@@ -112,10 +116,12 @@ test('noise payload ipv6', function (t) {
     firewall: 2,
     holepunch: null,
     addresses4: [],
-    addresses6: [{
-      host: '0:0:0:0:0:0:0:1',
-      port: 42420
-    }],
+    addresses6: [
+      {
+        host: '0:0:0:0:0:0:0:1',
+        port: 42420
+      }
+    ],
     udx: null,
     secretStream: null,
     relayThrough: null
@@ -136,7 +142,9 @@ test('noise payload ipv6', function (t) {
 
 test('noise payload newer version', function (t) {
   // version 2 with some "version specific" data
-  const newer = Buffer.from([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
+  const newer = Buffer.from([
+    2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+  ])
   const state = { start: 0, end: newer.byteLength, buffer: newer }
 
   const d = m.noisePayload.decode(state)
@@ -190,10 +198,12 @@ test('holepunch payload with flag and addresses', function (t) {
     round: 1,
     connected: false,
     punching: true,
-    addresses: [{
-      host: '127.0.0.1',
-      port: 10241
-    }],
+    addresses: [
+      {
+        host: '127.0.0.1',
+        port: 10241
+      }
+    ],
     remoteAddress: null,
     token: null,
     remoteToken: null
@@ -260,13 +270,16 @@ test('peer with multiple relays', function (t) {
 
   const peer = {
     publicKey: Buffer.alloc(32).fill('abc'),
-    relayAddresses: [{
-      host: '127.0.0.1',
-      port: 4242
-    }, {
-      host: '8.1.4.1',
-      port: 402
-    }]
+    relayAddresses: [
+      {
+        host: '127.0.0.1',
+        port: 4242
+      },
+      {
+        host: '8.1.4.1',
+        port: 402
+      }
+    ]
   }
 
   m.peer.preencode(state, peer)
@@ -284,19 +297,25 @@ test('peer with multiple relays', function (t) {
 test('peers', function (t) {
   const state = { start: 0, end: 0, buffer: null }
 
-  const peers = [{
-    publicKey: Buffer.alloc(32).fill('abc'),
-    relayAddresses: [{
-      host: '127.0.0.1',
-      port: 4242
-    }, {
-      host: '8.1.4.1',
-      port: 402
-    }]
-  }, {
-    publicKey: Buffer.alloc(32).fill('another'),
-    relayAddresses: []
-  }]
+  const peers = [
+    {
+      publicKey: Buffer.alloc(32).fill('abc'),
+      relayAddresses: [
+        {
+          host: '127.0.0.1',
+          port: 4242
+        },
+        {
+          host: '8.1.4.1',
+          port: 402
+        }
+      ]
+    },
+    {
+      publicKey: Buffer.alloc(32).fill('another'),
+      relayAddresses: []
+    }
+  ]
 
   m.peers.preencode(state, peers)
   state.buffer = b4a.allocUnsafe(state.end)
