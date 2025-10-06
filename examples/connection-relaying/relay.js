@@ -13,17 +13,8 @@ const server = dht.createServer({ shareLocalAddress: false }, (socket) => {
   console.log('Connection from', socket.remotePublicKey.toString('hex'))
   const session = relay.accept(socket, { id: socket.remotePublicKey })
   session.on('pair', (isInitiator, token, stream, remoteId) => {
-    console.log(
-      'Pair isInitiator =',
-      isInitiator,
-      'token =',
-      token.toString('hex')
-    )
+    console.log('Pair isInitiator =', isInitiator, 'token =', token.toString('hex'))
   })
 })
 
-server
-  .listen()
-  .then(() =>
-    console.log('Relay listening on', server.publicKey.toString('hex'))
-  )
+server.listen().then(() => console.log('Relay listening on', server.publicKey.toString('hex')))

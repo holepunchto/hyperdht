@@ -61,9 +61,7 @@ test('When Server is killed, Client should detect this - through relay', async (
         // when error is ETIMEDOUT it's the server connection that has broken
         // not so long after that, the client should have detected that the connection is gone
         if (err.code === 'ETIMEDOUT') {
-          relayTest.pass(
-            'Relay server detected that server has died. Waiting for client to detect'
-          )
+          relayTest.pass('Relay server detected that server has died. Waiting for client to detect')
 
           // In some cases, the client may have detected that the server has died before the relay server
           if (hasClientDetectedThatServerDied) return

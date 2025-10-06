@@ -43,9 +43,7 @@ test('announce to group and lookup', async function (t) {
     t.alike(result[0].peers[0].publicKey, keyPair1.publicKey)
   }
 
-  await a
-    .announce(target, keyPair2, [{ host: '1.2.3.4', port: 1234 }])
-    .finished()
+  await a.announce(target, keyPair2, [{ host: '1.2.3.4', port: 1234 }]).finished()
 
   {
     const result = await toArray(b.lookup(target))
@@ -56,10 +54,7 @@ test('announce to group and lookup', async function (t) {
       [keyPair1.publicKey, keyPair2.publicKey].sort()
     )
 
-    const latest =
-      result[0].peers[
-        result[0].peers[0].publicKey.equals(keyPair2.publicKey) ? 0 : 1
-      ]
+    const latest = result[0].peers[result[0].peers[0].publicKey.equals(keyPair2.publicKey) ? 0 : 1]
 
     t.is(latest.relayAddresses.length, 1, 'announced one relay')
     t.alike(latest.relayAddresses[0], { host: '1.2.3.4', port: 1234 })
@@ -241,10 +236,7 @@ test('announcer background does not over-trigger', async function (t) {
       ? a.io._tid // close enough for this test (ignoring those before wrapping)
       : a.io._tid - initTid
 
-  t.ok(
-    requestsSent < 50,
-    `No background spam of ping requests (saw ${requestsSent})`
-  )
+  t.ok(requestsSent < 50, `No background spam of ping requests (saw ${requestsSent})`)
 
   await a.destroy()
 })

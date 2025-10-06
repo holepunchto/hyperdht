@@ -18,9 +18,7 @@ test('Can destroy a DHT node while server.listen() is called', async function (t
   t.ok(server.closed === true, 'The server closed')
 
   await listenProm
-  t.pass(
-    'The listen function does not error when the DHT closes while it is running'
-  )
+  t.pass('The listen function does not error when the DHT closes while it is running')
 })
 
 test('Cannot listen on multiple servers with the same keypair', async function (t) {
@@ -39,9 +37,6 @@ test('Cannot listen on multiple servers with the same keypair', async function (
   const keyPair = hypCrypto.keyPair()
 
   await s3.listen(keyPair)
-  await t.exception(
-    async () => await s4.listen(keyPair),
-    /KEYPAIR_ALREADY_USED/
-  )
+  await t.exception(async () => await s4.listen(keyPair), /KEYPAIR_ALREADY_USED/)
   await s5.listen(hypCrypto.keyPair())
 })

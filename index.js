@@ -9,12 +9,7 @@ const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const {
-  FIREWALL,
-  BOOTSTRAP_NODES,
-  KNOWN_NODES,
-  COMMANDS
-} = require('./lib/constants')
+const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const { decode } = require('hypercore-id-encoding')
 const RawStreamSet = require('./lib/raw-stream-set')
@@ -179,10 +174,7 @@ class HyperDHT extends DHT {
   findPeer(publicKey, opts = {}) {
     const target = opts.hash === false ? publicKey : hash(publicKey)
     opts = { ...opts, map: mapFindPeer }
-    return this.query(
-      { target, command: COMMANDS.FIND_PEER, value: null },
-      opts
-    )
+    return this.query({ target, command: COMMANDS.FIND_PEER, value: null }, opts)
   }
 
   lookup(target, opts = {}) {
@@ -225,14 +217,7 @@ class HyperDHT extends DHT {
 
       unannounces.push(
         dht
-          ._requestUnannounce(
-            keyPair,
-            dht,
-            target,
-            data.token,
-            data.from,
-            signUnannounce
-          )
+          ._requestUnannounce(keyPair, dht, target, data.token, data.from, signUnannounce)
           .catch(safetyCatch)
       )
 
@@ -250,9 +235,7 @@ class HyperDHT extends DHT {
 
     opts = { ...opts, commit }
 
-    return opts.clear
-      ? this.lookupAndUnannounce(target, keyPair, opts)
-      : this.lookup(target, opts)
+    return opts.clear ? this.lookupAndUnannounce(target, keyPair, opts) : this.lookup(target, opts)
 
     function commit(reply, dht) {
       return dht._requestAnnounce(
@@ -271,10 +254,7 @@ class HyperDHT extends DHT {
   async immutableGet(target, opts = {}) {
     opts = { ...opts, map: mapImmutable }
 
-    const query = this.query(
-      { target, command: COMMANDS.IMMUTABLE_GET, value: null },
-      opts
-    )
+    const query = this.query({ target, command: COMMANDS.IMMUTABLE_GET, value: null }, opts)
     const check = b4a.allocUnsafe(32)
 
     for await (const node of query) {
@@ -306,10 +286,7 @@ class HyperDHT extends DHT {
       }
     }
 
-    const query = this.query(
-      { target, command: COMMANDS.IMMUTABLE_GET, value: null },
-      opts
-    )
+    const query = this.query({ target, command: COMMANDS.IMMUTABLE_GET, value: null }, opts)
     await query.finished()
 
     return { hash: target, closestNodes: query.closestNodes }
@@ -340,12 +317,7 @@ class HyperDHT extends DHT {
       if (result && node.seq <= result.seq) continue
       if (
         node.seq < userSeq ||
-        !Persistent.verifyMutable(
-          node.signature,
-          node.seq,
-          node.value,
-          publicKey
-        )
+        !Persistent.verifyMutable(node.signature, node.seq, node.value, publicKey)
       )
         continue
       if (!latest) return node
@@ -494,28 +466,14 @@ class HyperDHT extends DHT {
 
     if (!stream.connected) throw STREAM_NOT_CONNECTED()
 
-    rawStream.connect(
-      stream.socket,
-      remoteId,
-      stream.remotePort,
-      stream.remoteHost
-    )
+    rawStream.connect(stream.socket, remoteId, stream.remotePort, stream.remoteHost)
   }
 
   createRawStream(opts) {
     return this.rawStreams.add(opts)
   }
 
-  async _requestAnnounce(
-    keyPair,
-    dht,
-    target,
-    token,
-    from,
-    relayAddresses,
-    sign,
-    bump
-  ) {
+  async _requestAnnounce(keyPair, dht, target, token, from, relayAddresses, sign, bump) {
     const ann = {
       peer: {
         publicKey: keyPair.publicKey,
@@ -639,10 +597,7 @@ function noop() {}
 function filterNode(node) {
   // always skip these testnet nodes that got mixed in by accident, until they get updated
   return (
-    !(
-      node.port === 49738 &&
-      (node.host === '134.209.28.98' || node.host === '167.99.142.185')
-    ) &&
+    !(node.port === 49738 && (node.host === '134.209.28.98' || node.host === '167.99.142.185')) &&
     !(node.port === 9400 && node.host === '35.233.47.252') &&
     !(node.host === '150.136.142.116')
   )

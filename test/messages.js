@@ -142,9 +142,7 @@ test('noise payload ipv6', function (t) {
 
 test('noise payload newer version', function (t) {
   // version 2 with some "version specific" data
-  const newer = Buffer.from([
-    2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
-  ])
+  const newer = Buffer.from([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16])
   const state = { start: 0, end: newer.byteLength, buffer: newer }
 
   const d = m.noisePayload.decode(state)

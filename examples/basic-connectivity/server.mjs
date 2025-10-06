@@ -6,9 +6,7 @@ const node = new DHT()
 printInfo()
 
 // Obvs no security implied here!
-const serverKeyPair = DHT.keyPair(
-  Buffer.alloc(32).fill('basic-connectivity-server')
-)
+const serverKeyPair = DHT.keyPair(Buffer.alloc(32).fill('basic-connectivity-server'))
 
 function firewall(pub, remotePayload, addr) {
   console.log('Should firewall?', pub, remotePayload, addr)

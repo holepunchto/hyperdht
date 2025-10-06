@@ -52,8 +52,6 @@ test('Client use keepalive to detect disconnect - separated by processes', async
     clientSocket.setKeepAlive(100)
     clientSocket.on('open', () => clientTest.pass('Connected'))
     clientSocket.on('error', (err) => clientTest.is(err.code, 'ETIMEDOUT'))
-    clientSocket.on('close', () =>
-      clientTest.pass('Discovered that the connection has been lost')
-    )
+    clientSocket.on('close', () => clientTest.pass('Discovered that the connection has been lost'))
   }
 })

@@ -5,8 +5,7 @@ const HyperDHT = require('./')
 const bootstrap = arg('bootstrap')
 const nodes = arg('node') ? '' : arg('nodes')
 
-const isBootstrap =
-  bootstrap === '' || (bootstrap !== null && bootstrap.startsWith('--'))
+const isBootstrap = bootstrap === '' || (bootstrap !== null && bootstrap.startsWith('--'))
 
 if (isBootstrap) {
   const port = Number(arg('port') || '0') || 49737
@@ -48,8 +47,7 @@ async function startNodes(cnt, bootstrap) {
   const host = arg('host') || undefined
   const all = []
 
-  if (port && cnt !== 1)
-    throw new Error('--port is only valid when running a single node')
+  if (port && cnt !== 1) throw new Error('--port is only valid when running a single node')
 
   while (all.length < cnt) {
     const node = new HyperDHT({ host, port, anyPort: !port, bootstrap })
@@ -65,10 +63,7 @@ async function startNodes(cnt, bootstrap) {
     })
 
     node.on('persistent', function () {
-      console.log(
-        'Node #' + id + ' is persistent, joining remote routing tables',
-        node.address()
-      )
+      console.log('Node #' + id + ' is persistent, joining remote routing tables', node.address())
     })
 
     node.on('close', function () {
@@ -76,9 +71,7 @@ async function startNodes(cnt, bootstrap) {
     })
   }
 
-  console.log(
-    'Fully started ' + cnt + ' Hyperswarm DHT node' + (cnt === 1 ? '' : 's')
-  )
+  console.log('Fully started ' + cnt + ' Hyperswarm DHT node' + (cnt === 1 ? '' : 's'))
 
   process.once('SIGINT', function () {
     console.log('Shutting down nodes...')

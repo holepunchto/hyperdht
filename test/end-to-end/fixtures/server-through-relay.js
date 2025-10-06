@@ -27,9 +27,7 @@ async function main() {
           socket.write('world')
         })
         .on('open', () =>
-          console.log(
-            `socket_onopen ${socket.rawStream.remoteHost}:${socket.rawStream.remotePort}`
-          )
+          console.log(`socket_onopen ${socket.rawStream.remoteHost}:${socket.rawStream.remotePort}`)
         )
         .on('close', () => console.log('socket_onclose'))
         .on('error', (err) => console.log(`socket_onerror ${err.code}`))

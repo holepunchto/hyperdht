@@ -205,20 +205,17 @@ test('relay connections through node, server side', async function (t) {
 
   await aServer.listen()
 
-  const bServer = b.createServer(
-    { relayThrough: aServer.publicKey },
-    function (socket) {
-      lc.pass('server socket opened')
-      socket
-        .on('data', (data) => {
-          lc.alike(data, Buffer.from('hello world'))
-        })
-        .on('close', () => {
-          lc.pass('server socket closed')
-        })
-        .end()
-    }
-  )
+  const bServer = b.createServer({ relayThrough: aServer.publicKey }, function (socket) {
+    lc.pass('server socket opened')
+    socket
+      .on('data', (data) => {
+        lc.alike(data, Buffer.from('hello world'))
+      })
+      .on('close', () => {
+        lc.pass('server socket closed')
+      })
+      .end()
+  })
 
   await bServer.listen()
 
@@ -265,20 +262,17 @@ test('relay connections through node, server side, client aborts hole punch', as
 
   await aServer.listen()
 
-  const bServer = b.createServer(
-    { relayThrough: aServer.publicKey },
-    function (socket) {
-      lc.pass('server socket opened')
-      socket
-        .on('data', (data) => {
-          lc.alike(data, Buffer.from('hello world'))
-        })
-        .on('close', () => {
-          lc.pass('server socket closed')
-        })
-        .end()
-    }
-  )
+  const bServer = b.createServer({ relayThrough: aServer.publicKey }, function (socket) {
+    lc.pass('server socket opened')
+    socket
+      .on('data', (data) => {
+        lc.alike(data, Buffer.from('hello world'))
+      })
+      .on('close', () => {
+        lc.pass('server socket closed')
+      })
+      .end()
+  })
 
   await bServer.listen()
 

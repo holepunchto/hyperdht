@@ -3,11 +3,7 @@ const DHT = require('.')
 module.exports = async function createTestnet(size = 10, opts = {}) {
   const swarm = []
   const teardown =
-    typeof opts === 'function'
-      ? opts
-      : opts.teardown
-        ? opts.teardown.bind(opts)
-        : noop
+    typeof opts === 'function' ? opts : opts.teardown ? opts.teardown.bind(opts) : noop
   const host = opts.host || '127.0.0.1'
   const port = opts.port || 0
   const bootstrap = opts.bootstrap ? [...opts.bootstrap] : []
@@ -25,8 +21,7 @@ module.exports = async function createTestnet(size = 10, opts = {}) {
 
   await first.fullyBootstrapped()
 
-  if (bootstrap.length === 0)
-    bootstrap.push({ host, port: first.address().port })
+  if (bootstrap.length === 0) bootstrap.push({ host, port: first.address().port })
 
   swarm.push(first)
 
