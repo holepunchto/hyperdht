@@ -10,26 +10,31 @@ const keyPair = { publicKey, secretKey }
 
 main()
 
-async function main () {
+async function main() {
   const node = new DHT()
-  const server = node.createServer({
-    holepunch: false, // To ensure it relies only on relaying
-    shareLocalAddress: false, // To help ensure it relies only on relaying (otherwise it can connect directly over LAN, without even trying to holepunch)
-    relayKeepAlive,
-    relayThrough: relayServer
-  }, socket => {
-    socket.setKeepAlive(socketKeepAlive)
-    socket
-      .on('data', data => {
-        console.log(`socket_ondata ${b4a.toString(data)}`)
-        socket.write('world')
-      })
-      .on('open', () => console.log(`socket_onopen ${socket.rawStream.remoteHost}:${socket.rawStream.remotePort}`))
-      .on('close', () => console.log('socket_onclose'))
-      .on('error', err => console.log(`socket_onerror ${err.code}`))
-  })
+  const server = node.createServer(
+    {
+      holepunch: false, // To ensure it relies only on relaying
+      shareLocalAddress: false, // To help ensure it relies only on relaying (otherwise it can connect directly over LAN, without even trying to holepunch)
+      relayKeepAlive,
+      relayThrough: relayServer
+    },
+    (socket) => {
+      socket.setKeepAlive(socketKeepAlive)
+      socket
+        .on('data', (data) => {
+          console.log(`socket_ondata ${b4a.toString(data)}`)
+          socket.write('world')
+        })
+        .on('open', () =>
+          console.log(`socket_onopen ${socket.rawStream.remoteHost}:${socket.rawStream.remotePort}`)
+        )
+        .on('close', () => console.log('socket_onclose'))
+        .on('error', (err) => console.log(`socket_onerror ${err.code}`))
+    }
+  )
   server.on('open', () => console.log('server_onopen'))
-  server.on('error', err => console.log(`server_onerror ${err.code}`))
+  server.on('error', (err) => console.log(`server_onerror ${err.code}`))
   server.on('close', () => console.log('server_onclose'))
   console.log('prelistening')
   await server.listen(keyPair)

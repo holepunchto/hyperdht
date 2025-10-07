@@ -14,7 +14,7 @@ const b4a = require('b4a')
   A bug that occured with udx-native < 1.8.9 is that the relay server had detected the control socket had bad been destroyed,
   but didn't fully clean up internally. That meant that this information was never fully relayed to the other peer.
 */
-test('When Server is killed, Client should detect this - through relay', async t => {
+test('When Server is killed, Client should detect this - through relay', async (t) => {
   t.plan(3)
 
   const relayTest = t.test('relay')
@@ -46,18 +46,18 @@ test('When Server is killed, Client should detect this - through relay', async t
   await startRelayServer()
   await startServer()
 
-  async function startRelayServer () {
+  async function startRelayServer() {
     const relay = new RelayServer({
-      createStream (opts) {
+      createStream(opts) {
         return relayNode.createRawStream({ ...opts, framed: true })
       }
     })
 
-    const relayServer = relayNode.createServer(socket => {
+    const relayServer = relayNode.createServer((socket) => {
       relayTest.pass('Socket connected')
       socket.setKeepAlive(RELAY_KEEPALIVE)
 
-      socket.on('error', err => {
+      socket.on('error', (err) => {
         // when error is ETIMEDOUT it's the server connection that has broken
         // not so long after that, the client should have detected that the connection is gone
         if (err.code === 'ETIMEDOUT') {
@@ -75,13 +75,13 @@ test('When Server is killed, Client should detect this - through relay', async t
       })
 
       const session = relay.accept(socket, { id: socket.remotePublicKey })
-      session.on('error', () => { })
+      session.on('error', () => {})
     })
 
     await relayServer.listen(relayKeyPair)
   }
 
-  async function startServer () {
+  async function startServer() {
     const args = [
       path.join(__dirname, 'fixtures/server-through-relay.js'),
       serverPublicKey,
@@ -97,7 +97,9 @@ test('When Server is killed, Client should detect this - through relay', async t
         startClient()
       }
       if (data === 'socket_ondata hello') {
-        serverTest.pass('Received "hello" from client. Sending "world" back, then wait 1 second and kill server')
+        serverTest.pass(
+          'Received "hello" from client. Sending "world" back, then wait 1 second and kill server'
+        )
         setTimeout(kill, 1000)
       }
     }
@@ -105,7 +107,7 @@ test('When Server is killed, Client should detect this - through relay', async t
     serverTest.pass('Server process killed. Waiting for relay server to detect')
   }
 
-  function startClient () {
+  function startClient() {
     const client = clientNode.connect(serverKeyPair.publicKey, {
       keyPair: clientKeyPair, // To ensure same client keyPair on each connection
       relayKeepAlive: RELAY_KEEPALIVE,
@@ -118,12 +120,12 @@ test('When Server is killed, Client should detect this - through relay', async t
     // detected that the server had been killed and relayed that information downstream
     // to the client
     client
-      .on('error', () => { })
+      .on('error', () => {})
       .on('open', () => {
         clientTest.pass('Socket opened. Now sending "hello"')
         client.write('hello')
       })
-      .on('data', data => {
+      .on('data', (data) => {
         data = b4a.toString(data)
 
         if (data === 'world') {

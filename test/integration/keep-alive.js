@@ -9,7 +9,7 @@ const b4a = require('b4a')
 // to the client and it would notice that the socket has been closed - and thus the
 // keepalive timeout would never kick in.
 
-test('Client use keepalive to detect disconnect - separated by processes', async t => {
+test('Client use keepalive to detect disconnect - separated by processes', async (t) => {
   t.plan(2)
   t.teardown(() => node.destroy())
 
@@ -22,7 +22,7 @@ test('Client use keepalive to detect disconnect - separated by processes', async
 
   clientTest.plan(3)
 
-  t.test('server', async serverTest => {
+  t.test('server', async (serverTest) => {
     serverTest.plan(3)
 
     const args = [
@@ -47,11 +47,11 @@ test('Client use keepalive to detect disconnect - separated by processes', async
     serverTest.pass('Process died')
   })
 
-  function startClient () {
+  function startClient() {
     const clientSocket = node.connect(publicKey)
     clientSocket.setKeepAlive(100)
     clientSocket.on('open', () => clientTest.pass('Connected'))
-    clientSocket.on('error', err => clientTest.is(err.code, 'ETIMEDOUT'))
+    clientSocket.on('error', (err) => clientTest.is(err.code, 'ETIMEDOUT'))
     clientSocket.on('close', () => clientTest.pass('Discovered that the connection has been lost'))
   }
 })

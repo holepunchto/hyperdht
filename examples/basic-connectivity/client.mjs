@@ -31,7 +31,7 @@ encryptedSocket.on('end', function () {
   encryptedSocket.end()
 })
 
-async function printInfo () {
+async function printInfo() {
   await node.ready()
 
   console.log('DHT node info:')

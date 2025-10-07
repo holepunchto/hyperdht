@@ -114,7 +114,7 @@ test('createServer + connect - exchange data', { timeout: 60000 }, async functio
 
   for (let i = 0; i < 10; i++) send()
 
-  function send () {
+  function send() {
     sent += blk.byteLength
     socket.write(blk)
   }
@@ -194,15 +194,18 @@ test('server choosing to abort holepunch', async function (t) {
   const lc = t.test('socket lifecycle')
   lc.plan(2)
 
-  const server = a.createServer({
-    shareLocalAddress: false,
-    holepunch () {
-      lc.pass('server should trigger holepuncher hook')
-      return false
+  const server = a.createServer(
+    {
+      shareLocalAddress: false,
+      holepunch() {
+        lc.pass('server should trigger holepuncher hook')
+        return false
+      }
+    },
+    function (socket) {
+      lc.fail('server should not make a connection')
     }
-  }, function (socket) {
-    lc.fail('server should not make a connection')
-  })
+  )
 
   await server.listen()
 
@@ -248,7 +251,7 @@ test('client choosing to abort holepunch', async function (t) {
   const socket = b.connect(server.publicKey, {
     fastOpen: false,
     localConnection: false,
-    holepunch () {
+    holepunch() {
       lc.pass('client is aborting')
       return false
     }
@@ -516,7 +519,10 @@ test('create many connections with reusable sockets', async function (t) {
   let same = 0
 
   for (let i = 0; i < 100; i++) {
-    const socket = b.connect(server.address().publicKey, { reusableSocket: true, localConnection: false })
+    const socket = b.connect(server.address().publicKey, {
+      reusableSocket: true,
+      localConnection: false
+    })
 
     socket.on('connect', function () {
       if (prev === socket.rawStream.socket) same++
@@ -531,7 +537,10 @@ test('create many connections with reusable sockets', async function (t) {
   t.is(same, 99, 'reused socket')
 
   for (let i = 0; i < 100; i++) {
-    const socket = b.connect(server.address().publicKey, { reusableSocket: false, localConnection: false })
+    const socket = b.connect(server.address().publicKey, {
+      reusableSocket: false,
+      localConnection: false
+    })
 
     socket.on('connect', function () {
       if (prev === socket.rawStream.socket) same++
@@ -640,7 +649,7 @@ test('connect using id instead of buffer', async function (t) {
 
   const [a, b] = await swarm(t)
   const server = a.createServer()
-  server.on('connection', conn => {
+  server.on('connection', (conn) => {
     conn.on('end', () => conn.end())
   })
 

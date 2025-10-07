@@ -27,7 +27,7 @@ test('relay connections through node, client side', async function (t) {
   await aServer.listen()
 
   const relay = new RelayServer({
-    createStream (opts) {
+    createStream(opts) {
       return b.createRawStream({ ...opts, framed: true })
     }
   })
@@ -36,8 +36,7 @@ test('relay connections through node, client side', async function (t) {
 
   const bServer = b.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
-    session
-      .on('error', (err) => t.comment(err.message))
+    session.on('error', (err) => t.comment(err.message))
   })
 
   await bServer.listen()
@@ -85,7 +84,7 @@ test('relay connections through node, client side, client aborts hole punch', as
   await aServer.listen()
 
   const relay = new RelayServer({
-    createStream (opts) {
+    createStream(opts) {
       return b.createRawStream({ ...opts, framed: true })
     }
   })
@@ -94,13 +93,15 @@ test('relay connections through node, client side, client aborts hole punch', as
 
   const bServer = b.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
-    session
-      .on('error', (err) => t.comment(err.message))
+    session.on('error', (err) => t.comment(err.message))
   })
 
   await bServer.listen()
 
-  const aSocket = c.connect(aServer.publicKey, { holepunch: () => false, relayThrough: bServer.publicKey })
+  const aSocket = c.connect(aServer.publicKey, {
+    holepunch: () => false,
+    relayThrough: bServer.publicKey
+  })
 
   aSocket
     .on('open', () => {
@@ -143,7 +144,7 @@ test('relay connections through node, client side, server aborts hole punch', as
   await aServer.listen()
 
   const relay = new RelayServer({
-    createStream (opts) {
+    createStream(opts) {
       return b.createRawStream({ ...opts, framed: true })
     }
   })
@@ -152,8 +153,7 @@ test('relay connections through node, client side, server aborts hole punch', as
 
   const bServer = b.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
-    session
-      .on('error', (err) => t.comment(err.message))
+    session.on('error', (err) => t.comment(err.message))
   })
 
   await bServer.listen()
@@ -187,7 +187,7 @@ test('relay connections through node, server side', async function (t) {
   lc.plan(5)
 
   const relay = new RelayServer({
-    createStream (opts) {
+    createStream(opts) {
       return a.createRawStream({ ...opts, framed: true })
     }
   })
@@ -196,8 +196,7 @@ test('relay connections through node, server side', async function (t) {
 
   const aServer = a.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
-    session
-      .on('error', (err) => t.comment(err.message))
+    session.on('error', (err) => t.comment(err.message))
   })
 
   await aServer.listen()
@@ -245,7 +244,7 @@ test('relay connections through node, server side, client aborts hole punch', as
   lc.plan(5)
 
   const relay = new RelayServer({
-    createStream (opts) {
+    createStream(opts) {
       return a.createRawStream({ ...opts, framed: true })
     }
   })
@@ -254,8 +253,7 @@ test('relay connections through node, server side, client aborts hole punch', as
 
   const aServer = a.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
-    session
-      .on('error', (err) => t.comment(err.message))
+    session.on('error', (err) => t.comment(err.message))
   })
 
   await aServer.listen()
@@ -303,7 +301,7 @@ test('relay connections through node, server side, server aborts hole punch', as
   lc.plan(5)
 
   const relay = new RelayServer({
-    createStream (opts) {
+    createStream(opts) {
       return a.createRawStream({ ...opts, framed: true })
     }
   })
@@ -312,23 +310,25 @@ test('relay connections through node, server side, server aborts hole punch', as
 
   const aServer = a.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
-    session
-      .on('error', (err) => t.comment(err.message))
+    session.on('error', (err) => t.comment(err.message))
   })
 
   await aServer.listen()
 
-  const bServer = b.createServer({ holepunch: () => false, relayThrough: aServer.publicKey }, function (socket) {
-    lc.pass('server socket opened')
-    socket
-      .on('data', (data) => {
-        lc.alike(data, Buffer.from('hello world'))
-      })
-      .on('close', () => {
-        lc.pass('server socket closed')
-      })
-      .end()
-  })
+  const bServer = b.createServer(
+    { holepunch: () => false, relayThrough: aServer.publicKey },
+    function (socket) {
+      lc.pass('server socket opened')
+      socket
+        .on('data', (data) => {
+          lc.alike(data, Buffer.from('hello world'))
+        })
+        .on('close', () => {
+          lc.pass('server socket closed')
+        })
+        .end()
+    }
+  )
 
   await bServer.listen()
 
@@ -367,7 +367,7 @@ test('relay connections through node, client and server side', async function (t
   testRelayFollower.plan(1)
 
   const relay = new RelayServer({
-    createStream (opts) {
+    createStream(opts) {
       testRelay.pass('The relay server created a relay stream')
       return a.createRawStream({ ...opts, framed: true })
     }
@@ -384,27 +384,29 @@ test('relay connections through node, client and server side', async function (t
         testRelayFollower.pass('The non-iniator paired with the relay server')
       }
     })
-    session
-      .on('error', (err) => t.comment(err.message))
+    session.on('error', (err) => t.comment(err.message))
   })
 
   await aServer.listen()
 
-  const bServer = b.createServer({
-    holepunch: false, // To ensure it relies only on relaying
-    shareLocalAddress: false, // To help ensure it relies only on relaying (otherwise it can connect directly over LAN, without even trying to holepunch)
-    relayThrough: aServer.publicKey
-  }, function (socket) {
-    lc.pass('server socket opened')
-    socket
-      .on('data', (data) => {
-        lc.alike(data, Buffer.from('hello world'))
-      })
-      .on('close', () => {
-        lc.pass('server socket closed')
-      })
-      .end()
-  })
+  const bServer = b.createServer(
+    {
+      holepunch: false, // To ensure it relies only on relaying
+      shareLocalAddress: false, // To help ensure it relies only on relaying (otherwise it can connect directly over LAN, without even trying to holepunch)
+      relayThrough: aServer.publicKey
+    },
+    function (socket) {
+      lc.pass('server socket opened')
+      socket
+        .on('data', (data) => {
+          lc.alike(data, Buffer.from('hello world'))
+        })
+        .on('close', () => {
+          lc.pass('server socket closed')
+        })
+        .end()
+    }
+  )
 
   await bServer.listen()
 
@@ -451,7 +453,7 @@ test.skip('relay several connections through node with pool', async function (t)
   await aServer.listen()
 
   const relay = new RelayServer({
-    createStream (opts) {
+    createStream(opts) {
       return b.createRawStream({ ...opts, framed: true })
     }
   })
@@ -460,8 +462,7 @@ test.skip('relay several connections through node with pool', async function (t)
 
   const bServer = b.createServer(function (socket) {
     const session = relay.accept(socket, { id: socket.remotePublicKey })
-    session
-      .on('error', (err) => t.comment(err.message))
+    session.on('error', (err) => t.comment(err.message))
   })
 
   await bServer.listen()

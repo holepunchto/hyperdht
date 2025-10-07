@@ -16,13 +16,13 @@ if (isBootstrap) {
   startNodes(Number(nodes) || 1, bootstrap ? bootstrap.split(',') : undefined)
 }
 
-function arg (name) {
+function arg(name) {
   const i = process.argv.indexOf('--' + name)
   if (i === -1) return null
   return i < process.argv.length - 1 ? process.argv[i + 1] : ''
 }
 
-async function startBootstrapNode (port, host) {
+async function startBootstrapNode(port, host) {
   console.log('Starting DHT bootstrap node...')
 
   const node = HyperDHT.bootstrapper(port, host)
@@ -40,7 +40,7 @@ async function startBootstrapNode (port, host) {
   })
 }
 
-async function startNodes (cnt, bootstrap) {
+async function startNodes(cnt, bootstrap) {
   console.log('Booting DHT nodes...')
 
   const port = Number(arg('port') || '0') || 0
