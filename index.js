@@ -7,6 +7,7 @@ const m = require('./lib/messages')
 const SocketPool = require('./lib/socket-pool')
 const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
+const Cache = require('xache')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
 const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS } = require('./lib/constants')
@@ -24,7 +25,7 @@ class HyperDHT extends DHT {
 
     super({ ...opts, port, bootstrap, nodes, filterNode })
 
-    const { router, persistent } = defaultCacheOpts(opts)
+    const { router, relayAddresses, persistent } = defaultCacheOpts(opts)
 
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
@@ -43,6 +44,7 @@ class HyperDHT extends DHT {
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
     this._persistent = null
     this._validatedLocalAddresses = new Map()
+    this._relayAddressesCache = new Cache(relayAddresses)
 
     this._deferRandomPunch = !!opts.deferRandomPunch
     this._lastRandomPunch = this._deferRandomPunch ? Date.now() : 0
@@ -590,6 +592,7 @@ function defaultCacheOpts(opts) {
     router: {
       forwards: { maxSize, maxAge }
     },
+    relayAddresses: { maxSize: Math.min(maxSize, 512), maxAge: 0 },
     persistent: {
       records: { maxSize, maxAge },
       refreshes: { maxSize, maxAge },
