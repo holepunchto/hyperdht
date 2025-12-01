@@ -1,6 +1,6 @@
 # hyperdht
 
-### [See the full API docs at docs.holepunch.to](https://docs.holepunch.to/building-blocks/hyperswarm#dht)
+### [See the full API docs at docs.pears.com](https://docs.pears.com/building-blocks/hyperdht)
 
 The DHT powering Hyperswarm
 
