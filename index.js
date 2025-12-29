@@ -17,6 +17,12 @@ const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 
+const DEFAULTS = {
+  ...DHT.DEFAULTS,
+  connectionKeepAlive: 5000,
+  randomPunchInterval: 20000
+}
+
 class HyperDHT extends DHT {
   constructor(opts = {}) {
     const port = opts.port || 49737
@@ -30,7 +36,9 @@ class HyperDHT extends DHT {
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
     this.connectionKeepAlive =
-      opts.connectionKeepAlive === false ? 0 : opts.connectionKeepAlive || 5000
+      opts.connectionKeepAlive === false
+        ? 0
+        : opts.connectionKeepAlive || DEFAULTS.connectionKeepAlive
 
     // stats is inherited from dht-rpc so fwd the ones from there
     this.stats = {
@@ -49,7 +57,7 @@ class HyperDHT extends DHT {
     this._deferRandomPunch = !!opts.deferRandomPunch
     this._lastRandomPunch = this._deferRandomPunch ? Date.now() : 0
     this._connectable = true
-    this._randomPunchInterval = opts.randomPunchInterval || 20000 // min 20s between random punches...
+    this._randomPunchInterval = opts.randomPunchInterval || DEFAULTS.randomPunchInterval // min 20s between random punches...
     this._randomPunches = 0
     this._randomPunchLimit = 1 // set to one for extra safety for now
 
@@ -66,6 +74,8 @@ class HyperDHT extends DHT {
       for (const server of this.listening) server.notifyOnline()
     })
   }
+
+  static DEFAULTS = DEFAULTS
 
   connect(remotePublicKey, opts) {
     return connect(this, decode(remotePublicKey), opts)
