@@ -13,6 +13,7 @@ const connect = require('./lib/connect')
 const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const { decode } = require('hypercore-id-encoding')
+const { hammingDistance } = require('@holepunchto/searchable-record-cache')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
@@ -52,6 +53,7 @@ class HyperDHT extends DHT {
     this._randomPunchInterval = opts.randomPunchInterval || 20000 // min 20s between random punches...
     this._randomPunches = 0
     this._randomPunchLimit = 1 // set to one for extra safety for now
+    this._simhash = opts.simhash
 
     this.once('persistent', () => {
       this._persistent = new Persistent(this, persistent)
@@ -182,6 +184,68 @@ class HyperDHT extends DHT {
   lookup(target, opts = {}) {
     opts = { ...opts, map: mapLookup }
     return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
+  }
+
+  async searchableRecordPut(tokens, value, opts = {}) {
+    if (!this._simhash) return
+
+    const target = this._simhash.hash(tokens)
+    const query = this.query({ target, command: COMMANDS.SEARCH, value: null }, opts)
+    await query.finished()
+
+    for (const closest of query.closestReplies) {
+      await this.request(
+        {
+          target,
+          command: COMMANDS.SEARCHABLE_RECORD_PUT,
+          value: c.encode(m.searchableRecord, { value, key: target })
+        },
+        closest.from
+      )
+    }
+
+    return target
+  }
+
+  async search(tokens, opts = {}) {
+    if (!this._simhash) return
+
+    const target = this._simhash.hash(tokens)
+
+    const query = this.query(
+      {
+        target,
+        command: COMMANDS.SEARCH,
+        value: c.encode(m.searchOptions, {
+          closest: opts.closest || 5,
+          values: opts.values || 5
+        })
+      },
+      opts
+    )
+
+    const results = []
+    const seen = new Set()
+
+    for await (const reply of query) {
+      if (reply.value) {
+        const res = c.decode(m.searchResponse, reply.value)
+
+        for (const r of res) {
+          const key = r.key.toString('hex')
+          if (seen.has(key)) continue
+
+          const distance = hammingDistance(r.key, target)
+          seen.add(key)
+          results.push({ ...r, distance, from: reply.from })
+        }
+      }
+    }
+
+    results.sort((a, b) => a.distance - b.distance)
+    while (results.length > 5) results.pop()
+
+    return results
   }
 
   lookupAndUnannounce(target, keyPair, opts = {}) {
@@ -426,6 +490,14 @@ class HyperDHT extends DHT {
         this._persistent.onimmutableget(req)
         return true
       }
+      case COMMANDS.SEARCH: {
+        this._persistent.onsearch(req)
+        return true
+      }
+      case COMMANDS.SEARCHABLE_RECORD_PUT: {
+        this._persistent.onsearchablerecordput(req)
+        return true
+      }
     }
 
     return false
@@ -604,6 +676,7 @@ function defaultCacheOpts(opts) {
         maxSize: (maxSize / 2) | 0,
         maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
       },
+      searchableRecords: { maxSize: Infinity, maxAge: Infinity },
       bumps: { maxSize, maxAge }
     }
   }

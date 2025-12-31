@@ -16,6 +16,7 @@ async function runTests() {
   await import('./noncustodial.js')
   await import('./pool.js')
   await import('./relaying.js')
+  await import('./search.js')
   await import('./storing.js')
 
   test.resume()
