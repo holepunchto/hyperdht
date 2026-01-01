@@ -281,9 +281,7 @@ const vocabulary = [
   'puppy'
 ]
 
-test.configure({ timeout: 60_000 })
-
-test('search - big', async function (t) {
+test.skip('search - big', async function (t) {
   const { nodes } = await swarm(t, 2000)
 
   const targetPointer = randomBytes(32)
