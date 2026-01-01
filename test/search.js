@@ -6,12 +6,9 @@ const { randomBytes } = require('hypercore-crypto')
 
 test('search', async function (t) {
   const { nodes } = await swarm(t, 100, [], {
-    maxAge: 100 // give us some time to do a search
+    maxAge: 100, // give us some time to do a search
+    simhash: new SimHash(vocabulary)
   })
-
-  for (const n of nodes) {
-    n._simhash = new SimHash(vocabulary)
-  }
 
   const pointer = randomBytes(32)
 
@@ -31,11 +28,7 @@ test('search', async function (t) {
 })
 
 test('search', async function (t) {
-  const { nodes } = await swarm(t, 100)
-
-  for (const n of nodes) {
-    n._simhash = new SimHash(vocabulary)
-  }
+  const { nodes } = await swarm(t, 100, [], { simhash: new SimHash(vocabulary) })
 
   const pointer = randomBytes(32)
 
@@ -306,13 +299,9 @@ const vocabulary = [
 ]
 
 test.skip('search - big', async function (t) {
-  const { nodes } = await swarm(t, 2000)
+  const { nodes } = await swarm(t, 2000, [], { simhash: new SimHash(vocabulary) })
 
   const targetPointer = randomBytes(32)
-
-  for (const n of nodes) {
-    n._simhash = new SimHash(vocabulary)
-  }
 
   const target = generateDoc()
   await nodes[30].searchableRecordPut(target, targetPointer)
