@@ -5,7 +5,9 @@ const { SimHash } = require('simhash-vocabulary')
 const { randomBytes } = require('hypercore-crypto')
 
 test('search', async function (t) {
-  const { nodes } = await swarm(t, 100)
+  const { nodes } = await swarm(t, 100, [], {
+    maxAge: 100 // give us some time to do a search
+  })
 
   for (const n of nodes) {
     n._simhash = new SimHash(vocabulary)
@@ -15,7 +17,29 @@ test('search', async function (t) {
 
   await nodes[30].searchableRecordPut(['planet', 'satellite'], pointer)
 
-  await new Promise((res) => setTimeout(res, 1000))
+  const res = await nodes[30].search(['planet', 'satellite'])
+  t.is(res.length, 1)
+  t.is(res[0].values[0].toString('hex'), pointer.toString('hex'))
+
+  await new Promise((res) => setTimeout(res, 250))
+
+  // after gc
+  {
+    const res = await nodes[30].search(['planet', 'satellite'])
+    t.is(res.length, 0)
+  }
+})
+
+test('search', async function (t) {
+  const { nodes } = await swarm(t, 100)
+
+  for (const n of nodes) {
+    n._simhash = new SimHash(vocabulary)
+  }
+
+  const pointer = randomBytes(32)
+
+  await nodes[30].searchableRecordPut(['planet', 'satellite'], pointer)
 
   const res = await nodes[30].search(['planet', 'satellite'])
   t.is(res.length, 1)
