@@ -676,7 +676,10 @@ function defaultCacheOpts(opts) {
         maxSize: (maxSize / 2) | 0,
         maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
       },
-      searchableRecords: { maxSize: Infinity, maxAge: 0 },
+      searchableRecords: {
+        maxSize: (maxSize / 2) | 0,
+        maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
+      },
       bumps: { maxSize, maxAge }
     }
   }
