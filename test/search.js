@@ -1,7 +1,7 @@
 const test = require('brittle')
 const { swarm } = require('./helpers')
 
-const { SimHash } = require('@holepunchto/simhash')
+const { SimHash } = require('simhash-vocabulary')
 const { randomBytes } = require('hypercore-crypto')
 
 test('search', async function (t) {
