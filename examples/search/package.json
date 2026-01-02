@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "searchable-record-cache": "^0.0.6"
+  }
+}
