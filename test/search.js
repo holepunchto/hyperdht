@@ -4,17 +4,51 @@ const { swarm } = require('./helpers')
 const { SimHash } = require('simhash-vocabulary')
 const { randomBytes } = require('hypercore-crypto')
 
-test('search', async function (t) {
+test('search - disabled', async function (t) {
+  const simhash = new SimHash(vocabulary)
+  const { nodes } = await swarm(t, 100, [])
+
+  // disabled
+  t.is(nodes[30]._experimentalSearch, false)
+  t.is(nodes[30]._persistent.searchableRecords, null)
+
+  const pointer = randomBytes(32)
+
+  await nodes[30].searchableRecordPut(simhash.hash(['planet', 'satellite']), pointer)
+
+  const res = await nodes[30].search(simhash.hash(['planet', 'satellite']))
+  t.is(res, undefined)
+})
+
+test('search - enabled', async function (t) {
+  const simhash = new SimHash(vocabulary)
+  const { nodes } = await swarm(t, 100, [], { experimentalSearch: true })
+
+  // enabled
+  t.is(nodes[30]._experimentalSearch, true)
+  t.ok(nodes[30]._persistent.searchableRecords)
+
+  const pointer = randomBytes(32)
+
+  await nodes[30].searchableRecordPut(simhash.hash(['planet', 'satellite']), pointer)
+
+  const res = await nodes[30].search(simhash.hash(['planet', 'satellite']))
+  t.is(res.length, 1)
+  t.is(res[0].values[0].toString('hex'), pointer.toString('hex'))
+})
+
+test('search - gc', async function (t) {
+  const simhash = new SimHash(vocabulary)
   const { nodes } = await swarm(t, 100, [], {
     maxAge: 100, // give us some time to do a search
-    simhash: new SimHash(vocabulary)
+    experimentalSearch: true
   })
 
   const pointer = randomBytes(32)
 
-  await nodes[30].searchableRecordPut(['planet', 'satellite'], pointer)
+  await nodes[30].searchableRecordPut(simhash.hash(['planet', 'satellite']), pointer)
 
-  const res = await nodes[30].search(['planet', 'satellite'])
+  const res = await nodes[30].search(simhash.hash(['planet', 'satellite']))
   t.is(res.length, 1)
   t.is(res[0].values[0].toString('hex'), pointer.toString('hex'))
 
@@ -25,18 +59,6 @@ test('search', async function (t) {
     const res = await nodes[30].search(['planet', 'satellite'])
     t.is(res.length, 0)
   }
-})
-
-test('search', async function (t) {
-  const { nodes } = await swarm(t, 100, [], { simhash: new SimHash(vocabulary) })
-
-  const pointer = randomBytes(32)
-
-  await nodes[30].searchableRecordPut(['planet', 'satellite'], pointer)
-
-  const res = await nodes[30].search(['planet', 'satellite'])
-  t.is(res.length, 1)
-  t.is(res[0].values[0].toString('hex'), pointer.toString('hex'))
 })
 
 const vocabulary = [
@@ -299,25 +321,26 @@ const vocabulary = [
 ]
 
 test.skip('search - big', async function (t) {
-  const { nodes } = await swarm(t, 2000, [], { simhash: new SimHash(vocabulary) })
+  const simhash = new SimHash(vocabulary)
+  const { nodes } = await swarm(t, 2000, [], { experimentalSearch: true })
 
   const targetPointer = randomBytes(32)
 
   const target = generateDoc()
-  await nodes[30].searchableRecordPut(target, targetPointer)
+  await nodes[30].searchableRecordPut(simhash.hash(target), targetPointer)
 
   t.comment('creating docs')
 
   for (let i = 0; i < 10_000; i++) {
     const tokens = generateDoc()
     const pointer = randomBytes(32)
-    await nodes[30].searchableRecordPut(tokens, pointer)
+    await nodes[30].searchableRecordPut(simhash.hash(tokens), pointer)
   }
 
   t.pass('setup')
 
   const time = Date.now()
-  const res = await nodes[30].search(target, { closest: 10, values: 1 })
+  const res = await nodes[30].search(simhash.hash(target), { closest: 10, values: 1 })
 
   t.ok(res.length, 5)
 

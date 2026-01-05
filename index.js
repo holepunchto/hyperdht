@@ -53,7 +53,7 @@ class HyperDHT extends DHT {
     this._randomPunchInterval = opts.randomPunchInterval || 20000 // min 20s between random punches...
     this._randomPunches = 0
     this._randomPunchLimit = 1 // set to one for extra safety for now
-    this._simhash = opts.simhash
+    this._experimentalSearch = opts.experimentalSearch === true
 
     this.once('persistent', () => {
       this._persistent = new Persistent(this, persistent)
@@ -186,10 +186,9 @@ class HyperDHT extends DHT {
     return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
   }
 
-  async searchableRecordPut(tokens, value, opts = {}) {
-    if (!this._simhash) return
+  async searchableRecordPut(target, value, opts = {}) {
+    if (!this._experimentalSearch) return
 
-    const target = this._simhash.hash(tokens)
     const query = this.query({ target, command: COMMANDS.SEARCH, value: null }, opts)
     await query.finished()
 
@@ -207,10 +206,8 @@ class HyperDHT extends DHT {
     return target
   }
 
-  async search(tokens, opts = {}) {
-    if (!this._simhash) return
-
-    const target = this._simhash.hash(tokens)
+  async search(target, opts = {}) {
+    if (!this._experimentalSearch) return
 
     const query = this.query(
       {
@@ -666,6 +663,7 @@ function defaultCacheOpts(opts) {
     },
     relayAddresses: { maxSize: Math.min(maxSize, 512), maxAge: 0 },
     persistent: {
+      experimentalSearch: opts.experimentalSearch,
       records: { maxSize, maxAge },
       refreshes: { maxSize, maxAge },
       mutables: {
