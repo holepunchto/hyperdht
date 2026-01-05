@@ -53,7 +53,7 @@
     "newline-decoder": "^1.0.2",
     "prettier": "^3.6.2",
     "prettier-config-holepunch": "^2.0.0",
-    "simhash-vocabulary": "^1.0.1"
+    "simhash-vocabulary": "^1.0.2"
   },
   "scripts": {
     "format": "prettier --write .",
