@@ -14,11 +14,9 @@ const Hyperbee = require('hyperbee')
 async function main() {
   const testnet = await createTestnet(10, {
     port: 49739
-  })
-
-  for (const n of testnet) {
-    n._simhash = new SimHash(vocabulary)
-  }
+  }, { experimentalSearch: true })
+  
+  const simhash = new SimHash(vocabulary)
 
   function pushDHT(file) {
     return new Transform({
@@ -26,7 +24,8 @@ async function main() {
         const tokens = path.basename(file).replace(/\..+$/, '').split('_').filter(Boolean)
 
         const key = randomBytes(32)
-        await testnet.nodes[0].searchableRecordPut(['gif', ...tokens], key)
+        console.log('pushing to dht', ['gif', ...tokens], key.toString('hex'))
+        await testnet.nodes[0].searchableRecordPut(simhash.hash(['gif', ...tokens]), key)
         await bee.put(key.toString('hex'), {
           path: file,
           key: dst.key.toString('hex')

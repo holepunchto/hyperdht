@@ -17,8 +17,10 @@ async function main() {
     ephemeral: true,
     host: '127.0.0.1',
     bootstrap: [{ host: '127.0.0.1', port: 49739 }],
-    simhash: new SimHash(vocabulary)
+    experimentalSearch: true
   })
+  
+  const simhash = new SimHash(vocabulary)
   const swarm = new Hyperswarm()
   const store = new Corestore('./client')
   const bee = new Hyperbee(store.get(beeKey), {
@@ -37,7 +39,7 @@ async function main() {
 
   await new Promise((res) => setTimeout(res, 2000))
 
-  const res = await node.search(['gif', ...searchTokens])
+  const res = await node.search(simhash.hash(['gif', ...searchTokens]))
 
   for (const r of res) {
     const file = await bee.get(r.values[0].toString('hex'))
@@ -53,6 +55,9 @@ async function main() {
     await discovery.flushed()
 
     const fileData = await drive.get(file.path)
+    if (!fs.existsSync(`search-results/${file.path}`)) {
+      fs.mkdirSync(`search-results`)
+    }
     fs.writeFileSync(`search-results/${file.path}`, fileData)
 
     spawn('open', [`search-results/${file.path}`])
