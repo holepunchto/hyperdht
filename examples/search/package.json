@@ -6,7 +6,7 @@
     "bare-subprocess": "^5.2.2",
     "corestore": "^7.7.0",
     "hyperbee": "^2.26.5",
-    "hyperdht": "git+https://github.com/holepunchto/hyperdht.git#search",
+    "hyperdht": "^6.28.0",
     "hyperdrive": "^13.1.1",
     "hyperswarm": "^4.16.0",
     "localdrive": "^2.2.0",
