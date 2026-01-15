@@ -15,7 +15,7 @@ async function main() {
   const testnet = await createTestnet(10, {
     port: 49739
   }, { experimentalSearch: true })
-  
+
   const simhash = new SimHash(vocabulary)
 
   function pushDHT(file) {
@@ -24,7 +24,6 @@ async function main() {
         const tokens = path.basename(file).replace(/\..+$/, '').split('_').filter(Boolean)
 
         const key = randomBytes(32)
-        console.log('pushing to dht', ['gif', ...tokens], key.toString('hex'))
         await testnet.nodes[0].searchableRecordPut(simhash.hash(['gif', ...tokens]), key)
         await bee.put(key.toString('hex'), {
           path: file,
