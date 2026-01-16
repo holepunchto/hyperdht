@@ -19,7 +19,7 @@ async function main() {
     bootstrap: [{ host: '127.0.0.1', port: 49739 }],
     experimentalSearch: true
   })
-  
+
   const simhash = new SimHash(vocabulary)
   const swarm = new Hyperswarm()
   const store = new Corestore('./client')

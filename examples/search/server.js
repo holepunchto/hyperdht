@@ -12,9 +12,13 @@ const vocabulary = require('./vocabulary')
 const Hyperbee = require('hyperbee')
 
 async function main() {
-  const testnet = await createTestnet(10, {
-    port: 49739
-  }, { experimentalSearch: true })
+  const testnet = await createTestnet(
+    10,
+    {
+      port: 49739
+    },
+    { experimentalSearch: true }
+  )
 
   const simhash = new SimHash(vocabulary)
 
