@@ -31,7 +31,8 @@ class HyperDHT extends DHT {
 
     super({ ...opts, port, bootstrap, nodes, filterNode })
 
-    const { router, relayAddresses, persistent } = defaultCacheOpts(opts)
+    const { router, relayAddresses, nodeRTT, connectionCache, directConnectionCache, persistent } =
+      defaultCacheOpts(opts)
 
     this.defaultKeyPair = opts.keyPair || createKeyPair(opts.seed)
     this.listening = new Set()
@@ -54,6 +55,12 @@ class HyperDHT extends DHT {
     this._validatedLocalAddresses = new Map()
     this._relayAddressesCache = new Cache(relayAddresses)
 
+    this._nodeRTT = new Cache(nodeRTT)
+
+    this._connectionCache = new Cache(connectionCache)
+
+    this._directConnectionCache = new Cache(directConnectionCache)
+
     this._deferRandomPunch = !!opts.deferRandomPunch
     this._lastRandomPunch = this._deferRandomPunch ? Date.now() : 0
     this._connectable = true
@@ -73,6 +80,63 @@ class HyperDHT extends DHT {
       if (!this.online) return
       for (const server of this.listening) server.notifyOnline()
     })
+
+    this._rttWarmupInterval = null
+    if (opts.preWarmRTT !== false) {
+      this._startRTTWarmup()
+    }
+
+    this.parallelProbing = opts.parallelProbing !== false
+  }
+
+  _startRTTWarmup() {
+    if (this._rttWarmupInterval) return
+
+    this._rttWarmupInterval = setInterval(() => {
+      if (this.destroyed || !this.online) return
+
+      // Sample up to 10 random nodes for RTT measurement
+      const nodes = []
+      if (this.nodes && this.nodes.latest) {
+        let count = 0
+        for (let node = this.nodes.latest; node && count < 10; node = node.prev) {
+          if (node.host && node.port) {
+            nodes.push(node)
+            count++
+          }
+        }
+      }
+
+      for (const node of nodes) {
+        const key = `${node.host}:${node.port}`
+        const stats = this._nodeRTT.get(key)
+        const needsUpdate = !stats || Date.now() - stats.lastUpdate > 60000 // Update if older than 60s
+
+        if (needsUpdate) {
+          // Measure RTT in background (don't await)
+          const startTime = process.hrtime.bigint()
+          this.ping({ host: node.host, port: node.port }).then(
+            () => {
+              const endTime = process.hrtime.bigint()
+              const rtt = Number(endTime - startTime) / 1_000_000
+              if (rtt > 0 && rtt < 10000) {
+               
+                this.updateNodeRTT(node, rtt)
+              }
+            },
+            () => {
+            }
+          )
+        }
+      }
+    }, 30000) 
+  }
+
+  _stopRTTWarmup() {
+    if (this._rttWarmupInterval) {
+      clearInterval(this._rttWarmupInterval)
+      this._rttWarmupInterval = null
+    }
   }
 
   static DEFAULTS = DEFAULTS
@@ -129,7 +193,102 @@ class HyperDHT extends DHT {
     if (this._persistent) this._persistent.destroy()
     await this.rawStreams.clear()
     await this._socketPool.destroy()
+    this._stopRTTWarmup()
+    this._nodeRTT.clear()
+    this._connectionCache.clear()
+    this._directConnectionCache.clear()
     await super.destroy()
+  }
+
+  
+  getNodeRTT(node) {
+    if (!node) return null
+    const host = node.host || (node.address && node.address.host)
+    const port = node.port || (node.address && node.address.port)
+    if (!host || !port) return null
+
+    const key = `${host}:${port}`
+    const stats = this._nodeRTT.get(key)
+    return stats ? stats.srtt : null
+  }
+
+
+  updateNodeRTT(node, rtt) {
+    if (!node || !rtt || rtt <= 0) return
+
+    const host = node.host || (node.address && node.address.host)
+    const port = node.port || (node.address && node.address.port)
+    if (!host || !port) return
+
+    const key = `${host}:${port}`
+
+    const alpha = 0.125 // Weight for SRTT
+    const beta = 0.25 // Weight for RTTVAR
+
+    if (!this._nodeRTT.has(key)) {
+      // First measurement
+      this._nodeRTT.set(key, {
+        srtt: rtt,
+        rttvar: rtt / 2, // Initial variance estimate
+        samples: 1,
+        lastUpdate: Date.now()
+      })
+    } else {
+      const stats = this._nodeRTT.get(key)
+
+      stats.rttvar = (1 - beta) * stats.rttvar + beta * Math.abs(stats.srtt - rtt)
+
+      stats.srtt = (1 - alpha) * stats.srtt + alpha * rtt
+
+      stats.samples++
+      stats.lastUpdate = Date.now()
+    }
+  }
+
+
+  sortNodesByRTT(nodes) {
+    return nodes
+      .map((node) => ({
+        node,
+        rtt: this.getNodeRTT(node) || Infinity
+      }))
+      .sort((a, b) => a.rtt - b.rtt)
+      .map((item) => item.node)
+  }
+
+ 
+  getAverageRTT() {
+    if (!this._nodeRTT) return null
+
+    let totalRTT = 0
+    let count = 0
+    for (const stats of this._nodeRTT.values()) {
+      if (stats.srtt && stats.srtt > 0) {
+        totalRTT += stats.srtt
+        count++
+      }
+    }
+
+    return count > 0 ? totalRTT / count : null
+  }
+
+ 
+  getRTTBasedTimeout(baseTimeout = 10000, minMultiplier = 0.9, maxMultiplier = 1.5) {
+    const avgRTT = this.getAverageRTT()
+    if (!avgRTT) return baseTimeout
+
+    // Only optimize timeout if we have very fast RTT (< 100ms)
+    // For slower networks, keep the base timeout to avoid premature timeouts
+    if (avgRTT < 100) {
+      // For fast networks, use 10x RTT as timeout (very conservative)
+      const rttBasedTimeout = avgRTT * 10
+      const minTimeout = baseTimeout * minMultiplier
+      const maxTimeout = baseTimeout * maxMultiplier
+      return Math.max(minTimeout, Math.min(maxTimeout, rttBasedTimeout))
+    }
+
+    // For slower networks, don't reduce timeout - keep base
+    return baseTimeout
   }
 
   async validateLocalAddresses(addresses) {
@@ -603,6 +762,9 @@ function defaultCacheOpts(opts) {
       forwards: { maxSize, maxAge }
     },
     relayAddresses: { maxSize: Math.min(maxSize, 512), maxAge: 0 },
+    nodeRTT: { maxSize: Math.min(maxSize, 2048), maxAge: 3600000 }, 
+    connectionCache: { maxSize: Math.min(maxSize, 1024), maxAge: 60000 }, 
+    directConnectionCache: { maxSize: Math.min(maxSize, 1024), maxAge: 300000 },
     persistent: {
       records: { maxSize, maxAge },
       refreshes: { maxSize, maxAge },
