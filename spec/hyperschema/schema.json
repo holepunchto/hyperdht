@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "schema": [
+    {
+      "name": "key",
+      "namespace": "hyperdht",
+      "compact": false,
+      "flagsPosition": 1,
+      "fields": [
+        {
+          "name": "key",
+          "required": true,
+          "type": "fixed32",
+          "version": 1
+        },
+        {
+          "name": "nodes",
+          "array": true,
+          "type": "ipv4Address",
+          "version": 1
+        }
+      ]
+    }
+  ]
+}
