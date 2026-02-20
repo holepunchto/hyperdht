@@ -22,11 +22,9 @@ test('createServer + connect - once defaults', async function (t) {
 
   await server.listen()
 
-  const q = b.findPeer(server.publicKey)
-  const result = await toArray(q)
-  const target = HyperDHT.EncodeKey(server.publicKey, [result[0].to])
-
-  console.log(target)
+  const target = HyperDHT.EncodeKey(server.publicKey, [
+    { host: b.io._boundServerPort, port: b.io._boundServerPort }
+  ])
 
   const socket = b.connect(target)
 
