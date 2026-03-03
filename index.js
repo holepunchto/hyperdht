@@ -520,9 +520,9 @@ module.exports = HyperDHT
 function mapLookup(node) {
   if (!node.value) return null
 
-  const l = c.decode(m.lookupRawReply, node.value)
-
   try {
+    const l = c.decode(m.lookupRawReply, node.value)
+
     return {
       token: node.token,
       from: node.from,
