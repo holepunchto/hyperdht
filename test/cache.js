@@ -1,44 +1,48 @@
 const test = require('brittle')
 const { swarm } = require('./helpers')
 const HyperDHTAddress = require('hyperdht-address')
-const HyperDHT = require('../')
 
-test('createServer + connect - once defaults', async function (t) {
-  t.plan(2)
+test('cache - key with nodes', async function (t) {
+  t.plan(3)
 
   const [a, b] = await swarm(t)
-  const lc = t.test('socket lifecycle')
+  const ts = t.test('server')
 
-  lc.plan(4)
+  ts.plan(2)
 
   const server = a.createServer(function (socket) {
-    lc.pass('server side opened')
+    ts.pass('server side opened')
 
     socket.once('end', function () {
-      lc.pass('server side ended')
+      ts.pass('server side ended')
       socket.end()
     })
   })
 
   await server.listen()
 
-  const target = HyperDHTAddress.encode(server.publicKey, [
-    { host: b.io._boundServerPort, port: b.io._boundServerPort }
-  ])
+  {
+    const tn = t.test('client w/nodes')
+    tn.plan(2)
 
-  const socket = b.connect(target)
+    const target = HyperDHTAddress.encode(server.publicKey, [
+      { host: b.io._boundServerPort, port: b.io._boundServerPort }
+    ])
 
-  socket.once('open', function () {
-    lc.pass('client side opened')
-  })
+    const socket = b.connect(target)
 
-  socket.once('end', function () {
-    lc.pass('client side ended')
-  })
+    socket.once('open', function () {
+      tn.pass('client side opened')
+    })
 
-  socket.end()
+    socket.once('end', function () {
+      tn.pass('client side ended')
+    })
 
-  await lc
+    socket.end()
+
+    await tn
+  }
 
   server.on('close', function () {
     t.pass('server closed')
