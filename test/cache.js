@@ -1,6 +1,6 @@
 const test = require('brittle')
-const { swarm, toArray } = require('./helpers')
-const DHT = require('../')
+const { swarm } = require('./helpers')
+const HyperDHTAddress = require('hyperdht-address')
 const HyperDHT = require('../')
 
 test('createServer + connect - once defaults', async function (t) {
@@ -22,7 +22,7 @@ test('createServer + connect - once defaults', async function (t) {
 
   await server.listen()
 
-  const target = HyperDHT.EncodeKey(server.publicKey, [
+  const target = HyperDHTAddress.encode(server.publicKey, [
     { host: b.io._boundServerPort, port: b.io._boundServerPort }
   ])
 

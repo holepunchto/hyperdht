@@ -15,9 +15,6 @@ const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
-const { getEncoding } = require('./spec/hyperschema/index.js')
-
-const KeyEncoding = getEncoding('@hyperdht/key')
 
 const DEFAULTS = {
   ...DHT.DEFAULTS,
@@ -78,10 +75,6 @@ class HyperDHT extends DHT {
   }
 
   static DEFAULTS = DEFAULTS
-
-  static EncodeKey(key, nodes = []) {
-    return c.encode(KeyEncoding, { key, nodes })
-  }
 
   connect(remotePublicKey, opts = {}) {
     return connect(this, remotePublicKey, opts)
