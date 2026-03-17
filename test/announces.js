@@ -1,7 +1,11 @@
 const test = require('brittle')
+const b4a = require('b4a')
+const cenc = require('compact-encoding')
+const messages = require('../lib/messages.js')
 const { swarm, toArray } = require('./helpers')
 const DHT = require('../')
 const HyperDHT = require('../')
+const { COMMANDS } = require('../lib/constants.js')
 
 test('server listen and findPeer', async function (t) {
   const [a, b] = await swarm(t)
@@ -239,4 +243,37 @@ test('announcer background does not over-trigger', async function (t) {
   t.ok(requestsSent < 50, `No background spam of ping requests (saw ${requestsSent})`)
 
   await a.destroy()
+})
+
+test('refresh-only announce does not crash persistent node', async function (t) {
+  const [a] = await swarm(t)
+  const keyPair = DHT.keyPair()
+  const target = DHT.hash(Buffer.from('refresh-only-test'))
+
+  // get a token
+  await a.announce(target, keyPair, []).finished()
+  let token = null
+  let from = null
+  for await (const node of a.lookup(target)) {
+    if (node.token) {
+      token = node.token
+      from = node.from
+      break
+    }
+  }
+  t.ok(token, 'got a token')
+  t.ok(from, 'got a from address')
+
+  const value = cenc.encode(messages.announce, {
+    peer: null,
+    refresh: b4a.alloc(32),
+    signature: null,
+    bump: 0
+  })
+
+  a.request({ command: COMMANDS.ANNOUNCE, target, token, value }, from).catch(() => {})
+  // Give some time to let remote crash (as it would before bugfix)
+  await new Promise((resolve) => setTimeout(resolve, 200))
+
+  t.pass('no remote crash')
 })
