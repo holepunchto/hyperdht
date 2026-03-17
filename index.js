@@ -401,7 +401,7 @@ class HyperDHT extends DHT {
       // TODO: implement Persistent.verifyAuthenticatedPHTNode and verify here
       // (what else must we verify?)
 
-      return node
+      return phtNode
     }
 
     return null
@@ -445,7 +445,7 @@ class HyperDHT extends DHT {
     )
     await query.finished()
 
-    return { indexID: indexID, closestNodes: query.closestNodes }
+    return { target: target, indexID: indexID, closestNodes: query.closestNodes }
   }
 
   onrequest(req) {
@@ -651,13 +651,13 @@ function mapAuthenticatedPHTNode(node) {
   if (!node.value) return null
 
   try {
-    const { node: phtNode } = c.decode(m.authenticatedPHTNodeGetResponse, node.value)
+    const { phtNode } = c.decode(m.authenticatedPHTNodeGetResponse, node.value)
 
     return {
       token: node.token,
       from: node.from,
       to: node.to,
-      node: phtNode
+      phtNode: phtNode
     }
   } catch {
     return null
