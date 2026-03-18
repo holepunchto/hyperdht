@@ -448,6 +448,44 @@ class HyperDHT extends DHT {
     return { target: target, indexID: indexID, closestNodes: query.closestNodes }
   }
 
+  async phtShardGet(target, key, opts = {}) {
+    opts = { ...opts, map: mapPHTShard }
+    const query = this.query({ target, command: COMMANDS.PHT_SHARD_GET, value: key }, opts)
+
+    for await (const node of query) {
+      const { value } = node
+      
+      // TODO: merge the responses
+
+      return node
+    }
+
+    return null
+  }
+
+  async phtShardPut(target, key, value, opts = {}) {
+    const encoded = c.encode(m.phtShardPutRequest, {
+      key: key,
+      value: value
+    })
+
+    opts = {
+      ...opts,
+      map: mapPHTShard,
+      commit(reply, dht) {
+        return dht.request(
+          { token: reply.token, target, command: COMMANDS.PHT_SHARD_PUT, value: encoded },
+          reply.from
+        )
+      }
+    }
+
+    const query = this.query({ target, command: COMMANDS.PHT_SHARD_GET, value: key }, opts)
+    await query.finished()
+
+    return { closestNodes: query.closestNodes }
+  }
+
   onrequest(req) {
     switch (req.command) {
       case COMMANDS.PEER_HANDSHAKE: {
@@ -501,6 +539,14 @@ class HyperDHT extends DHT {
       }
       case COMMANDS.AUTHENTICATED_PHT_NODE_GET: {
         this._persistent.onauthenticatedphtnodeget(req)
+        return true
+      }
+      case COMMANDS.PHT_SHARD_PUT: {
+        this._persistent.onphtshardput(req)
+        return true
+      }
+      case COMMANDS.PHT_SHARD_GET: {
+        this._persistent.onphtshardget(req)
         return true
       }
     }
@@ -661,6 +707,17 @@ function mapAuthenticatedPHTNode(node) {
     }
   } catch {
     return null
+  }
+}
+
+function mapPHTShard(node) {
+  if (!node.value) return null
+
+  return {
+    token: node.token,
+    from: node.from,
+    to: node.to,
+    value: c.decode(m.phtShardGetResponse, node.value)
   }
 }
 
