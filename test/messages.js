@@ -440,3 +440,26 @@ test('announce with refresh', function (t) {
 
   t.alike(d, ann)
 })
+
+test('search', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const searchResponse = []
+  for (let i = 0; i < 12; i++) {
+    searchResponse.push({
+      key: Buffer.alloc(32).fill(i),
+      values: [Buffer.alloc(32).fill(i)]
+    })
+  }
+
+  m.searchResponse.preencode(state, searchResponse)
+  state.buffer = b4a.allocUnsafe(state.end)
+  m.searchResponse.encode(state, searchResponse)
+
+  t.is(state.end, state.start, 'fully encoded')
+
+  state.start = 0
+  const d = m.searchResponse.decode(state)
+
+  t.alike(d, searchResponse)
+})
