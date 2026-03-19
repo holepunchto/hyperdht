@@ -498,7 +498,7 @@ class HyperDHT extends DHT {
       }
     }
 
-    if (this._persistent === null) return false
+    if (this._persistent === null || this.id === null) return false
 
     switch (req.command) {
       case COMMANDS.FIND_PEER: {
