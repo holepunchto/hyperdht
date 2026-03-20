@@ -46,7 +46,10 @@ async function main() {
   const searchIndex = new PrefixHashTree({
     indexID: indexID.toString('hex'),
     bitDomain: 80,
-    getFunc: alice.authenticatedPHTNodeGet.bind(alice),
+    getFunc: async (target) => {
+      const res = await alice.authenticatedPHTNodeGet(target)
+      return res === null ? res : res.phtNode
+    },
     putFunc: null
   })
 
@@ -88,7 +91,10 @@ async function main() {
   const bobSearchIndex = new PrefixHashTree({
     indexID: indexID.toString('hex'),
     bitDomain: 80,
-    getFunc: bob.authenticatedPHTNodeGet.bind(bob),
+    getFunc: async (target) => {
+      const res = await bob.authenticatedPHTNodeGet(target)
+      return res === null ? res : res.phtNode
+    },
     putFunc: null
   })
 

@@ -401,7 +401,7 @@ class HyperDHT extends DHT {
       // TODO: implement Persistent.verifyAuthenticatedPHTNode and verify here
       // (what else must we verify?)
 
-      return phtNode
+      return node
     }
 
     return null
