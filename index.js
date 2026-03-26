@@ -16,6 +16,8 @@ const { decode } = require('hypercore-id-encoding')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
+const { PrefixHashTree } = require('prefix-hash-tree')
+const { label } = require('prefix-hash-tree/node') 
 
 const DEFAULTS = {
   ...DHT.DEFAULTS,
@@ -389,6 +391,101 @@ class HyperDHT extends DHT {
     return { publicKey: keyPair.publicKey, closestNodes: query.closestNodes, seq, signature }
   }
 
+  async authenticatedPHTNodeGet(target, opts = {}) {
+    opts = { ...opts, map: mapAuthenticatedPHTNode }
+    const query = this.query({ target, command: COMMANDS.AUTHENTICATED_PHT_NODE_GET, value: null }, opts)
+
+    for await (const node of query) {
+      const { phtNode } = node
+
+      // TODO: implement Persistent.verifyAuthenticatedPHTNode and verify here
+      // (what else must we verify?)
+
+      return node
+    }
+
+    return null
+  }
+
+  async authenticatedPHTNodePut(keyPair, topologyID, phtNode, opts = {}) {
+    const signAuthenticatedPHTNode =
+      opts.signAuthenticatedPHTNode || Persistent.signAuthenticatedPHTNode
+
+    const indexID = b4a.allocUnsafe(32)
+    sodium.crypto_generichash(indexID, b4a.concat([keyPair.publicKey, topologyID]))
+    const target = b4a.allocUnsafe(32)
+
+    // TODO: this re-implements PrefixHashTree._labelHash because we're putting nodes 'a la carte'
+    // outside the context of a PrefixHashTree instance. Is there a better way?
+    sodium.crypto_generichash(target, b4a.from(`${indexID.toString('hex')}${label(phtNode)}`))
+
+    const signature = await signAuthenticatedPHTNode(phtNode, topologyID, keyPair)
+
+    const signed = c.encode(m.authenticatedPHTNodePutRequest, {
+      publicKey: keyPair.publicKey,
+      topologyID: topologyID,
+      phtNode: phtNode,
+      signature: signature
+    })
+
+    opts = {
+      ...opts,
+      map: mapAuthenticatedPHTNode,
+      commit(reply, dht) {
+        return dht.request(
+          { token: reply.token, target, command: COMMANDS.AUTHENTICATED_PHT_NODE_PUT, value: signed },
+          reply.from
+        )
+      }
+    }
+
+    const query = this.query(
+      { target, command: COMMANDS.AUTHENTICATED_PHT_NODE_GET, value: null },
+      opts
+    )
+    await query.finished()
+
+    return { target: target, indexID: indexID, closestNodes: query.closestNodes }
+  }
+
+  async phtShardGet(target, key, opts = {}) {
+    opts = { ...opts, map: mapPHTShard }
+    const query = this.query({ target, command: COMMANDS.PHT_SHARD_GET, value: key }, opts)
+
+    for await (const node of query) {
+      const { value } = node
+      
+      // TODO: merge the responses
+
+      return node
+    }
+
+    return null
+  }
+
+  async phtShardPut(target, key, value, opts = {}) {
+    const encoded = c.encode(m.phtShardPutRequest, {
+      key: key,
+      value: value
+    })
+
+    opts = {
+      ...opts,
+      map: mapPHTShard,
+      commit(reply, dht) {
+        return dht.request(
+          { token: reply.token, target, command: COMMANDS.PHT_SHARD_PUT, value: encoded },
+          reply.from
+        )
+      }
+    }
+
+    const query = this.query({ target, command: COMMANDS.PHT_SHARD_GET, value: key }, opts)
+    await query.finished()
+
+    return { closestNodes: query.closestNodes }
+  }
+
   onrequest(req) {
     switch (req.command) {
       case COMMANDS.PEER_HANDSHAKE: {
@@ -434,6 +531,22 @@ class HyperDHT extends DHT {
       }
       case COMMANDS.IMMUTABLE_GET: {
         this._persistent.onimmutableget(req)
+        return true
+      }
+      case COMMANDS.AUTHENTICATED_PHT_NODE_PUT: {
+        this._persistent.onauthenticatedphtnodeput(req)
+        return true
+      }
+      case COMMANDS.AUTHENTICATED_PHT_NODE_GET: {
+        this._persistent.onauthenticatedphtnodeget(req)
+        return true
+      }
+      case COMMANDS.PHT_SHARD_PUT: {
+        this._persistent.onphtshardput(req)
+        return true
+      }
+      case COMMANDS.PHT_SHARD_GET: {
+        this._persistent.onphtshardget(req)
         return true
       }
     }
@@ -577,6 +690,34 @@ function mapMutable(node) {
     }
   } catch {
     return null
+  }
+}
+
+function mapAuthenticatedPHTNode(node) {
+  if (!node.value) return null
+
+  try {
+    const { phtNode } = c.decode(m.authenticatedPHTNodeGetResponse, node.value)
+
+    return {
+      token: node.token,
+      from: node.from,
+      to: node.to,
+      phtNode: phtNode
+    }
+  } catch {
+    return null
+  }
+}
+
+function mapPHTShard(node) {
+  if (!node.value) return null
+
+  return {
+    token: node.token,
+    from: node.from,
+    to: node.to,
+    value: c.decode(m.phtShardGetResponse, node.value)
   }
 }
 
