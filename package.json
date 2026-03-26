@@ -1,6 +1,6 @@
 {
   "name": "hyperdht",
-  "version": "6.29.1",
+  "version": "6.29.6",
   "description": "The DHT powering Hyperswarm",
   "main": "index.js",
   "browser": "browser.js",
@@ -31,7 +31,6 @@
     "blind-relay": "^1.3.0",
     "bogon": "^1.2.0",
     "compact-encoding": "^2.4.1",
-    "compact-encoding-net": "^1.0.1",
     "dht-rpc": "^6.15.1",
     "hypercore-crypto": "^3.3.0",
     "hypercore-id-encoding": "^1.2.0",

@@ -401,7 +401,7 @@ class HyperDHT extends DHT {
       }
     }
 
-    if (this._persistent === null) return false
+    if (this._persistent === null || this.id === null) return false
 
     switch (req.command) {
       case COMMANDS.FIND_PEER: {
@@ -520,9 +520,9 @@ module.exports = HyperDHT
 function mapLookup(node) {
   if (!node.value) return null
 
-  const l = c.decode(m.lookupRawReply, node.value)
-
   try {
+    const l = c.decode(m.lookupRawReply, node.value)
+
     return {
       token: node.token,
       from: node.from,
