@@ -76,7 +76,7 @@ class HyperDHT extends DHT {
 
   static DEFAULTS = DEFAULTS
 
-  connect(remotePublicKey, opts = {}) {
+  connect(remotePublicKey, opts) {
     return connect(this, remotePublicKey, opts)
   }
 

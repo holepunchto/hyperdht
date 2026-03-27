@@ -36,7 +36,6 @@
     "hypercore-crypto": "^3.3.0",
     "hypercore-id-encoding": "^1.2.0",
     "hyperdht-address": "^1.0.1",
-    "hyperschema": "^1.20.1",
     "noise-curve-ed": "^2.0.0",
     "noise-handshake": "^4.0.0",
     "record-cache": "^1.1.1",

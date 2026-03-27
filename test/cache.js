@@ -25,9 +25,7 @@ test('cache - key with nodes', async function (t) {
     const tn = t.test('client w/nodes')
     tn.plan(2)
 
-    const target = HyperDHTAddress.encode(server.publicKey, [
-      { host: b.io._boundServerPort, port: b.io._boundServerPort }
-    ])
+    const target = HyperDHTAddress.encode(server.publicKey, server.relayAddresses)
 
     const socket = b.connect(target)
 
