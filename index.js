@@ -408,25 +408,26 @@ class HyperDHT extends DHT {
   }
 
   async authenticatedPHTNodePut(keyPair, topologyID, phtNode, opts = {}) {
+    const publicKey = opts.publicKey || keyPair.publicKey
+    
     const signAuthenticatedPHTNode =
       opts.signAuthenticatedPHTNode || Persistent.signAuthenticatedPHTNode
 
     const indexID = b4a.allocUnsafe(32)
-    sodium.crypto_generichash(indexID, b4a.concat([keyPair.publicKey, topologyID]))
+    sodium.crypto_generichash(indexID, b4a.concat([publicKey, topologyID]))
     const target = b4a.allocUnsafe(32)
 
     // TODO: this re-implements PrefixHashTree._labelHash because we're putting nodes 'a la carte'
     // outside the context of a PrefixHashTree instance. Is there a better way?
     sodium.crypto_generichash(target, b4a.from(`${indexID.toString('hex')}${label(phtNode)}`))
 
-    const signature = await signAuthenticatedPHTNode(phtNode, topologyID, keyPair)
+    const signature = opts.signature || await signAuthenticatedPHTNode(phtNode, topologyID, keyPair)
+    const connectionKey = opts.connectionKey || b4a.alloc(32)
 
-    const signed = c.encode(m.authenticatedPHTNodePutRequest, {
-      publicKey: keyPair.publicKey,
-      topologyID: topologyID,
-      phtNode: phtNode,
-      signature: signature
-    })
+    const signed = c.encode(
+      m.authenticatedPHTNodePutRequest,
+      { publicKey, topologyID, phtNode, signature, connectionKey }
+    )
 
     opts = {
       ...opts,
