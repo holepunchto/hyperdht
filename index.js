@@ -17,7 +17,7 @@ const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 const { PrefixHashTree } = require('prefix-hash-tree')
-const { label } = require('prefix-hash-tree/node') 
+const { label, isNode } = require('prefix-hash-tree/node') 
 
 const DEFAULTS = {
   ...DHT.DEFAULTS,
@@ -391,54 +391,55 @@ class HyperDHT extends DHT {
     return { publicKey: keyPair.publicKey, closestNodes: query.closestNodes, seq, signature }
   }
 
-  async authenticatedPHTNodeGet(target, opts = {}) {
-    opts = { ...opts, map: mapAuthenticatedPHTNode }
-    const query = this.query({ target, command: COMMANDS.AUTHENTICATED_PHT_NODE_GET, value: null }, opts)
+  async phtNodeGet(target, opts = {}) {
+    opts = { ...opts, map: mapPHTNode }
+
+    const query = this.query({
+      target, 
+      command: COMMANDS.PHT_NODE_GET, 
+      value: null 
+    }, opts)
 
     for await (const node of query) {
-      const { phtNode } = node
-
-      // TODO: implement Persistent.verifyAuthenticatedPHTNode and verify here
-      // (what else must we verify?)
-
-      return node
+      const { publicKey, treeID, phtNode, signature } = node
+      if (isNode(phtNode) && Persistent.verifyPHTNode(signature, treeID, phtNode, publicKey)) return node
     }
 
     return null
   }
 
-  async authenticatedPHTNodePut(keyPair, treeID, phtNode, opts = {}) {
+  async phtNodePut(keyPair, treeID, phtNode, opts = {}) {
     const publicKey = opts.publicKey || keyPair.publicKey
     
-    const signAuthenticatedPHTNode =
-      opts.signAuthenticatedPHTNode || Persistent.signAuthenticatedPHTNode
+    const signPHTNode = opts.signPHTNode || Persistent.signPHTNode
 
     const hash = b4a.allocUnsafe(32)
     sodium.crypto_generichash(hash, b4a.concat([publicKey, treeID]))
     const indexID = b4a.toString(hash, 'hex')
     const target = new PrefixHashTree({ indexID })._labelHash(label(phtNode))
 
-    const signature = opts.signature || await signAuthenticatedPHTNode(phtNode, treeID, keyPair)
+    const signature = opts.signature || await signPHTNode(phtNode, treeID, keyPair)
     const connectionKey = opts.connectionKey || b4a.alloc(32)
 
     const signed = c.encode(
-      m.authenticatedPHTNodePutRequest,
+      m.phtNodePutRequest,
       { publicKey, treeID, phtNode, signature, connectionKey }
     )
 
     opts = {
       ...opts,
-      map: mapAuthenticatedPHTNode,
+      map: mapPHTNode
+ ,
       commit(reply, dht) {
         return dht.request(
-          { token: reply.token, target, command: COMMANDS.AUTHENTICATED_PHT_NODE_PUT, value: signed },
+          { token: reply.token, target, command: COMMANDS.PHT_NODE_PUT, value: signed },
           reply.from
         )
       }
     }
 
     const query = this.query(
-      { target, command: COMMANDS.AUTHENTICATED_PHT_NODE_GET, value: null },
+      { target, command: COMMANDS.PHT_NODE_GET, value: null },
       opts
     )
     await query.finished()
@@ -493,12 +494,12 @@ class HyperDHT extends DHT {
         this._persistent.onimmutableget(req)
         return true
       }
-      case COMMANDS.AUTHENTICATED_PHT_NODE_PUT: {
-        this._persistent.onauthenticatedphtnodeput(req)
+      case COMMANDS.PHT_NODE_PUT: {
+        this._persistent.onphtnodeput(req)
         return true
       }
-      case COMMANDS.AUTHENTICATED_PHT_NODE_GET: {
-        this._persistent.onauthenticatedphtnodeget(req)
+      case COMMANDS.PHT_NODE_GET: {
+        this._persistent.onphtnodeget(req)
         return true
       }
     }
@@ -645,31 +646,24 @@ function mapMutable(node) {
   }
 }
 
-function mapAuthenticatedPHTNode(node) {
+function mapPHTNode(node) {
   if (!node.value) return null
 
   try {
-    const { phtNode } = c.decode(m.authenticatedPHTNodeGetResponse, node.value)
+    const p = c.decode(m.phtNodeGetResponse, node.value)
+    const { publicKey, treeID, phtNode, signature } = p 
 
     return {
       token: node.token,
       from: node.from,
       to: node.to,
-      phtNode: phtNode
+      publicKey,
+      treeID,
+      phtNode,
+      signature
     }
   } catch {
     return null
-  }
-}
-
-function mapPHTShard(node) {
-  if (!node.value) return null
-
-  return {
-    token: node.token,
-    from: node.from,
-    to: node.to,
-    value: c.decode(m.phtShardGetResponse, node.value)
   }
 }
 
