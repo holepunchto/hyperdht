@@ -413,13 +413,10 @@ class HyperDHT extends DHT {
     const signAuthenticatedPHTNode =
       opts.signAuthenticatedPHTNode || Persistent.signAuthenticatedPHTNode
 
-    const indexID = b4a.allocUnsafe(32)
-    sodium.crypto_generichash(indexID, b4a.concat([publicKey, topologyID]))
-    const target = b4a.allocUnsafe(32)
-
-    // TODO: this re-implements PrefixHashTree._labelHash because we're putting nodes 'a la carte'
-    // outside the context of a PrefixHashTree instance. Is there a better way?
-    sodium.crypto_generichash(target, b4a.from(`${indexID.toString('hex')}${label(phtNode)}`))
+    const hash = b4a.allocUnsafe(32)
+    sodium.crypto_generichash(hash, b4a.concat([publicKey, topologyID]))
+    const indexID = b4a.toString(hash, 'hex')
+    const target = new PrefixHashTree({ indexID })._labelHash(label(phtNode))
 
     const signature = opts.signature || await signAuthenticatedPHTNode(phtNode, topologyID, keyPair)
     const connectionKey = opts.connectionKey || b4a.alloc(32)
@@ -446,7 +443,7 @@ class HyperDHT extends DHT {
     )
     await query.finished()
 
-    return { target: target, indexID: indexID, closestNodes: query.closestNodes }
+    return { target, indexID, closestNodes: query.closestNodes }
   }
 
   onrequest(req) {
