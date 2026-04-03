@@ -407,23 +407,23 @@ class HyperDHT extends DHT {
     return null
   }
 
-  async authenticatedPHTNodePut(keyPair, topologyID, phtNode, opts = {}) {
+  async authenticatedPHTNodePut(keyPair, treeID, phtNode, opts = {}) {
     const publicKey = opts.publicKey || keyPair.publicKey
     
     const signAuthenticatedPHTNode =
       opts.signAuthenticatedPHTNode || Persistent.signAuthenticatedPHTNode
 
     const hash = b4a.allocUnsafe(32)
-    sodium.crypto_generichash(hash, b4a.concat([publicKey, topologyID]))
+    sodium.crypto_generichash(hash, b4a.concat([publicKey, treeID]))
     const indexID = b4a.toString(hash, 'hex')
     const target = new PrefixHashTree({ indexID })._labelHash(label(phtNode))
 
-    const signature = opts.signature || await signAuthenticatedPHTNode(phtNode, topologyID, keyPair)
+    const signature = opts.signature || await signAuthenticatedPHTNode(phtNode, treeID, keyPair)
     const connectionKey = opts.connectionKey || b4a.alloc(32)
 
     const signed = c.encode(
       m.authenticatedPHTNodePutRequest,
-      { publicKey, topologyID, phtNode, signature, connectionKey }
+      { publicKey, treeID, phtNode, signature, connectionKey }
     )
 
     opts = {
