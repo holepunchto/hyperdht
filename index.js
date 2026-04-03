@@ -62,6 +62,7 @@ class HyperDHT extends DHT {
     this._randomPunchInterval = opts.randomPunchInterval || DEFAULTS.randomPunchInterval // min 20s between random punches...
     this._randomPunches = 0
     this._randomPunchLimit = 1 // set to one for extra safety for now
+    this._experimentalPHT = opts.experimentalPHT === true
 
     this.once('persistent', () => {
       this._persistent = new Persistent(this, persistent)
@@ -392,6 +393,8 @@ class HyperDHT extends DHT {
   }
 
   async phtNodeGet(target, opts = {}) {
+    if (!this._experimentalPHT) return
+
     opts = { ...opts, map: mapPHTNode }
 
     const query = this.query({
@@ -409,6 +412,8 @@ class HyperDHT extends DHT {
   }
 
   async phtNodePut(keyPair, treeID, phtNode, opts = {}) {
+    if (!this._experimentalPHT) return
+
     const publicKey = opts.publicKey || keyPair.publicKey
     
     const signPHTNode = opts.signPHTNode || Persistent.signPHTNode
@@ -691,6 +696,7 @@ function defaultCacheOpts(opts) {
     },
     relayAddresses: { maxSize: Math.min(maxSize, 512), maxAge: 0 },
     persistent: {
+      experimentalPHT: opts.experimentalPHT,
       records: { maxSize, maxAge },
       refreshes: { maxSize, maxAge },
       mutables: {
@@ -698,6 +704,10 @@ function defaultCacheOpts(opts) {
         maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
       },
       immutables: {
+        maxSize: (maxSize / 2) | 0,
+        maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
+      },
+      phtNodes: {
         maxSize: (maxSize / 2) | 0,
         maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
       },
