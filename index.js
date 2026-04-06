@@ -408,7 +408,17 @@ class HyperDHT extends DHT {
 
     for await (const node of query) {
       const { publicKey, treeID, phtNode, signature } = node
-      if (isNode(phtNode) && Persistent.verifyPHTNode(signature, treeID, phtNode, publicKey))
+
+      const hash = b4a.allocUnsafe(32)
+      sodium.crypto_generichash(hash, b4a.concat([publicKey, treeID]))
+      const indexID = b4a.toString(hash, 'hex')
+      const t = new PrefixHashTree({ indexID })._labelHash(label(phtNode))
+
+      if (
+        isNode(phtNode) &&
+        t.equals(target) &&
+        Persistent.verifyPHTNode(signature, treeID, phtNode, publicKey)
+      )
         return node
     }
 
