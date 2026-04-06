@@ -452,7 +452,7 @@ class HyperDHT extends DHT {
     const query = this.query({ target, command: COMMANDS.PHT_NODE_GET, value: null }, opts)
     await query.finished()
 
-    return { target, indexID, closestNodes: query.closestNodes }
+    return { target, indexID, closestNodes: query.closestNodes, signature, connectionKey }
   }
 
   onrequest(req) {
