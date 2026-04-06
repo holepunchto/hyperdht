@@ -17,7 +17,7 @@ const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 const { PrefixHashTree } = require('prefix-hash-tree')
-const { label, isNode } = require('prefix-hash-tree/node') 
+const { label, isNode } = require('prefix-hash-tree/node')
 
 const DEFAULTS = {
   ...DHT.DEFAULTS,
@@ -397,15 +397,19 @@ class HyperDHT extends DHT {
 
     opts = { ...opts, map: mapPHTNode }
 
-    const query = this.query({
-      target, 
-      command: COMMANDS.PHT_NODE_GET, 
-      value: null 
-    }, opts)
+    const query = this.query(
+      {
+        target,
+        command: COMMANDS.PHT_NODE_GET,
+        value: null
+      },
+      opts
+    )
 
     for await (const node of query) {
       const { publicKey, treeID, phtNode, signature } = node
-      if (isNode(phtNode) && Persistent.verifyPHTNode(signature, treeID, phtNode, publicKey)) return node
+      if (isNode(phtNode) && Persistent.verifyPHTNode(signature, treeID, phtNode, publicKey))
+        return node
     }
 
     return null
@@ -415,7 +419,7 @@ class HyperDHT extends DHT {
     if (!this._experimentalPHT) return
 
     const publicKey = opts.publicKey || keyPair.publicKey
-    
+
     const signPHTNode = opts.signPHTNode || Persistent.signPHTNode
 
     const hash = b4a.allocUnsafe(32)
@@ -423,18 +427,20 @@ class HyperDHT extends DHT {
     const indexID = b4a.toString(hash, 'hex')
     const target = new PrefixHashTree({ indexID })._labelHash(label(phtNode))
 
-    const signature = opts.signature || await signPHTNode(phtNode, treeID, keyPair)
+    const signature = opts.signature || (await signPHTNode(phtNode, treeID, keyPair))
     const connectionKey = opts.connectionKey || b4a.alloc(32)
 
-    const signed = c.encode(
-      m.phtNodePutRequest,
-      { publicKey, treeID, phtNode, signature, connectionKey }
-    )
+    const signed = c.encode(m.phtNodePutRequest, {
+      publicKey,
+      treeID,
+      phtNode,
+      signature,
+      connectionKey
+    })
 
     opts = {
       ...opts,
-      map: mapPHTNode
- ,
+      map: mapPHTNode,
       commit(reply, dht) {
         return dht.request(
           { token: reply.token, target, command: COMMANDS.PHT_NODE_PUT, value: signed },
@@ -443,10 +449,7 @@ class HyperDHT extends DHT {
       }
     }
 
-    const query = this.query(
-      { target, command: COMMANDS.PHT_NODE_GET, value: null },
-      opts
-    )
+    const query = this.query({ target, command: COMMANDS.PHT_NODE_GET, value: null }, opts)
     await query.finished()
 
     return { target, indexID, closestNodes: query.closestNodes }
@@ -656,7 +659,7 @@ function mapPHTNode(node) {
 
   try {
     const p = c.decode(m.phtNodeGetResponse, node.value)
-    const { publicKey, treeID, phtNode, signature } = p 
+    const { publicKey, treeID, phtNode, signature } = p
 
     return {
       token: node.token,
