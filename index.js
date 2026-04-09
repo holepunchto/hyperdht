@@ -12,7 +12,6 @@ const Server = require('./lib/server')
 const connect = require('./lib/connect')
 const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
-const { decode } = require('hypercore-id-encoding')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
@@ -78,7 +77,7 @@ class HyperDHT extends DHT {
   static DEFAULTS = DEFAULTS
 
   connect(remotePublicKey, opts) {
-    return connect(this, decode(remotePublicKey), opts)
+    return connect(this, remotePublicKey, opts)
   }
 
   createServer(opts, onconnection) {
