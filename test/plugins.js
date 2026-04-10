@@ -1,6 +1,5 @@
 const test = require('brittle')
 const c = require('compact-encoding')
-const b4a = require('b4a')
 const sodium = require('sodium-universal')
 const HyperDHT = require('../')
 const { swarm } = require('./helpers')
@@ -67,14 +66,14 @@ test('plugin put - get', async function (t) {
         return req.reply(null)
       }
 
-      const k = b4a.toString(req.target, 'hex')
+      const k = req.target.toString('hex')
       this.data.set(k, val)
       req.reply(null)
     }
 
     onget(req) {
       if (!req.target) return
-      const k = b4a.toString(req.target, 'hex')
+      const k = req.target.toString('hex')
       req.reply(this.data.get(k) || null)
     }
 
@@ -82,7 +81,7 @@ test('plugin put - get', async function (t) {
       const putReq = c.encode(m.pluginRequest, {
         plugin: this.name,
         command: PLUGIN_COMMANDS.PUT,
-        payload: b4a.from(val, 'utf8')
+        payload: Buffer.from(val)
       })
 
       const opts = {
@@ -100,8 +99,8 @@ test('plugin put - get', async function (t) {
         }
       }
 
-      const target = b4a.allocUnsafe(32)
-      sodium.crypto_generichash(target, b4a.from(val, 'utf8'))
+      const target = Buffer.alloc(32)
+      sodium.crypto_generichash(target, Buffer.from(val))
 
       const getReq = c.encode(m.pluginRequest, {
         plugin: this.name,
@@ -164,7 +163,7 @@ test('plugin put - get', async function (t) {
   const res = await pluginClients[30].get(put.target)
   const { value } = res
 
-  t.is(b4a.toString(value, 'utf8'), 'myTestValue')
+  t.is(value.toString(), 'myTestValue')
   t.is(typeof res.from, 'object')
   t.is(typeof res.from.host, 'string')
   t.is(typeof res.from.port, 'number')
