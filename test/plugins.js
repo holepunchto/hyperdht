@@ -140,7 +140,7 @@ test('plugin put - get', async function (t) {
       )
 
       for await (const node of query) {
-        return node
+        if (node.value !== null) return node
       }
 
       return null
