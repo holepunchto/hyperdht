@@ -111,15 +111,14 @@ test('plugin put - get', async function (t) {
 
   for (const node of nodes) {
     const p = new TestPlugin(node)
-    pluginClients.push(p)
     node.register(p.name, p)
   }
 
-  const put = await pluginClients[30].put('myTestValue')
+  const put = await nodes[30].testplugin.put('myTestValue')
 
   t.is(put.target.length, 32)
 
-  const res = await pluginClients[30].get(put.target)
+  const res = await nodes[30].testplugin.get(put.target)
   const { value } = res
 
   t.is(value.toString(), 'myTestValue')
