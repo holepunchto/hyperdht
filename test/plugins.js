@@ -24,18 +24,7 @@ test('plugin put - get', async function (t) {
     }
 
     onrequest(req) {
-      if (!req.value) return
-
-      let plugreq
-      try {
-        plugreq = c.decode(m.pluginRequest, req.value)
-      } catch {
-        return
-      }
-
-      const { plugin, command, payload } = plugreq
-
-      switch (command) {
+      switch (req.command) {
         case PLUGIN_COMMANDS.PUT: {
           this.onput(req)
           return true
@@ -56,16 +45,8 @@ test('plugin put - get', async function (t) {
     onput(req) {
       if (!req.target || !req.token || !req.value) return
 
-      let val
-      try {
-        const { plugin, command, payload } = c.decode(m.pluginRequest, req.value)
-        val = payload
-      } catch {
-        return req.reply(null)
-      }
-
       const k = req.target.toString('hex')
-      this.data.set(k, val)
+      this.data.set(k, req.payload)
       req.reply(null)
     }
 
