@@ -1,7 +1,6 @@
 const test = require('brittle')
 const c = require('compact-encoding')
 const sodium = require('sodium-universal')
-const HyperDHT = require('../')
 const { swarm } = require('./helpers')
 const DHTPlugin = require('../lib/plugin')
 
