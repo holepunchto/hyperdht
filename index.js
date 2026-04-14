@@ -63,6 +63,7 @@ class HyperDHT extends DHT {
 
     this.once('persistent', () => {
       this._persistent = new Persistent(this, persistent)
+      for (const plugin of this.plugins.values()) plugin.onpersistent()
     })
 
     this.on('network-change', () => {
