@@ -518,6 +518,7 @@ class HyperDHT extends DHT {
 
   register(name, plugin) {
     this.plugins.set(name, plugin)
+    plugin.onregister(this)
   }
 }
 
