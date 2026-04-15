@@ -128,19 +128,7 @@ test('relay connections through node, server side, client abort notifies remote'
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
-
-  let holepunchCalls = 0
-  let holepunchCallsAtAbort = -1
-  const peerHolepunch = c._router.peerHolepunch.bind(c._router)
-
-  c._router.peerHolepunch = async function (...args) {
-    holepunchCalls++
-    return peerHolepunch(...args)
-  }
-
-  t.teardown(() => {
-    c._router.peerHolepunch = peerHolepunch
-  })
+  let clientAbortedUpgrade = false
 
   const relay = new RelayServer({
     createStream(opts) {
@@ -177,11 +165,13 @@ test('relay connections through node, server side, client abort notifies remote'
 
   await bServer.listen()
 
+  const remoteAbort = waitFor(() => bServer._holepunches.some((hs) => hs && hs.aborted))
+
   const bSocket = c.connect(bServer.publicKey, {
     fastOpen: false,
     localConnection: false,
     holepunch() {
-      holepunchCallsAtAbort = holepunchCalls
+      clientAbortedUpgrade = true
       return false
     }
   })
@@ -196,18 +186,27 @@ test('relay connections through node, server side, client abort notifies remote'
     .end('hello world')
 
   await lc
-  await new Promise((resolve) => setTimeout(resolve, 50))
+  await remoteAbort
 
-  t.ok(holepunchCallsAtAbort >= 0, 'client reached the holepunch decision point')
-  t.ok(
-    holepunchCalls > holepunchCallsAtAbort,
-    'client sends a follow-up abort message after declining the direct upgrade'
-  )
+  t.ok(clientAbortedUpgrade, 'client reached the holepunch decision point')
+  t.pass('remote records the client abort')
 
   await a.destroy()
   await b.destroy()
   await c.destroy()
 })
+
+async function waitFor(fn, timeout = 2000) {
+  const started = Date.now()
+
+  while (!fn()) {
+    if (Date.now() - started > timeout) {
+      throw new Error('Timed out waiting for test condition')
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}
 
 test('relay connections through node, client side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
