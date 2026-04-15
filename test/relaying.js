@@ -119,6 +119,96 @@ test('relay connections through node, client side, client aborts hole punch', as
   await c.destroy()
 })
 
+test('relay connections through node, server side, client abort notifies remote', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const lc = t.test('socket lifecycle')
+  lc.plan(5)
+
+  let holepunchCalls = 0
+  let holepunchCallsAtAbort = -1
+  const peerHolepunch = c._router.peerHolepunch.bind(c._router)
+
+  c._router.peerHolepunch = async function (...args) {
+    holepunchCalls++
+    return peerHolepunch(...args)
+  }
+
+  t.teardown(() => {
+    c._router.peerHolepunch = peerHolepunch
+  })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return a.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const aServer = a.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await aServer.listen()
+
+  const bServer = b.createServer(
+    {
+      relayThrough: aServer.publicKey,
+      shareLocalAddress: false
+    },
+    function (socket) {
+      lc.pass('server socket opened')
+      socket
+        .on('data', (data) => {
+          lc.alike(data, Buffer.from('hello world'))
+        })
+        .on('close', () => {
+          lc.pass('server socket closed')
+        })
+        .end()
+    }
+  )
+
+  await bServer.listen()
+
+  const bSocket = c.connect(bServer.publicKey, {
+    fastOpen: false,
+    localConnection: false,
+    holepunch() {
+      holepunchCallsAtAbort = holepunchCalls
+      return false
+    }
+  })
+
+  bSocket
+    .on('open', () => {
+      lc.pass('client socket opened')
+    })
+    .on('close', () => {
+      lc.pass('client socket closed')
+    })
+    .end('hello world')
+
+  await lc
+  await new Promise((resolve) => setTimeout(resolve, 50))
+
+  t.ok(holepunchCallsAtAbort >= 0, 'client reached the holepunch decision point')
+  t.ok(
+    holepunchCalls > holepunchCallsAtAbort,
+    'client sends a follow-up abort message after declining the direct upgrade'
+  )
+
+  await a.destroy()
+  await b.destroy()
+  await c.destroy()
+})
+
 test('relay connections through node, client side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
