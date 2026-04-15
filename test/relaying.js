@@ -127,10 +127,15 @@ test('relay connections through node, server side, client abort notifies remote'
   const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(5)
+  lc.plan(6)
+  let sawRelayStream = false
 
   const relay = new RelayServer({
     createStream(opts) {
+      if (!sawRelayStream) {
+        sawRelayStream = true
+        lc.pass('sanity check: using the relay')
+      }
       return a.createRawStream({ ...opts, framed: true })
     }
   })
