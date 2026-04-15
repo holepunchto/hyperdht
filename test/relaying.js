@@ -437,8 +437,10 @@ test('relay connection upgrades to direct connection', { timeout: 30000 }, async
   const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
+  // Capture raw-stream transitions so we can prove the socket upgrades in place.
   instrumentRawStreams(t, b)
   instrumentRawStreams(t, c)
+  // Give the relay path a short head start so the upgrade ordering is deterministic.
   delayPunching(t, 500)
 
   const relay = new RelayServer({
@@ -491,10 +493,12 @@ test('relay connection upgrades to direct connection', { timeout: 30000 }, async
   t.is(clientSocket.rawStream._transitions[0].type, 'connect')
   t.is(serverSocket.rawStream._transitions[0].type, 'connect')
 
+  // The relayed connection should already be usable before the direct path wins.
   const beforeUpgrade = once(clientSocket, 'data')
   clientSocket.write(Buffer.from('before upgrade'))
   t.alike((await beforeUpgrade)[0], Buffer.from('before upgrade'), 'relay path carries data')
 
+  // changeRemote is the signal that the same raw stream switched transport.
   await waitForUpgrade(clientSocket.rawStream)
   await waitForUpgrade(serverSocket.rawStream)
 
@@ -603,6 +607,7 @@ function instrumentRawStreams(t, dht) {
     const stream = createRawStream(...args)
     stream._transitions = []
 
+    // Record the initial relay connect and the later direct changeRemote.
     const connect = stream.connect.bind(stream)
     stream.connect = function (socket, id, port, host) {
       stream._transitions.push({ type: 'connect', host, port })
@@ -627,6 +632,7 @@ function delayPunching(t, ms) {
   const punch = Holepuncher.prototype._punch
 
   Holepuncher.prototype._punch = async function () {
+    // Bias the race without changing the real upgrade logic.
     await new Promise((resolve) => setTimeout(resolve, ms))
     return punch.call(this)
   }
@@ -639,6 +645,7 @@ function delayPunching(t, ms) {
 async function waitForUpgrade(stream) {
   const started = Date.now()
 
+  // Poll until the raw stream reports its remote endpoint changed.
   while (!hasUpgrade(stream)) {
     if (Date.now() - started > 5000) {
       throw new Error('Timed out waiting for relay-to-direct upgrade')
