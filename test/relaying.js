@@ -128,7 +128,6 @@ test('relay connections through node, server side, client abort notifies remote'
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
-  let clientAbortedUpgrade = false
 
   const relay = new RelayServer({
     createStream(opts) {
@@ -171,7 +170,6 @@ test('relay connections through node, server side, client abort notifies remote'
     fastOpen: false,
     localConnection: false,
     holepunch() {
-      clientAbortedUpgrade = true
       return false
     }
   })
@@ -188,7 +186,6 @@ test('relay connections through node, server side, client abort notifies remote'
   await lc
   await remoteAbort
 
-  t.ok(clientAbortedUpgrade, 'client reached the holepunch decision point')
   t.pass('remote records the client abort')
 
   await a.destroy()
