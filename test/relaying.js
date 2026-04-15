@@ -1,6 +1,8 @@
 const test = require('brittle')
+const { once } = require('events')
 const RelayServer = require('blind-relay').Server
-const { swarm, createDHT } = require('./helpers')
+const Holepuncher = require('../lib/holepuncher')
+const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 
 test('relay connections through node, client side', async function (t) {
   const { bootstrap } = await swarm(t)
@@ -428,6 +430,102 @@ test('relay connections through node, client and server side', async function (t
   await a.destroy()
 })
 
+test('relay connection upgrades to direct connection', { timeout: 30000 }, async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  instrumentRawStreams(t, b)
+  instrumentRawStreams(t, c)
+  delayPunching(t, 500)
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return a.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const aServer = a.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await aServer.listen()
+
+  let serverSocket = null
+  let resolveServerSocket = null
+  const serverSocketOpened = new Promise((resolve) => {
+    resolveServerSocket = resolve
+  })
+
+  const bServer = b.createServer(
+    {
+      relayThrough: aServer.publicKey,
+      shareLocalAddress: false
+    },
+    function (socket) {
+      serverSocket = socket
+      resolveServerSocket(socket)
+
+      socket.on('data', (data) => socket.write(data))
+      socket.on('end', () => socket.end())
+    }
+  )
+
+  await bServer.listen()
+
+  const clientSocket = c.connect(bServer.publicKey, {
+    fastOpen: false,
+    localConnection: false
+  })
+
+  await once(clientSocket, 'open')
+  await serverSocketOpened
+
+  t.is(clientSocket.rawStream._transitions.length, 1, 'client starts on the relayed stream')
+  t.is(serverSocket.rawStream._transitions.length, 1, 'server starts on the relayed stream')
+  t.is(clientSocket.rawStream._transitions[0].type, 'connect')
+  t.is(serverSocket.rawStream._transitions[0].type, 'connect')
+
+  const beforeUpgrade = once(clientSocket, 'data')
+  clientSocket.write(Buffer.from('before upgrade'))
+  t.alike((await beforeUpgrade)[0], Buffer.from('before upgrade'), 'relay path carries data')
+
+  await waitForUpgrade(clientSocket.rawStream)
+  await waitForUpgrade(serverSocket.rawStream)
+
+  const clientTransitions = clientSocket.rawStream._transitions
+  const serverTransitions = serverSocket.rawStream._transitions
+
+  t.is(clientTransitions[1].type, 'changeRemote')
+  t.is(serverTransitions[1].type, 'changeRemote')
+  t.ok(
+    clientTransitions[0].host !== clientTransitions[1].host ||
+      clientTransitions[0].port !== clientTransitions[1].port,
+    'client switches away from the relay address'
+  )
+  t.ok(
+    serverTransitions[0].host !== serverTransitions[1].host ||
+      serverTransitions[0].port !== serverTransitions[1].port,
+    'server switches away from the relay address'
+  )
+
+  const afterUpgrade = once(clientSocket, 'data')
+  clientSocket.write(Buffer.from('after upgrade'))
+  t.alike((await afterUpgrade)[0], Buffer.from('after upgrade'), 'direct path carries data')
+
+  await endAndCloseSocket(clientSocket)
+  if (!serverSocket.destroyed) await once(serverSocket, 'close')
+
+  await a.destroy()
+  await b.destroy()
+  await c.destroy()
+})
+
 test.skip('relay several connections through node with pool', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -497,6 +595,62 @@ test.skip('relay several connections through node with pool', async function (t)
   await b.destroy()
   await c.destroy()
 })
+
+function instrumentRawStreams(t, dht) {
+  const createRawStream = dht.createRawStream.bind(dht)
+
+  dht.createRawStream = function (...args) {
+    const stream = createRawStream(...args)
+    stream._transitions = []
+
+    const connect = stream.connect.bind(stream)
+    stream.connect = function (socket, id, port, host) {
+      stream._transitions.push({ type: 'connect', host, port })
+      return connect(socket, id, port, host)
+    }
+
+    const changeRemote = stream.changeRemote.bind(stream)
+    stream.changeRemote = function (socket, id, port, host) {
+      stream._transitions.push({ type: 'changeRemote', host, port })
+      return changeRemote(socket, id, port, host)
+    }
+
+    return stream
+  }
+
+  t.teardown(() => {
+    dht.createRawStream = createRawStream
+  })
+}
+
+function delayPunching(t, ms) {
+  const punch = Holepuncher.prototype._punch
+
+  Holepuncher.prototype._punch = async function () {
+    await new Promise((resolve) => setTimeout(resolve, ms))
+    return punch.call(this)
+  }
+
+  t.teardown(() => {
+    Holepuncher.prototype._punch = punch
+  })
+}
+
+async function waitForUpgrade(stream) {
+  const started = Date.now()
+
+  while (!hasUpgrade(stream)) {
+    if (Date.now() - started > 5000) {
+      throw new Error('Timed out waiting for relay-to-direct upgrade')
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}
+
+function hasUpgrade(stream) {
+  return stream._transitions.some((transition) => transition.type === 'changeRemote')
+}
 
 test.skip('server does not support connection relaying', async function (t) {
   const { bootstrap } = await swarm(t)
