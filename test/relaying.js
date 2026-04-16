@@ -646,17 +646,13 @@ async function waitForUpgrade(stream) {
   const started = Date.now()
 
   // Poll until the raw stream reports its remote endpoint changed.
-  while (!hasUpgrade(stream)) {
+  while (!stream._transitions.some((transition) => transition.type === 'changeRemote')) {
     if (Date.now() - started > 5000) {
       throw new Error('Timed out waiting for relay-to-direct upgrade')
     }
 
     await new Promise((resolve) => setTimeout(resolve, 20))
   }
-}
-
-function hasUpgrade(stream) {
-  return stream._transitions.some((transition) => transition.type === 'changeRemote')
 }
 
 test.skip('server does not support connection relaying', async function (t) {
