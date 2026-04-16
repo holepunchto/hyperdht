@@ -3,7 +3,7 @@ const c = require('compact-encoding')
 const sodium = require('sodium-universal')
 const { swarm } = require('./helpers')
 const m = require('../lib/messages')
-const { COMMANDS: HYPERDHT_COMMANDS } = require('../lib/constants')
+// const { COMMANDS: HYPERDHT_COMMANDS } = require('../lib/constants')
 const DHTPlugin = require('../lib/plugin')
 
 test('plugin put - get', async function (t) {
@@ -19,8 +19,6 @@ test('plugin put - get', async function (t) {
   class TestPlugin extends DHTPlugin {
     constructor(dht) {
       super('testplugin')
-
-      this.dht = dht
       this.data = new Map()
     }
 
@@ -75,21 +73,15 @@ test('plugin put - get', async function (t) {
     }
 
     async put(val) {
-      const putReq = c.encode(m.pluginRequest, {
-        plugin: this.name,
-        command: PLUGIN_COMMANDS.PUT,
-        value: Buffer.from(val)
-      })
-
       const opts = {
         map: mapTest,
-        commit(reply, dht) {
-          return dht.request(
+        commit: (reply, dht) => {
+          return this.request(
             {
               token: reply.token,
               target,
-              command: HYPERDHT_COMMANDS.PLUGIN_PERSISTENT,
-              value: putReq
+              command: PLUGIN_COMMANDS.PUT,
+              value: Buffer.from(val)
             },
             reply.from
           )
@@ -99,17 +91,11 @@ test('plugin put - get', async function (t) {
       const target = Buffer.alloc(32)
       sodium.crypto_generichash(target, Buffer.from(val))
 
-      const getReq = c.encode(m.pluginRequest, {
-        plugin: this.name,
-        command: PLUGIN_COMMANDS.GET,
-        value: null
-      })
-
-      const query = this.dht.query(
+      const query = this.query(
         {
           target,
-          command: HYPERDHT_COMMANDS.PLUGIN_PERSISTENT,
-          value: getReq
+          command: PLUGIN_COMMANDS.GET,
+          value: null
         },
         opts
       )
@@ -121,17 +107,11 @@ test('plugin put - get', async function (t) {
     async get(target) {
       const opts = { map: mapTest }
 
-      const req = c.encode(m.pluginRequest, {
-        plugin: this.name,
-        command: PLUGIN_COMMANDS.GET,
-        value: null
-      })
-
-      const query = this.dht.query(
+      const query = this.query(
         {
           target,
-          command: HYPERDHT_COMMANDS.PLUGIN_PERSISTENT,
-          value: req
+          command: PLUGIN_COMMANDS.GET,
+          value: null
         },
         opts
       )
