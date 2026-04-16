@@ -17,7 +17,7 @@ test('plugin put - get', async function (t) {
   }
 
   class TestPlugin extends DHTPlugin {
-    constructor(dht) {
+    constructor() {
       super('testplugin')
       this.data = new Map()
     }
