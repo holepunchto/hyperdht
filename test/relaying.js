@@ -440,8 +440,8 @@ test('relay connection upgrades to direct connection', { timeout: 30000 }, async
   // Capture raw-stream transitions so we can prove the socket upgrades in place.
   instrumentRawStreams(t, serverNode)
   instrumentRawStreams(t, clientNode)
-  // Bias the race so relay wins first; upgrade assertions below are still condition-based.
-  delayPunching(t, 500)
+  // Bias the race so relay wins first for these nodes only; upgrade assertions below are still condition-based.
+  delayPunching(t, 500, [serverNode, clientNode])
 
   const relayServer = new RelayServer({
     createStream(opts) {
@@ -628,12 +628,15 @@ function instrumentRawStreams(t, dht) {
   })
 }
 
-function delayPunching(t, ms) {
+function delayPunching(t, ms, delayedNodes) {
   const punch = Holepuncher.prototype._punch
 
   Holepuncher.prototype._punch = async function () {
-    // Bias the race without changing the real upgrade logic.
-    await new Promise((resolve) => setTimeout(resolve, ms))
+    // Only delay the punchers created by this test.
+    if (delayedNodes.includes(this.dht)) {
+      // Bias the race without changing the real upgrade logic.
+      await new Promise((resolve) => setTimeout(resolve, ms))
+    }
     return punch.call(this)
   }
 
