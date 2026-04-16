@@ -1,7 +1,6 @@
 const test = require('brittle')
 const c = require('compact-encoding')
 const sodium = require('sodium-universal')
-const HyperDHT = require('../')
 const { swarm } = require('./helpers')
 const m = require('../lib/messages')
 const { COMMANDS: HYPERDHT_COMMANDS } = require('../lib/constants')
@@ -26,8 +25,6 @@ test('plugin put - get', async function (t) {
     }
 
     onrequest(req) {
-      if (!req.value) return
-
       let plugreq
       try {
         plugreq = c.decode(m.pluginRequest, req.value)
@@ -35,7 +32,7 @@ test('plugin put - get', async function (t) {
         return
       }
 
-      const { plugin, command, payload } = plugreq
+      const { command } = plugreq
 
       switch (command) {
         case PLUGIN_COMMANDS.PUT: {
@@ -60,8 +57,8 @@ test('plugin put - get', async function (t) {
 
       let val
       try {
-        const { plugin, command, payload } = c.decode(m.pluginRequest, req.value)
-        val = payload
+        const { value } = c.decode(m.pluginRequest, req.value)
+        val = value
       } catch {
         return req.reply(null)
       }
@@ -81,7 +78,7 @@ test('plugin put - get', async function (t) {
       const putReq = c.encode(m.pluginRequest, {
         plugin: this.name,
         command: PLUGIN_COMMANDS.PUT,
-        payload: Buffer.from(val)
+        value: Buffer.from(val)
       })
 
       const opts = {
@@ -105,7 +102,7 @@ test('plugin put - get', async function (t) {
       const getReq = c.encode(m.pluginRequest, {
         plugin: this.name,
         command: PLUGIN_COMMANDS.GET,
-        payload: null
+        value: null
       })
 
       const query = this.dht.query(
@@ -127,7 +124,7 @@ test('plugin put - get', async function (t) {
       const req = c.encode(m.pluginRequest, {
         plugin: this.name,
         command: PLUGIN_COMMANDS.GET,
-        payload: null
+        value: null
       })
 
       const query = this.dht.query(
