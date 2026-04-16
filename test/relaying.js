@@ -433,30 +433,30 @@ test('relay connections through node, client and server side', async function (t
 test('relay connection upgrades to direct connection', { timeout: 30000 }, async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const relayNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   // Capture raw-stream transitions so we can prove the socket upgrades in place.
-  instrumentRawStreams(t, b)
-  instrumentRawStreams(t, c)
-  // Give the relay path a short head start so the upgrade ordering is deterministic.
+  instrumentRawStreams(t, serverNode)
+  instrumentRawStreams(t, clientNode)
+  // Bias the race so relay wins first; upgrade assertions below are still condition-based.
   delayPunching(t, 500)
 
-  const relay = new RelayServer({
+  const relayServer = new RelayServer({
     createStream(opts) {
-      return a.createRawStream({ ...opts, framed: true })
+      return relayNode.createRawStream({ ...opts, framed: true })
     }
   })
 
-  t.teardown(() => relay.close())
+  t.teardown(() => relayServer.close())
 
-  const aServer = a.createServer(function (socket) {
-    const session = relay.accept(socket, { id: socket.remotePublicKey })
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relayServer.accept(socket, { id: socket.remotePublicKey })
     session.on('error', (err) => t.comment(err.message))
   })
 
-  await aServer.listen()
+  await relayTransportServer.listen()
 
   let serverSocket = null
   let resolveServerSocket = null
@@ -464,9 +464,9 @@ test('relay connection upgrades to direct connection', { timeout: 30000 }, async
     resolveServerSocket = resolve
   })
 
-  const bServer = b.createServer(
+  const appServer = serverNode.createServer(
     {
-      relayThrough: aServer.publicKey,
+      relayThrough: relayTransportServer.publicKey,
       shareLocalAddress: false
     },
     function (socket) {
@@ -478,9 +478,9 @@ test('relay connection upgrades to direct connection', { timeout: 30000 }, async
     }
   )
 
-  await bServer.listen()
+  await appServer.listen()
 
-  const clientSocket = c.connect(bServer.publicKey, {
+  const clientSocket = clientNode.connect(appServer.publicKey, {
     fastOpen: false,
     localConnection: false
   })
@@ -525,9 +525,9 @@ test('relay connection upgrades to direct connection', { timeout: 30000 }, async
   await endAndCloseSocket(clientSocket)
   if (!serverSocket.destroyed) await once(serverSocket, 'close')
 
-  await a.destroy()
-  await b.destroy()
-  await c.destroy()
+  await relayNode.destroy()
+  await serverNode.destroy()
+  await clientNode.destroy()
 })
 
 test.skip('relay several connections through node with pool', async function (t) {
