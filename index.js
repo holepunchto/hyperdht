@@ -46,6 +46,7 @@ class HyperDHT extends DHT {
       ...this.stats
     }
     this.rawStreams = new RawStreamSet(this)
+    this.plugins = new Map()
 
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
@@ -126,6 +127,7 @@ class HyperDHT extends DHT {
     }
     this._router.destroy()
     if (this._persistent) this._persistent.destroy()
+    for (const plugin of this.plugins.values()) plugin.destroy()
     await this.rawStreams.clear()
     await this._socketPool.destroy()
     await super.destroy()
@@ -435,6 +437,10 @@ class HyperDHT extends DHT {
         this._persistent.onimmutableget(req)
         return true
       }
+      case COMMANDS.PLUGIN: {
+        this._persistent.onplugin(req)
+        return true
+      }
     }
 
     return false
@@ -508,6 +514,11 @@ class HyperDHT extends DHT {
       },
       from
     )
+  }
+
+  register(name, plugin) {
+    this.plugins.set(name, plugin)
+    plugin.onregister(this)
   }
 }
 
