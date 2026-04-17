@@ -15,6 +15,8 @@ const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
+const { PrefixHashTree } = require('prefix-hash-tree')
+const { label, isNode } = require('prefix-hash-tree/node')
 
 const DEFAULTS = {
   ...DHT.DEFAULTS,
@@ -59,6 +61,7 @@ class HyperDHT extends DHT {
     this._randomPunchInterval = opts.randomPunchInterval || DEFAULTS.randomPunchInterval // min 20s between random punches...
     this._randomPunches = 0
     this._randomPunchLimit = 1 // set to one for extra safety for now
+    this._experimentalPHT = opts.experimentalPHT === true
 
     this.once('persistent', () => {
       this._persistent = new Persistent(this, persistent)
@@ -388,6 +391,79 @@ class HyperDHT extends DHT {
     return { publicKey: keyPair.publicKey, closestNodes: query.closestNodes, seq, signature }
   }
 
+  async phtNodeGet(target, opts = {}) {
+    if (!this._experimentalPHT) return
+
+    opts = { ...opts, map: mapPHTNode }
+
+    const query = this.query(
+      {
+        target,
+        command: COMMANDS.PHT_NODE_GET,
+        value: null
+      },
+      opts
+    )
+
+    for await (const node of query) {
+      const { publicKey, treeID, phtNode, signature } = node
+
+      const hash = b4a.allocUnsafe(32)
+      sodium.crypto_generichash(hash, b4a.concat([publicKey, treeID]))
+      const indexID = b4a.toString(hash, 'hex')
+      const t = new PrefixHashTree({ indexID })._labelHash(label(phtNode))
+
+      if (
+        isNode(phtNode) &&
+        t.equals(target) &&
+        Persistent.verifyPHTNode(signature, treeID, phtNode, publicKey)
+      )
+        return node
+    }
+
+    return null
+  }
+
+  async phtNodePut(keyPair, treeID, phtNode, opts = {}) {
+    if (!this._experimentalPHT) return
+
+    const publicKey = opts.publicKey || keyPair.publicKey
+
+    const signPHTNode = opts.signPHTNode || Persistent.signPHTNode
+
+    const hash = b4a.allocUnsafe(32)
+    sodium.crypto_generichash(hash, b4a.concat([publicKey, treeID]))
+    const indexID = b4a.toString(hash, 'hex')
+    const target = new PrefixHashTree({ indexID })._labelHash(label(phtNode))
+
+    const signature = opts.signature || (await signPHTNode(phtNode, treeID, keyPair))
+    const connectionKey = opts.connectionKey || b4a.alloc(32)
+
+    const signed = c.encode(m.phtNodePutRequest, {
+      publicKey,
+      treeID,
+      phtNode,
+      signature,
+      connectionKey
+    })
+
+    opts = {
+      ...opts,
+      map: mapPHTNode,
+      commit(reply, dht) {
+        return dht.request(
+          { token: reply.token, target, command: COMMANDS.PHT_NODE_PUT, value: signed },
+          reply.from
+        )
+      }
+    }
+
+    const query = this.query({ target, command: COMMANDS.PHT_NODE_GET, value: null }, opts)
+    await query.finished()
+
+    return { target, indexID, closestNodes: query.closestNodes, signature, connectionKey }
+  }
+
   onrequest(req) {
     switch (req.command) {
       case COMMANDS.PEER_HANDSHAKE: {
@@ -433,6 +509,14 @@ class HyperDHT extends DHT {
       }
       case COMMANDS.IMMUTABLE_GET: {
         this._persistent.onimmutableget(req)
+        return true
+      }
+      case COMMANDS.PHT_NODE_PUT: {
+        this._persistent.onphtnodeput(req)
+        return true
+      }
+      case COMMANDS.PHT_NODE_GET: {
+        this._persistent.onphtnodeget(req)
         return true
       }
     }
@@ -579,6 +663,27 @@ function mapMutable(node) {
   }
 }
 
+function mapPHTNode(node) {
+  if (!node.value) return null
+
+  try {
+    const p = c.decode(m.phtNodeGetResponse, node.value)
+    const { publicKey, treeID, phtNode, signature } = p
+
+    return {
+      token: node.token,
+      from: node.from,
+      to: node.to,
+      publicKey,
+      treeID,
+      phtNode,
+      signature
+    }
+  } catch {
+    return null
+  }
+}
+
 function noop() {}
 
 function filterNode(node) {
@@ -603,6 +708,7 @@ function defaultCacheOpts(opts) {
     },
     relayAddresses: { maxSize: Math.min(maxSize, 512), maxAge: 0 },
     persistent: {
+      experimentalPHT: opts.experimentalPHT,
       records: { maxSize, maxAge },
       refreshes: { maxSize, maxAge },
       mutables: {
@@ -610,6 +716,10 @@ function defaultCacheOpts(opts) {
         maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
       },
       immutables: {
+        maxSize: (maxSize / 2) | 0,
+        maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
+      },
+      phtNodes: {
         maxSize: (maxSize / 2) | 0,
         maxAge: opts.maxAge || 48 * 60 * 60 * 1000 // 48 hours
       },
