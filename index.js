@@ -437,7 +437,7 @@ class HyperDHT extends DHT {
         this._persistent.onimmutableget(req)
         return true
       }
-      case COMMANDS.PLUGIN_PERSISTENT: {
+      case COMMANDS.PLUGIN: {
         this._persistent.onplugin(req)
         return true
       }
