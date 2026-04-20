@@ -46,6 +46,10 @@ test('plugin put - get', async function (t) {
       return false
     }
 
+    onpersistent() {
+      // Do nothing
+    }
+
     destroy() {
       // Do nothing
     }
