@@ -437,11 +437,7 @@ test('relay connection upgrades to direct connection', { timeout: 30000 }, async
   const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-  // Capture raw-stream transitions so we can prove the socket upgrades in place.
-  instrumentRawStreams(t, serverNode)
-  instrumentRawStreams(t, clientNode)
-  // Bias the race so relay wins first for these nodes only; upgrade assertions below are still condition-based.
-  delayPunching(t, 500, [serverNode, clientNode])
+  const resumePunching = pausePunching(t, [serverNode, clientNode])
 
   const relayServer = new RelayServer({
     createStream(opts) {
@@ -458,7 +454,6 @@ test('relay connection upgrades to direct connection', { timeout: 30000 }, async
 
   await relayTransportServer.listen()
 
-  let serverSocket = null
   let resolveServerSocket = null
   const serverSocketOpened = new Promise((resolve) => {
     resolveServerSocket = resolve
@@ -470,7 +465,6 @@ test('relay connection upgrades to direct connection', { timeout: 30000 }, async
       shareLocalAddress: false
     },
     function (socket) {
-      serverSocket = socket
       resolveServerSocket(socket)
 
       socket.on('data', (data) => socket.write(data))
@@ -485,37 +479,39 @@ test('relay connection upgrades to direct connection', { timeout: 30000 }, async
     localConnection: false
   })
 
-  await once(clientSocket, 'open')
-  await serverSocketOpened
+  const [serverSocket] = await Promise.all([serverSocketOpened, once(clientSocket, 'open')])
 
-  t.is(clientSocket.rawStream._transitions.length, 1, 'client starts on the relayed stream')
-  t.is(serverSocket.rawStream._transitions.length, 1, 'server starts on the relayed stream')
-  t.is(clientSocket.rawStream._transitions[0].type, 'connect')
-  t.is(serverSocket.rawStream._transitions[0].type, 'connect')
+  t.not(
+    serverSocket.rawStream.remotePort,
+    clientSocket.rawStream.localPort,
+    'server starts on the relayed stream'
+  )
+  t.not(
+    clientSocket.rawStream.remotePort,
+    serverSocket.rawStream.localPort,
+    'client starts on the relayed stream'
+  )
 
   // The relayed connection should already be usable before the direct path wins.
   const beforeUpgrade = once(clientSocket, 'data')
   clientSocket.write(Buffer.from('before upgrade'))
   t.alike((await beforeUpgrade)[0], Buffer.from('before upgrade'), 'relay path carries data')
 
-  // changeRemote is the signal that the same raw stream switched transport.
-  await waitForUpgrade(clientSocket.rawStream)
-  await waitForUpgrade(serverSocket.rawStream)
+  const clientUpgraded = once(clientSocket.rawStream, 'remote-changed')
+  const serverUpgraded = once(serverSocket.rawStream, 'remote-changed')
 
-  const clientTransitions = clientSocket.rawStream._transitions
-  const serverTransitions = serverSocket.rawStream._transitions
+  resumePunching()
+  await Promise.all([clientUpgraded, serverUpgraded])
 
-  t.is(clientTransitions[1].type, 'changeRemote')
-  t.is(serverTransitions[1].type, 'changeRemote')
-  t.ok(
-    clientTransitions[0].host !== clientTransitions[1].host ||
-      clientTransitions[0].port !== clientTransitions[1].port,
-    'client switches away from the relay address'
+  t.is(
+    serverSocket.rawStream.remotePort,
+    clientSocket.rawStream.localPort,
+    'server switches to the client address'
   )
-  t.ok(
-    serverTransitions[0].host !== serverTransitions[1].host ||
-      serverTransitions[0].port !== serverTransitions[1].port,
-    'server switches away from the relay address'
+  t.is(
+    clientSocket.rawStream.remotePort,
+    serverSocket.rawStream.localPort,
+    'client switches to the server address'
   )
 
   const afterUpgrade = once(clientSocket, 'data')
@@ -600,62 +596,24 @@ test.skip('relay several connections through node with pool', async function (t)
   await c.destroy()
 })
 
-function instrumentRawStreams(t, dht) {
-  const createRawStream = dht.createRawStream.bind(dht)
-
-  dht.createRawStream = function (...args) {
-    const stream = createRawStream(...args)
-    stream._transitions = []
-
-    // Record the initial relay connect and the later direct changeRemote.
-    const connect = stream.connect.bind(stream)
-    stream.connect = function (socket, id, port, host) {
-      stream._transitions.push({ type: 'connect', host, port })
-      return connect(socket, id, port, host)
-    }
-
-    const changeRemote = stream.changeRemote.bind(stream)
-    stream.changeRemote = function (socket, id, port, host) {
-      stream._transitions.push({ type: 'changeRemote', host, port })
-      return changeRemote(socket, id, port, host)
-    }
-
-    return stream
-  }
-
-  t.teardown(() => {
-    dht.createRawStream = createRawStream
-  })
-}
-
-function delayPunching(t, ms, delayedNodes) {
+function pausePunching(t, pausedNodes) {
   const punch = Holepuncher.prototype._punch
+  let resume = null
+  const punchingResumed = new Promise((resolve) => {
+    resume = resolve
+  })
 
   Holepuncher.prototype._punch = async function () {
-    // Only delay the punchers created by this test.
-    if (delayedNodes.includes(this.dht)) {
-      // Bias the race without changing the real upgrade logic.
-      await new Promise((resolve) => setTimeout(resolve, ms))
-    }
+    if (pausedNodes.includes(this.dht)) await punchingResumed
     return punch.call(this)
   }
 
   t.teardown(() => {
+    resume()
     Holepuncher.prototype._punch = punch
   })
-}
 
-async function waitForUpgrade(stream) {
-  const started = Date.now()
-
-  // Poll until the raw stream reports its remote endpoint changed.
-  while (!stream._transitions.some((transition) => transition.type === 'changeRemote')) {
-    if (Date.now() - started > 5000) {
-      throw new Error('Timed out waiting for relay-to-direct upgrade')
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 20))
-  }
+  return resume
 }
 
 test.skip('server does not support connection relaying', async function (t) {
