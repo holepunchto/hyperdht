@@ -22,23 +22,14 @@ test('plugin put - get', async function (t) {
       this.data = new Map()
     }
 
-    onrequest(req) {
-      let plugreq
-      try {
-        plugreq = c.decode(m.pluginRequest, req.value)
-      } catch {
-        return
-      }
-
-      const { command } = plugreq
-
-      switch (command) {
+    onrequest(req, outerReq) {
+      switch (req.command) {
         case PLUGIN_COMMANDS.PUT: {
-          this.onput(req)
+          this.onput(req, outerReq)
           return true
         }
         case PLUGIN_COMMANDS.GET: {
-          this.onget(req)
+          this.onget(outerReq)
           return true
         }
       }
@@ -54,26 +45,20 @@ test('plugin put - get', async function (t) {
       // Do nothing
     }
 
-    onput(req) {
-      if (!req.target || !req.token || !req.value) return
+    onput(req, outerReq) {
+      if (!outerReq.target || !outerReq.token || !outerReq.value) return
 
-      let val
-      try {
-        const { value } = c.decode(m.pluginRequest, req.value)
-        val = value
-      } catch {
-        return req.reply(null)
-      }
+      if (!req.value) return outerReq.reply(null)
 
-      const k = req.target.toString('hex')
-      this.data.set(k, val)
-      req.reply(null)
+      const k = outerReq.target.toString('hex')
+      this.data.set(k, req.value)
+      outerReq.reply(null)
     }
 
-    onget(req) {
-      if (!req.target) return
-      const k = req.target.toString('hex')
-      req.reply(this.data.get(k) || null)
+    onget(outerReq) {
+      if (!outerReq.target) return
+      const k = outerReq.target.toString('hex')
+      outerReq.reply(this.data.get(k) || null)
     }
 
     async put(val) {
