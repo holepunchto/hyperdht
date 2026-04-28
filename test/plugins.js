@@ -1,9 +1,6 @@
 const test = require('brittle')
-const c = require('compact-encoding')
 const sodium = require('sodium-universal')
 const { swarm } = require('./helpers')
-const m = require('../lib/messages')
-// const { COMMANDS: HYPERDHT_COMMANDS } = require('../lib/constants')
 const DHTPlugin = require('../lib/plugin')
 
 test('plugin put - get', async function (t) {
