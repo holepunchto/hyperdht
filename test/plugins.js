@@ -26,6 +26,7 @@ test('plugin put - get', async function (t) {
       switch (req.command) {
         case PLUGIN_COMMANDS.PUT: {
           this.onput(req, outerReq)
+          return
         }
         case PLUGIN_COMMANDS.GET: {
           this.onget(outerReq)
