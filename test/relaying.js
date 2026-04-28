@@ -538,7 +538,17 @@ test('relay connection upgrades to direct connection', async function (t) {
 
   t.teardown(() => relayServer.close())
 
+  const relaySockets = []
+  let resolveRelaySockets = null
+  const relaySocketsOpened = new Promise((resolve) => {
+    resolveRelaySockets = resolve
+  })
+
   const relayTransportServer = relayNode.createServer(function (socket) {
+    relaySockets.push(socket)
+    // Wait until both client and server have opened their relay transport sockets.
+    if (relaySockets.length === 2) resolveRelaySockets(relaySockets)
+
     const session = relayServer.accept(socket, { id: socket.remotePublicKey })
     session.on('error', (err) => t.comment(err.message))
   })
@@ -571,6 +581,9 @@ test('relay connection upgrades to direct connection', async function (t) {
   })
 
   const [serverSocket] = await Promise.all([serverSocketOpened, once(clientSocket, 'open')])
+  await relaySocketsOpened
+
+  t.is(relaySockets.length, 2, 'both peers opened relay transport sockets')
 
   t.not(
     serverSocket.rawStream.remotePort,
@@ -590,9 +603,12 @@ test('relay connection upgrades to direct connection', async function (t) {
 
   const clientUpgraded = once(clientSocket.rawStream, 'remote-changed')
   const serverUpgraded = once(serverSocket.rawStream, 'remote-changed')
+  const relaySocketsClosed = relaySockets.map((socket) => once(socket, 'close'))
 
   resumePunching()
   await Promise.all([clientUpgraded, serverUpgraded])
+  await Promise.all(relaySocketsClosed)
+  t.pass('relay transport sockets close after direct upgrade')
 
   t.is(
     serverSocket.rawStream.remotePort,
