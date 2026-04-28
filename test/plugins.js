@@ -26,15 +26,11 @@ test('plugin put - get', async function (t) {
       switch (req.command) {
         case PLUGIN_COMMANDS.PUT: {
           this.onput(req, outerReq)
-          return true
         }
         case PLUGIN_COMMANDS.GET: {
           this.onget(outerReq)
-          return true
         }
       }
-
-      return false
     }
 
     onpersistent() {
@@ -46,7 +42,7 @@ test('plugin put - get', async function (t) {
     }
 
     onput(req, outerReq) {
-      if (!outerReq.target || !outerReq.token || !outerReq.value) return
+      if (!outerReq.target || !outerReq.token) return
 
       if (!req.value) return outerReq.reply(null)
 
