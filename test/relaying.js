@@ -430,10 +430,10 @@ test('relay connections through node, client and server side', async function (t
   await a.destroy()
 })
 
-test('relay connection upgrades to direct connection', { timeout: 30000 }, async function (t) {
+test('relay connection upgrades to direct connection', async function (t) {
   const { bootstrap } = await swarm(t)
 
-  const relayNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const relayNode = createDHT({ bootstrap })
   const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
