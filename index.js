@@ -14,6 +14,7 @@ const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS } = require('./lib/cons
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
+const RelayPool = require('./lib/relay-pool')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 
 const DEFAULTS = {
@@ -47,6 +48,7 @@ class HyperDHT extends DHT {
     }
     this.rawStreams = new RawStreamSet(this)
     this.plugins = new Map()
+    this._relayPool = new RelayPool(this)
 
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
@@ -129,6 +131,7 @@ class HyperDHT extends DHT {
     this._router.destroy()
     if (this._persistent) this._persistent.destroy()
     for (const plugin of this.plugins.values()) plugin.destroy()
+    await this._relayPool.destroy()
     await this.rawStreams.clear()
     await this._socketPool.destroy()
     await super.destroy()
