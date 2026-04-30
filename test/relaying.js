@@ -1,6 +1,8 @@
 const test = require('brittle')
+const { once } = require('events')
 const RelayServer = require('blind-relay').Server
-const { swarm, createDHT } = require('./helpers')
+const Holepuncher = require('../lib/holepuncher')
+const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 
 test('relay connections through node, client side', async function (t) {
   const { bootstrap } = await swarm(t)
@@ -519,6 +521,102 @@ test('relay connections through node, client and server side', async function (t
   await a.destroy()
 })
 
+test('relay connection upgrades to direct connection', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const resumePunching = pausePunching(t, [serverNode, clientNode])
+
+  const relayServer = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relayServer.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relayServer.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  let resolveServerSocket = null
+  const serverSocketOpened = new Promise((resolve) => {
+    resolveServerSocket = resolve
+  })
+
+  const appServer = serverNode.createServer(
+    {
+      relayThrough: relayTransportServer.publicKey,
+      shareLocalAddress: false
+    },
+    function (socket) {
+      resolveServerSocket(socket)
+
+      socket.on('data', (data) => socket.write(data))
+      socket.on('end', () => socket.end())
+    }
+  )
+
+  await appServer.listen()
+
+  const clientSocket = clientNode.connect(appServer.publicKey, {
+    fastOpen: false,
+    localConnection: false
+  })
+
+  const [serverSocket] = await Promise.all([serverSocketOpened, once(clientSocket, 'open')])
+
+  t.not(
+    serverSocket.rawStream.remotePort,
+    clientSocket.rawStream.localPort,
+    'server starts on the relayed stream'
+  )
+  t.not(
+    clientSocket.rawStream.remotePort,
+    serverSocket.rawStream.localPort,
+    'client starts on the relayed stream'
+  )
+
+  // The relayed connection should already be usable before the direct path wins.
+  const beforeUpgrade = once(clientSocket, 'data')
+  clientSocket.write(Buffer.from('before upgrade'))
+  t.alike((await beforeUpgrade)[0], Buffer.from('before upgrade'), 'relay path carries data')
+
+  const clientUpgraded = once(clientSocket.rawStream, 'remote-changed')
+  const serverUpgraded = once(serverSocket.rawStream, 'remote-changed')
+
+  resumePunching()
+  await Promise.all([clientUpgraded, serverUpgraded])
+
+  t.is(
+    serverSocket.rawStream.remotePort,
+    clientSocket.rawStream.localPort,
+    'server switches to the client address'
+  )
+  t.is(
+    clientSocket.rawStream.remotePort,
+    serverSocket.rawStream.localPort,
+    'client switches to the server address'
+  )
+
+  const afterUpgrade = once(clientSocket, 'data')
+  clientSocket.write(Buffer.from('after upgrade'))
+  t.alike((await afterUpgrade)[0], Buffer.from('after upgrade'), 'direct path carries data')
+
+  await endAndCloseSocket(clientSocket)
+  if (!serverSocket.destroyed) await once(serverSocket, 'close')
+
+  await relayNode.destroy()
+  await serverNode.destroy()
+  await clientNode.destroy()
+})
+
 test.skip('relay several connections through node with pool', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -588,6 +686,26 @@ test.skip('relay several connections through node with pool', async function (t)
   await b.destroy()
   await c.destroy()
 })
+
+function pausePunching(t, pausedNodes) {
+  const punch = Holepuncher.prototype._punch
+  let resume = null
+  const punchingResumed = new Promise((resolve) => {
+    resume = resolve
+  })
+
+  Holepuncher.prototype._punch = async function () {
+    if (pausedNodes.includes(this.dht)) await punchingResumed
+    return punch.call(this)
+  }
+
+  t.teardown(() => {
+    resume()
+    Holepuncher.prototype._punch = punch
+  })
+
+  return resume
+}
 
 test.skip('server does not support connection relaying', async function (t) {
   const { bootstrap } = await swarm(t)
