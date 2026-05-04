@@ -63,6 +63,70 @@ test('relay connections through node, client side', async function (t) {
   await c.destroy()
 })
 
+test('relay service mode relays connections through node', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const lc = t.test('socket lifecycle')
+  lc.plan(5)
+
+  const sessions = []
+  const relayServer = b.createRelayServer()
+  relayServer.on('session', (session) => {
+    sessions.push(session)
+  })
+
+  await relayServer.listen()
+
+  const aServer = a.createServer(
+    {
+      holepunch: false,
+      shareLocalAddress: false,
+      relayThrough: relayServer.publicKey
+    },
+    function (socket) {
+      lc.pass('server socket opened')
+      socket
+        .on('data', (data) => {
+          lc.alike(data, Buffer.from('hello world'))
+        })
+        .on('close', () => {
+          lc.pass('server socket closed')
+        })
+        .end()
+    }
+  )
+
+  await aServer.listen()
+
+  const aSocket = c.connect(aServer.publicKey, {
+    relayThrough: relayServer.publicKey
+  })
+
+  aSocket
+    .on('open', () => {
+      lc.pass('client socket opened')
+    })
+    .on('close', () => {
+      lc.pass('client socket closed')
+    })
+    .end('hello world')
+
+  await lc
+
+  t.is(sessions.length, 2, 'relay service accepts both relay transport sessions')
+
+  await relayServer.close()
+  t.ok(relayServer.closed, 'relay service closes')
+
+  await a.destroy()
+  await b.destroy()
+  await c.destroy()
+})
+
 test('relay connections through node, client side, client aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 

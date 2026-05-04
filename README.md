@@ -166,6 +166,39 @@ Stop listening.
 
 Emitted when the server is fully closed.
 
+## Creating relay servers
+
+#### `const relay = node.createRelayServer([options])`
+
+Create a relay server that accepts blind relay transport connections.
+
+This is an explicit opt-in service. Peers still need to choose it with `relayThrough`.
+
+```js
+const relay = node.createRelayServer()
+await relay.listen()
+
+const socket = otherNode.connect(server.publicKey, {
+  relayThrough: relay.publicKey
+})
+```
+
+#### `await relay.listen([keyPair])`
+
+Start accepting relay transport connections using the key pair's public key.
+
+#### `relay.publicKey`
+
+The public key peers can pass as `relayThrough`.
+
+#### `relay.on('session', session, socket)`
+
+Emitted when a peer opens a relay transport session.
+
+#### `await relay.close()`
+
+Stop accepting relay transport connections and close active relay sessions.
+
 ## Connecting to P2P servers
 
 #### `const socket = node.connect(remotePublicKey, [options])`
