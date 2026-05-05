@@ -30,7 +30,7 @@
     "bare-events": "^2.2.0",
     "blind-relay": "^1.3.0",
     "bogon": "^1.0.0",
-    "compact-encoding": "^2.4.1",
+    "compact-encoding": "^3.0.0",
     "dht-rpc": "^6.15.1",
     "hypercore-crypto": "^3.3.0",
     "hypercore-id-encoding": "^1.2.0",
