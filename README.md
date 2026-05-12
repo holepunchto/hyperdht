@@ -195,9 +195,20 @@ The public key peers can pass as `relayThrough`.
 
 Emitted when a peer opens a relay transport session.
 
-#### `await relay.close()`
+#### `await relay.close([options])`
 
 Stop accepting relay transport connections and close active relay sessions.
+
+Options include:
+
+```js
+{
+  force: false // destroy active relay sessions immediately
+}
+```
+
+Use `await relay.close({ force: true })` when an app/user disables relay mode and
+active relayed connections should be torn down now.
 
 ## Connecting to P2P servers
 
