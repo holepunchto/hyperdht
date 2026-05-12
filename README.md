@@ -195,15 +195,36 @@ The public key peers can pass as `relayThrough`.
 
 Emitted when a peer opens a relay transport session.
 
+#### `relay.sessions`
+
+An iterator over active blind relay transport sessions.
+
+#### `relay.stats`
+
+In-memory relay service counters from `blind-relay`:
+
+```js
+{
+  sessions: { accepted, opened, closed, active },
+  pairings: { requested, matched, cancelled, pending, active },
+  streams: { opened, closed, errors, active }
+}
+```
+
 #### `await relay.close([options])`
 
-Stop accepting relay transport connections and close active relay sessions.
+Stop accepting relay transport connections and gracefully close active relay
+sessions.
+
+Graceful close uses the blind-relay protocol close path and waits for active
+relay sessions to close. It does not drain relayed application streams
+indefinitely; those streams close when their relay sessions close.
 
 Options include:
 
 ```js
 {
-  force: false // destroy active relay sessions immediately
+  force: false // use true to destroy active relay sessions immediately
 }
 ```
 

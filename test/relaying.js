@@ -118,9 +118,13 @@ test('relay service mode relays connections through node', async function (t) {
   await lc
 
   t.is(sessions.length, 2, 'relay service accepts both relay transport sessions')
+  await waitFor(() => relayServer.stats.sessions.opened === 2)
+  t.is(relayServer.stats.sessions.accepted, 2, 'relay service tracks accepted sessions')
+  t.is(relayServer.stats.sessions.active, 2, 'relay service tracks active sessions')
 
   await relayServer.close()
   t.ok(relayServer.closed, 'relay service closes')
+  t.is(relayServer.stats.sessions.active, 0, 'graceful close closes active sessions')
 
   await a.destroy()
   await b.destroy()
@@ -164,6 +168,7 @@ test('relay service force close tears down active relayed connections', async fu
   const reply = once(clientSocket, 'data')
   clientSocket.write(Buffer.from('still active'))
   t.alike((await reply)[0], Buffer.from('still active'), 'relay path carries data')
+  await waitFor(() => relayServer.stats.streams.active === 2)
 
   const clientStopped = waitForSocketStopped(clientSocket)
   const serverStopped = waitForSocketStopped(serverSocket)
@@ -173,6 +178,7 @@ test('relay service force close tears down active relayed connections', async fu
   await Promise.all([clientStopped, serverStopped])
 
   t.ok(relayServer.closed, 'relay service force closes')
+  t.is(relayServer.stats.streams.active, 0, 'force close tears down active relay streams')
 
   await a.destroy()
   await b.destroy()
