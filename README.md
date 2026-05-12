@@ -166,6 +166,71 @@ Stop listening.
 
 Emitted when the server is fully closed.
 
+## Creating relay servers
+
+#### `const relay = node.createRelayServer([options])`
+
+Create a relay server that accepts blind relay transport connections.
+
+This is an explicit opt-in service. Peers still need to choose it with `relayThrough`.
+
+```js
+const relay = node.createRelayServer()
+await relay.listen()
+
+const socket = otherNode.connect(server.publicKey, {
+  relayThrough: relay.publicKey
+})
+```
+
+#### `await relay.listen([keyPair])`
+
+Start accepting relay transport connections using the key pair's public key.
+
+#### `relay.publicKey`
+
+The public key peers can pass as `relayThrough`.
+
+#### `relay.on('session', session, socket)`
+
+Emitted when a peer opens a relay transport session.
+
+#### `relay.sessions`
+
+An iterator over active blind relay transport sessions.
+
+#### `relay.stats`
+
+In-memory relay service counters from `blind-relay`:
+
+```js
+{
+  sessions: { accepted, opened, closed, active },
+  pairings: { requested, matched, cancelled, pending, active },
+  streams: { opened, closed, errors, active }
+}
+```
+
+#### `await relay.close([options])`
+
+Stop accepting relay transport connections and gracefully close active relay
+sessions.
+
+Graceful close uses the blind-relay protocol close path and waits for active
+relay sessions to close. It does not drain relayed application streams
+indefinitely; those streams close when their relay sessions close.
+
+Options include:
+
+```js
+{
+  force: false // use true to destroy active relay sessions immediately
+}
+```
+
+Use `await relay.close({ force: true })` when an app/user disables relay mode and
+active relayed connections should be torn down now.
+
 ## Connecting to P2P servers
 
 #### `const socket = node.connect(remotePublicKey, [options])`

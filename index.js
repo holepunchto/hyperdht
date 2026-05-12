@@ -9,6 +9,7 @@ const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Cache = require('xache')
 const Server = require('./lib/server')
+const RelayServer = require('./lib/relay-server')
 const connect = require('./lib/connect')
 const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
@@ -90,6 +91,10 @@ class HyperDHT extends DHT {
     const s = new Server(this, opts)
     if (onconnection) s.on('connection', onconnection)
     return s
+  }
+
+  createRelayServer(opts) {
+    return new RelayServer(this, opts)
   }
 
   pool() {

@@ -63,6 +63,128 @@ test('relay connections through node, client side', async function (t) {
   await c.destroy()
 })
 
+test('relay service mode relays connections through node', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const lc = t.test('socket lifecycle')
+  lc.plan(5)
+
+  const sessions = []
+  const relayServer = b.createRelayServer()
+  relayServer.on('session', (session) => {
+    sessions.push(session)
+  })
+
+  await relayServer.listen()
+
+  const aServer = a.createServer(
+    {
+      holepunch: false,
+      shareLocalAddress: false,
+      relayThrough: relayServer.publicKey
+    },
+    function (socket) {
+      lc.pass('server socket opened')
+      socket
+        .on('data', (data) => {
+          lc.alike(data, Buffer.from('hello world'))
+        })
+        .on('close', () => {
+          lc.pass('server socket closed')
+        })
+        .end()
+    }
+  )
+
+  await aServer.listen()
+
+  const aSocket = c.connect(aServer.publicKey, {
+    relayThrough: relayServer.publicKey
+  })
+
+  aSocket
+    .on('open', () => {
+      lc.pass('client socket opened')
+    })
+    .on('close', () => {
+      lc.pass('client socket closed')
+    })
+    .end('hello world')
+
+  await lc
+
+  t.is(sessions.length, 2, 'relay service accepts both relay transport sessions')
+  await waitFor(() => relayServer.stats.sessions.opened === 2)
+  t.is(relayServer.stats.sessions.accepted, 2, 'relay service tracks accepted sessions')
+  t.is(relayServer.stats.sessions.active, 2, 'relay service tracks active sessions')
+
+  await relayServer.close()
+  t.ok(relayServer.closed, 'relay service closes')
+  t.is(relayServer.stats.sessions.active, 0, 'graceful close closes active sessions')
+
+  await a.destroy()
+  await b.destroy()
+  await c.destroy()
+})
+
+test('relay service force close tears down active relayed connections', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relayServer = b.createRelayServer()
+  await relayServer.listen()
+
+  let serverSocket = null
+  const aServer = a.createServer(
+    {
+      holepunch: false,
+      shareLocalAddress: false,
+      relayThrough: relayServer.publicKey
+    },
+    function (socket) {
+      serverSocket = socket
+      socket.on('error', noop)
+      socket.on('data', (data) => socket.write(data))
+    }
+  )
+
+  await aServer.listen()
+
+  const clientSocket = c.connect(aServer.publicKey, {
+    relayThrough: relayServer.publicKey
+  })
+  clientSocket.on('error', noop)
+
+  await once(clientSocket, 'open')
+  await waitFor(() => serverSocket !== null)
+
+  const reply = once(clientSocket, 'data')
+  clientSocket.write(Buffer.from('still active'))
+  t.alike((await reply)[0], Buffer.from('still active'), 'relay path carries data')
+  await waitFor(() => relayServer.stats.streams.active === 2)
+
+  const clientStopped = waitForSocketStopped(clientSocket)
+  const serverStopped = waitForSocketStopped(serverSocket)
+
+  await relayServer.close({ force: true })
+
+  await Promise.all([clientStopped, serverStopped])
+
+  t.ok(relayServer.closed, 'relay service force closes')
+  t.is(relayServer.stats.streams.active, 0, 'force close tears down active relay streams')
+
+  await a.destroy()
+  await b.destroy()
+  await c.destroy()
+})
+
 test('relay connections through node, client side, client aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -219,6 +341,31 @@ function getOnlyRelayPoolEntry(node) {
   if (entries.length !== 1) throw new Error('Expected exactly one relay pool entry')
   return entries[0]
 }
+
+function waitForSocketStopped(socket, timeout = 2000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      cleanup()
+      reject(new Error('Timed out waiting for socket to stop'))
+    }, timeout)
+
+    socket.once('close', done)
+    socket.once('error', done)
+
+    function done() {
+      cleanup()
+      resolve()
+    }
+
+    function cleanup() {
+      clearTimeout(timer)
+      socket.off('close', done)
+      socket.off('error', done)
+    }
+  })
+}
+
+function noop() {}
 
 test('relay connections through node, client side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
