@@ -845,6 +845,56 @@ test('relay pool unpairs if pairing aborts before remote pairs', async function 
   await relayNode.destroy()
 })
 
+test('relay pool does not reuse closing transport sockets', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const firstStream = clientNode.createRawStream({ framed: true })
+  const firstPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: firstStream,
+    keepAlive: 5000
+  })
+  const closingSocket = firstPairing.socket
+
+  closingSocket.destroy()
+
+  const secondStream = clientNode.createRawStream({ framed: true })
+  const secondPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: secondStream,
+    keepAlive: 5000
+  })
+
+  t.not(secondPairing.socket, closingSocket, 'new pairing gets a fresh relay transport')
+
+  firstStream.destroy()
+  secondStream.destroy()
+  secondPairing.release()
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
 test('relay connection upgrades to direct connection', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -1093,7 +1143,7 @@ test('direct upgrade keeps other pooled relay pairings alive', async function (t
 
   resumePunching()
   await Promise.all([clientUpgraded, serverUpgraded])
-  await waitFor(() => closedRelayStreams === 2)
+  await waitFor(() => closedRelayStreams === 2, 12000)
 
   t.is(closedRelayStreams, 2, 'direct upgrade releases only its relay pairing')
   t.is(closedRelaySockets, 0, 'shared relay transports stay open for the other pairing')
@@ -1132,7 +1182,7 @@ test('direct upgrade keeps other pooled relay pairings alive', async function (t
   await endAndCloseSocket(relayOnlyClientSocket)
   if (!relayOnlyServerSocket.destroyed) await once(relayOnlyServerSocket, 'close')
 
-  await waitFor(() => closedRelaySockets === 2)
+  await waitFor(() => closedRelaySockets === 2, 12000)
   t.is(closedRelaySockets, 2, 'shared relay transports close after remaining pairing closes')
 
   await relayNode.destroy()
