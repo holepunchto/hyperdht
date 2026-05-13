@@ -875,6 +875,7 @@ test('relay pool does not reuse closing transport sockets', async function (t) {
   })
   const closingSocket = firstPairing.socket
 
+  // Simulate the close-event race where the pool entry still exists but its transport is closing.
   closingSocket.destroy()
 
   const secondStream = clientNode.createRawStream({ framed: true })
@@ -890,6 +891,87 @@ test('relay pool does not reuse closing transport sockets', async function (t) {
   firstStream.destroy()
   secondStream.destroy()
   secondPairing.release()
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
+test('relay pool unrefs and clears delayed direct-upgrade unpairs', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const rawStream = clientNode.createRawStream({ framed: true })
+  const pairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: rawStream,
+    keepAlive: 5000
+  })
+
+  await waitFor(() => relay._pairing.size === 1)
+
+  // The direct-upgrade unpair delay is intentionally long, so wrap the timer to
+  // verify cleanup behavior without waiting for the delay to elapse.
+  const setTimeoutOriginal = global.setTimeout
+  const clearTimeoutOriginal = global.clearTimeout
+  let delayedTimer = null
+  let unrefed = false
+  let cleared = false
+
+  global.setTimeout = function (fn, delay, ...args) {
+    const timer = setTimeoutOriginal.call(this, fn, delay, ...args)
+
+    if (delay > 1000) {
+      delayedTimer = {
+        timer,
+        unref() {
+          unrefed = true
+          if (timer.unref) return timer.unref()
+        }
+      }
+
+      return delayedTimer
+    }
+
+    return timer
+  }
+
+  global.clearTimeout = function (timer) {
+    if (timer === delayedTimer) cleared = true
+    return clearTimeoutOriginal.call(this, timer === delayedTimer ? delayedTimer.timer : timer)
+  }
+
+  t.teardown(function () {
+    global.setTimeout = setTimeoutOriginal
+    global.clearTimeout = clearTimeoutOriginal
+    if (delayedTimer !== null) clearTimeoutOriginal(delayedTimer.timer)
+  })
+
+  // closePairing is the direct-upgrade cleanup path that schedules delayed unpair.
+  pairing.closePairing()
+  rawStream.destroy()
+
+  t.ok(unrefed, 'delayed unpair timer is unrefed')
+
+  await clientNode._relayPool.destroy()
+  t.ok(cleared, 'delayed unpair timer is cleared on pool destroy')
 
   await clientNode.destroy()
   await relayNode.destroy()
