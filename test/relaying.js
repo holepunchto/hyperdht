@@ -220,6 +220,68 @@ function getOnlyRelayPoolEntry(node) {
   return entries[0]
 }
 
+function captureDelayedRelayUnpairTimer(t) {
+  const setTimeoutOriginal = global.setTimeout
+  const clearTimeoutOriginal = global.clearTimeout
+  let captured = null
+  let unrefed = false
+  let cleared = false
+  let fired = false
+
+  global.setTimeout = function (fn, delay, ...args) {
+    const timer = setTimeoutOriginal.call(this, fn, delay, ...args)
+
+    if (delay !== 10000) return timer
+
+    captured = {
+      timer,
+      fire() {
+        if (fired) return
+        fired = true
+        clearTimeoutOriginal(timer)
+        return fn()
+      },
+      unref() {
+        unrefed = true
+        if (timer.unref) return timer.unref()
+      }
+    }
+
+    return captured
+  }
+
+  global.clearTimeout = function (timer) {
+    if (timer === captured) {
+      cleared = true
+      return clearTimeoutOriginal.call(this, captured.timer)
+    }
+
+    return clearTimeoutOriginal.call(this, timer)
+  }
+
+  t.teardown(function () {
+    global.setTimeout = setTimeoutOriginal
+    global.clearTimeout = clearTimeoutOriginal
+    if (captured !== null) clearTimeoutOriginal(captured.timer)
+  })
+
+  return {
+    fire() {
+      if (captured === null) throw new Error('Expected delayed relay unpair timer')
+      return captured.fire()
+    },
+    get captured() {
+      return captured !== null
+    },
+    get unrefed() {
+      return unrefed
+    },
+    get cleared() {
+      return cleared
+    }
+  }
+}
+
 test('relay connections through node, client side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -929,49 +991,85 @@ test('relay pool unrefs and clears delayed direct-upgrade unpairs', async functi
 
   // The direct-upgrade unpair delay is intentionally long, so wrap the timer to
   // verify cleanup behavior without waiting for the delay to elapse.
-  const setTimeoutOriginal = global.setTimeout
-  const clearTimeoutOriginal = global.clearTimeout
-  let delayedTimer = null
-  let unrefed = false
-  let cleared = false
-
-  global.setTimeout = function (fn, delay, ...args) {
-    const timer = setTimeoutOriginal.call(this, fn, delay, ...args)
-
-    if (delay > 1000) {
-      delayedTimer = {
-        timer,
-        unref() {
-          unrefed = true
-          if (timer.unref) return timer.unref()
-        }
-      }
-
-      return delayedTimer
-    }
-
-    return timer
-  }
-
-  global.clearTimeout = function (timer) {
-    if (timer === delayedTimer) cleared = true
-    return clearTimeoutOriginal.call(this, timer === delayedTimer ? delayedTimer.timer : timer)
-  }
-
-  t.teardown(function () {
-    global.setTimeout = setTimeoutOriginal
-    global.clearTimeout = clearTimeoutOriginal
-    if (delayedTimer !== null) clearTimeoutOriginal(delayedTimer.timer)
-  })
+  const delayedUnpair = captureDelayedRelayUnpairTimer(t)
 
   // closePairing is the direct-upgrade cleanup path that schedules delayed unpair.
   pairing.closePairing()
   rawStream.destroy()
 
-  t.ok(unrefed, 'delayed unpair timer is unrefed')
+  t.ok(delayedUnpair.unrefed, 'delayed unpair timer is unrefed')
 
   await clientNode._relayPool.destroy()
-  t.ok(cleared, 'delayed unpair timer is cleared on pool destroy')
+  t.ok(delayedUnpair.cleared, 'delayed unpair timer is cleared on pool destroy')
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
+test('relay pool keeps transport open for pairings started during delayed unpair', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const firstStream = clientNode.createRawStream({ framed: true })
+  const firstPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: firstStream,
+    keepAlive: 5000
+  })
+
+  await waitFor(() => relay._pairing.size === 1)
+
+  const relaySocket = firstPairing.socket
+  const delayedUnpair = captureDelayedRelayUnpairTimer(t)
+
+  // Simulate direct upgrade for the first pairing, leaving its unpair delayed.
+  firstPairing.closePairing()
+  firstStream.destroy()
+
+  t.ok(delayedUnpair.captured, 'first pairing schedules delayed unpair')
+
+  const secondStream = clientNode.createRawStream({ framed: true })
+  const secondPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: secondStream,
+    keepAlive: 5000
+  })
+
+  t.is(secondPairing.socket, relaySocket, 'new pairing reuses the pending relay transport')
+
+  await waitFor(() => relay._pairing.size === 2)
+
+  delayedUnpair.fire()
+
+  await waitFor(() => relay._pairing.size === 1)
+  t.is(clientNode._relayPool._entries.size, 1, 'pool entry stays open for the new pairing')
+  t.is(getOnlyRelayPoolEntry(clientNode).socket, relaySocket, 'same relay transport remains pooled')
+  t.absent(relaySocket.destroying, 'relay transport is not closing')
+
+  secondPairing.release()
+  secondStream.destroy()
+
+  await waitFor(() => relay._pairing.size === 0)
+  await waitFor(() => clientNode._relayPool._entries.size === 0)
 
   await clientNode.destroy()
   await relayNode.destroy()
