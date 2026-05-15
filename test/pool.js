@@ -1,5 +1,6 @@
 const test = require('brittle')
-const { swarm } = require('./helpers')
+const { EventEmitter } = require('events')
+const { swarm, createDHT } = require('./helpers')
 
 test('connection pool, client side', async function (t) {
   const [a, b] = await swarm(t)
@@ -112,4 +113,26 @@ test('connection pool, client and server side', async function (t) {
   await open
 
   await server.close()
+})
+
+test('socket pool ignores closing reusable routes', async function (t) {
+  const node = createDHT({ bootstrap: [], ephemeral: true })
+  const publicKey = Buffer.alloc(32, 1)
+
+  const socket = new EventEmitter()
+  socket.closing = false
+
+  const rawStream = new EventEmitter()
+  rawStream.socket = socket
+  rawStream.remoteHost = '127.0.0.1'
+  rawStream.remotePort = 1234
+
+  node._socketPool.routes.add(publicKey, rawStream)
+  t.ok(node._socketPool.routes.get(publicKey), 'route is registered')
+
+  socket.closing = true
+  t.absent(node._socketPool.routes.get(publicKey), 'closing socket route is ignored')
+  t.absent(node._socketPool.routes.get(publicKey), 'closing socket route is removed')
+
+  await node.destroy()
 })
