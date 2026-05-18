@@ -130,6 +130,7 @@ test('socket pool ignores closing reusable routes', async function (t) {
 
   socket.closing = true
   t.absent(routes.get(publicKey), 'closing socket route is ignored')
+  // Reset closing so the next lookup proves the stale route was removed.
   socket.closing = false
   t.absent(routes.get(publicKey), 'closing socket route is removed')
 
