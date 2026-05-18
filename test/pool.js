@@ -117,22 +117,20 @@ function noop() {}
 
 test('socket pool ignores closing reusable routes', async function (t) {
   const node = createDHT({ bootstrap: [], ephemeral: true })
+  const routes = node._socketPool.routes
   const publicKey = Buffer.alloc(32, 1)
 
   const socket = new EventEmitter()
-  socket.closing = false
 
   const rawStream = new EventEmitter()
   rawStream.socket = socket
-  rawStream.remoteHost = '127.0.0.1'
-  rawStream.remotePort = 1234
 
-  node._socketPool.routes.add(publicKey, rawStream)
-  t.ok(node._socketPool.routes.get(publicKey), 'route is registered')
+  routes.add(publicKey, rawStream)
+  t.ok(routes.get(publicKey), 'route is registered')
 
   socket.closing = true
-  t.absent(node._socketPool.routes.get(publicKey), 'closing socket route is ignored')
-  t.absent(node._socketPool.routes.get(publicKey), 'closing socket route is removed')
+  t.absent(routes.get(publicKey), 'closing socket route is ignored')
+  t.absent(routes.get(publicKey), 'closing socket route is removed')
 
   await node.destroy()
 })
