@@ -140,8 +140,7 @@ test('connection pool ignores destroying streams', async function (t) {
 
   second.destroy()
 
-  await a.destroy()
-  await b.destroy()
+  await server.close()
 })
 
 function noop() {}
