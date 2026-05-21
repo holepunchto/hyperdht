@@ -672,12 +672,10 @@ test('relay connections through same node reuse transport sockets', async functi
 
   const clientSockets = [
     clientNode.connect(appServer.publicKey, {
-      holepunch: false,
       localConnection: false,
       relayThrough: relayTransportServer.publicKey
     }),
     clientNode.connect(appServer.publicKey, {
-      holepunch: false,
       localConnection: false,
       relayThrough: relayTransportServer.publicKey
     })
@@ -724,7 +722,6 @@ test('relay connections through same node reuse transport sockets', async functi
 
   const reconnectedServerSocket = waitFor(() => serverSockets.length === 3)
   const reconnectedClientSocket = clientNode.connect(appServer.publicKey, {
-    holepunch: false,
     localConnection: false,
     relayThrough: relayTransportServer.publicKey
   })
@@ -806,12 +803,10 @@ test('relay pool closes app streams when shared transports close', async functio
 
   const clientSockets = [
     clientNode.connect(appServer.publicKey, {
-      holepunch: false,
       localConnection: false,
       relayThrough: relayTransportServer.publicKey
     }),
     clientNode.connect(appServer.publicKey, {
-      holepunch: false,
       localConnection: false,
       relayThrough: relayTransportServer.publicKey
     })
@@ -841,7 +836,6 @@ test('relay pool closes app streams when shared transports close', async functio
 
   const reconnectedServerSocket = waitFor(() => serverSockets.length === 3)
   const reconnectedClientSocket = clientNode.connect(appServer.publicKey, {
-    holepunch: false,
     localConnection: false,
     relayThrough: relayTransportServer.publicKey
   })
