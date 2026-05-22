@@ -952,6 +952,66 @@ test('relay pool does not reuse closing transport sockets', async function (t) {
   await relayNode.destroy()
 })
 
+test('relay pool keys transport reuse by relay keepalive', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const pairings = []
+
+  function pair(keepAlive) {
+    const stream = clientNode.createRawStream({ framed: true })
+    const pairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+      isInitiator: true,
+      token: BlindRelay.token(),
+      stream,
+      keepAlive
+    })
+
+    pairings.push({ pairing, stream })
+    return pairing
+  }
+
+  const firstPairing = pair(1000)
+  const firstSocket = firstPairing.socket
+
+  const secondPairing = pair(30000)
+
+  t.not(secondPairing.socket, firstSocket, 'different keepalive values do not share transport')
+  t.is(firstSocket.keepAlive, 1000, 'existing transport keepalive is preserved')
+  t.is(secondPairing.socket.keepAlive, 30000, 'new transport uses its requested keepalive')
+  t.is(clientNode._relayPool._entries.size, 2, 'different keepalive values use separate entries')
+
+  const thirdPairing = pair(1000)
+
+  t.is(thirdPairing.socket, firstSocket, 'same keepalive value reuses transport')
+  t.is(clientNode._relayPool._entries.size, 2, 'same keepalive value reuses existing entry')
+
+  for (const { pairing, stream } of pairings) {
+    pairing.release()
+    stream.destroy()
+  }
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
 test('relay pool unrefs and clears delayed direct-upgrade unpairs', async function (t) {
   const { bootstrap } = await swarm(t)
 
