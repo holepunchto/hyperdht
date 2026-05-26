@@ -14,8 +14,7 @@ async function toArray(iterable) {
 }
 
 async function swarm(t, n = 32, bootstrap = []) {
-  const dbPath = await tmp(t)
-  return createTestnet(n, { bootstrap, teardown: t.teardown, dbPath })
+  return createTestnet(n, { bootstrap, teardown: t.teardown, t })
 }
 
 async function* spawnFixture(t, args) {

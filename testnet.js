@@ -9,7 +9,7 @@ module.exports = async function createTestnet(size = 10, opts = {}) {
   const port = opts.port || 0
   const bootstrap = opts.bootstrap ? [...opts.bootstrap] : []
   const bindHost = host === '127.0.0.1' ? '127.0.0.1' : '0.0.0.0'
-  const dbPath = opts.dbPath || null
+  const t = opts.t || null
 
   if (size === 0) return new Testnet(swarm)
 
@@ -19,7 +19,7 @@ module.exports = async function createTestnet(size = 10, opts = {}) {
     bootstrap,
     port,
     host: bindHost,
-    dbPath
+    dbPath: t ? await tmp(t) : null
   })
 
   await first.fullyBootstrapped()
@@ -34,7 +34,7 @@ module.exports = async function createTestnet(size = 10, opts = {}) {
       firewalled: false,
       bootstrap,
       host: bindHost,
-      dbPath
+      dbPath: t ? await tmp(t) : null
     })
 
     await node.fullyBootstrapped()
