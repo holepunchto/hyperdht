@@ -142,8 +142,8 @@ test('createServer + connect - force holepunch', async function (t) {
   const [boot] = await swarm(t)
 
   const bootstrap = [{ host: '127.0.0.1', port: boot.address().port }]
-  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = await createDHT(t, { bootstrap, quickFirewall: false, ephemeral: true })
+  const b = await createDHT(t, { bootstrap, quickFirewall: false, ephemeral: true })
 
   await a.fullyBootstrapped()
   await b.fullyBootstrapped()
@@ -185,8 +185,8 @@ test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
 
   const bootstrap = [{ host: '127.0.0.1', port: boot.address().port }]
-  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = await createDHT(t, { bootstrap, quickFirewall: false, ephemeral: true })
+  const b = await createDHT(t, { bootstrap, quickFirewall: false, ephemeral: true })
 
   await a.fullyBootstrapped()
   await b.fullyBootstrapped()
@@ -233,8 +233,8 @@ test('client choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
 
   const bootstrap = [{ host: '127.0.0.1', port: boot.address().port }]
-  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = await createDHT(t, { bootstrap, quickFirewall: false, ephemeral: true })
+  const b = await createDHT(t, { bootstrap, quickFirewall: false, ephemeral: true })
 
   await a.fullyBootstrapped()
   await b.fullyBootstrapped()
@@ -404,8 +404,8 @@ test('relayed connection', async function (t) {
 
   const nodes = await swarm(t)
 
-  const a = nodes.createNode()
-  const b = nodes.createNode()
+  const a = await nodes.createNode(t)
+  const b = await nodes.createNode(t)
 
   const server = a.createServer()
   await server.listen()
@@ -431,7 +431,7 @@ test('relayed connection on same node', async function (t) {
 
   const nodes = await swarm(t)
 
-  const a = nodes.createNode()
+  const a = await nodes.createNode(t)
 
   const server = a.createServer()
   await server.listen()
@@ -501,8 +501,8 @@ test('create many connections with reusable sockets', async function (t) {
   const [boot] = await swarm(t)
 
   const bootstrap = [{ host: '127.0.0.1', port: boot.address().port }]
-  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const a = await createDHT(t, { bootstrap, quickFirewall: false, ephemeral: true })
+  const b = await createDHT(t, { bootstrap, quickFirewall: false, ephemeral: true })
 
   await a.fullyBootstrapped()
   await b.fullyBootstrapped()
@@ -724,8 +724,8 @@ test('connectionKeepAlive can be turned off', async function (t) {
 
   const { bootstrap } = await swarm(t)
 
-  const a = createDHT({ bootstrap, connectionKeepAlive: false })
-  const b = createDHT({ bootstrap, connectionKeepAlive: false })
+  const a = await createDHT(t, { bootstrap, connectionKeepAlive: false })
+  const b = await createDHT(t, { bootstrap, connectionKeepAlive: false })
   t.teardown(async () => {
     await a.destroy()
     await b.destroy()
@@ -753,8 +753,8 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
 
   const { bootstrap } = await swarm(t)
 
-  const a = createDHT({ bootstrap, connectionKeepAlive: 10000 })
-  const b = createDHT({ bootstrap, connectionKeepAlive: 20000 })
+  const a = await createDHT(t, { bootstrap, connectionKeepAlive: 10000 })
+  const b = await createDHT(t, { bootstrap, connectionKeepAlive: 20000 })
 
   const server = a.createServer((socket) => {
     socket.on('end', () => socket.end())
@@ -780,7 +780,7 @@ test('connectionKeepAlive passed to server and connection', async function (t) {
 test('bootstrap with suggested-IP', async function (t) {
   const [boot] = await swarm(t, 1)
   const bootstrap = ['127.0.0.1@invalid:' + boot.address().port]
-  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: false })
+  const a = await createDHT(t, { bootstrap, quickFirewall: false, ephemeral: false })
   await a.fullyBootstrapped()
 
   t.alike(boot.toArray(), [{ host: '127.0.0.1', port: a.address().port }])
@@ -789,11 +789,11 @@ test('bootstrap with suggested-IP', async function (t) {
 })
 
 test('Populate DHT with options.nodes', async function (t) {
-  const a = createDHT({ bootstrap: [] })
+  const a = await createDHT(t, { bootstrap: [] })
   await a.fullyBootstrapped()
   const nodes = [{ host: '127.0.0.1', port: a.address().port }]
 
-  const b = createDHT({ nodes, bootstrap: [] })
+  const b = await createDHT(t, { nodes, bootstrap: [] })
   await b.fullyBootstrapped()
 
   t.alike(b.toArray(), [{ host: '127.0.0.1', port: a.address().port }])

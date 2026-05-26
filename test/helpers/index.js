@@ -3,6 +3,7 @@ const NewlineDecoder = require('newline-decoder')
 const { spawn } = require('child_process')
 const goodbye = require('graceful-goodbye')
 const DHT = require('../../')
+const tmp = require('test-tmp')
 
 module.exports = { swarm, toArray, spawnFixture, createDHT, endAndCloseSocket }
 
@@ -13,7 +14,8 @@ async function toArray(iterable) {
 }
 
 async function swarm(t, n = 32, bootstrap = []) {
-  return createTestnet(n, { bootstrap, teardown: t.teardown })
+  const dbPath = await tmp(t)
+  return createTestnet(n, { bootstrap, teardown: t.teardown, dbPath })
 }
 
 async function* spawnFixture(t, args) {
@@ -31,8 +33,9 @@ async function* spawnFixture(t, args) {
   unregisterExitHandlers()
 }
 
-function createDHT(opts) {
-  return new DHT({ ...opts, host: '127.0.0.1' })
+async function createDHT(t, opts) {
+  const dbPath = await tmp(t)
+  return new DHT({ ...opts, host: '127.0.0.1', dbPath })
 }
 
 async function endAndCloseSocket(socket) {

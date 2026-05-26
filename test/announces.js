@@ -3,6 +3,7 @@ const b4a = require('b4a')
 const cenc = require('compact-encoding')
 const messages = require('../lib/messages.js')
 const { swarm, toArray } = require('./helpers')
+const tmp = require('test-tmp')
 const DHT = require('../')
 const HyperDHT = require('../')
 const { COMMANDS } = require('../lib/constants.js')
@@ -226,7 +227,7 @@ test('announcer background does not over-trigger', async function (t) {
   const testnet = await swarm(t, 2) // must be <=3 (less than announcer MIN_ACTIVE) to trigger previous bug
   const bootstrap = testnet.bootstrap
 
-  const a = new HyperDHT({ bootstrap })
+  const a = new HyperDHT({ bootstrap, dbPath: await tmp(t) })
 
   const initTid = a.io._tid
   const server = a.createServer()
