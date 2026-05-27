@@ -1,7 +1,7 @@
 const tmp = require('test-tmp')
 const DHT = require('.')
 
-module.exports = async function createTestnet(size = 10, opts = {}) {
+module.exports = async function createTestnet(size = 10, opts = {}, dhtOpts = {}) {
   const swarm = []
   const teardown =
     typeof opts === 'function' ? opts : opts.teardown ? opts.teardown.bind(opts) : noop
@@ -14,6 +14,7 @@ module.exports = async function createTestnet(size = 10, opts = {}) {
   if (size === 0) return new Testnet(swarm)
 
   const first = new DHT({
+    ...dhtOpts,
     ephemeral: false,
     firewalled: false,
     bootstrap,
@@ -30,6 +31,7 @@ module.exports = async function createTestnet(size = 10, opts = {}) {
 
   while (swarm.length < size) {
     const node = new DHT({
+      ...dhtOpts,
       ephemeral: false,
       firewalled: false,
       bootstrap,

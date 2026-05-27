@@ -13,8 +13,8 @@ async function toArray(iterable) {
   return result
 }
 
-async function swarm(t, n = 32, bootstrap = []) {
-  return createTestnet(n, { bootstrap, teardown: t.teardown, t })
+async function swarm(t, n = 32, bootstrap = [], opts = {}) {
+  return createTestnet(n, { bootstrap, teardown: t.teardown, t }, opts)
 }
 
 async function* spawnFixture(t, args) {
