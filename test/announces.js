@@ -197,7 +197,7 @@ test('server announces relay addrs', async function (t) {
 test('announcer prefers lower rtt among close-enough replies', async function (t) {
   const keyPair = DHT.keyPair()
   const target = DHT.hash(Buffer.from('rtt-ranked-announces'))
-  const rtts = [80, 70, 60, 50, 40, 30, 20, 10, 1, 2]
+  const rtts = [80, 70, 20, 20, 40, 20, 60, 10, 1, 2]
   const replies = rtts.map((rtt, i) => {
     return {
       token: b4a.alloc(32, i),
@@ -237,9 +237,9 @@ test('announcer prefers lower rtt among close-enough replies', async function (t
   await announcer._update()
 
   t.alike(
-    announced.sort((a, b) => a - b),
-    [10005, 10006, 10007],
-    'announced to lowest-rtt replies inside the candidate window'
+    announced,
+    [10007, 10002, 10003],
+    'announced to lowest-rtt replies and kept reply order for equal rtt'
   )
   t.absent(announced.includes(10008), 'ignored lower-rtt reply outside the candidate window')
 })
