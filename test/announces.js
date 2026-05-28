@@ -5,6 +5,7 @@ const messages = require('../lib/messages.js')
 const { swarm, toArray } = require('./helpers')
 const DHT = require('../')
 const HyperDHT = require('../')
+const Announcer = require('../lib/announcer')
 const { COMMANDS } = require('../lib/constants.js')
 
 test('server listen and findPeer', async function (t) {
@@ -191,6 +192,56 @@ test('server announces relay addrs', async function (t) {
 
     t.ok(found, 'found addr')
   }
+})
+
+test('announcer prefers lower rtt among close-enough replies', async function (t) {
+  const keyPair = DHT.keyPair()
+  const target = DHT.hash(Buffer.from('rtt-ranked-announces'))
+  const rtts = [80, 70, 60, 50, 40, 30, 20, 10, 1, 2]
+  const replies = rtts.map((rtt, i) => {
+    return {
+      token: b4a.alloc(32, i),
+      rtt,
+      from: {
+        id: b4a.alloc(32, i + 1),
+        host: '127.0.0.1',
+        port: 10000 + i
+      },
+      to: {
+        host: '127.0.0.1',
+        port: 20000 + i
+      }
+    }
+  })
+  const announced = []
+  const dht = {
+    firewalled: true,
+    destroyed: false,
+    findPeer() {
+      return {
+        closestReplies: replies,
+        closestNodes: replies.map((reply) => reply.from),
+        finished: () => Promise.resolve()
+      }
+    },
+    request(req, to) {
+      t.is(req.command, COMMANDS.ANNOUNCE)
+      announced.push(to.port)
+      return Promise.resolve({ error: 0 })
+    }
+  }
+  const announcer = new Announcer(dht, keyPair, target, {
+    signAnnounce: () => b4a.alloc(64)
+  })
+
+  await announcer._update()
+
+  t.alike(
+    announced.sort((a, b) => a - b),
+    [10005, 10006, 10007],
+    'announced to lowest-rtt replies inside the candidate window'
+  )
+  t.absent(announced.includes(10008), 'ignored lower-rtt reply outside the candidate window')
 })
 
 test('connect when we relay ourself', async function (t) {
