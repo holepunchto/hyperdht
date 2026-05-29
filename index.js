@@ -8,7 +8,7 @@ const SocketPool = require('./lib/socket-pool')
 const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Cache = require('xache')
-const NSRocks = require('ns-rocks')
+const NamespacedDB = require('namespaced-native')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
 const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS, DB_PATH } = require('./lib/constants')
@@ -48,7 +48,7 @@ class HyperDHT extends DHT {
     }
     this.rawStreams = new RawStreamSet(this)
     this.plugins = new Map()
-    this.db = new NSRocks(opts.dbPath || DB_PATH)
+    this.db = new NamespacedDB(opts.dbPath || DB_PATH)
 
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
