@@ -184,6 +184,9 @@ test('createServer + connect - force holepunch', async function (t) {
 test('createServer + connect - failed LAN ping falls back to holepunch', async function (t) {
   const [boot] = await swarm(t)
 
+  // Use loopback to deterministically enter the same-LAN shortcut in CI.
+  // This does not model NAT; the injected ping failure below verifies that
+  // a blocked LAN shortcut still falls through to normal holepunch.
   const bootstrap = [{ host: '127.0.0.1', port: boot.address().port }]
   const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
