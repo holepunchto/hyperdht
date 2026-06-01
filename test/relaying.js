@@ -214,9 +214,9 @@ async function waitFor(fn, timeout = 2000) {
   }
 }
 
-function getOnlyRelayPoolEntry(node) {
+function getOnlyRelayPoolConnection(node) {
   const entries = [...node._relayPool._entries.values()]
-  if (entries.length !== 1) throw new Error('Expected exactly one relay pool entry')
+  if (entries.length !== 1) throw new Error('Expected exactly one relay pool connection')
   return entries[0]
 }
 
@@ -826,8 +826,8 @@ test('relay pool closes app streams when shared transports close', async functio
     ...serverSockets.map((socket) => once(socket, 'close'))
   ]
 
-  getOnlyRelayPoolEntry(clientNode).socket.destroy()
-  getOnlyRelayPoolEntry(serverNode).socket.destroy()
+  getOnlyRelayPoolConnection(clientNode).socket.destroy()
+  getOnlyRelayPoolConnection(serverNode).socket.destroy()
 
   await Promise.all(closed)
   t.pass('active app streams close when shared relay transports close')
@@ -1116,7 +1116,11 @@ test('relay pool keeps transport open for pairings started during delayed unpair
 
   await waitFor(() => relay._pairing.size === 1)
   t.is(clientNode._relayPool._entries.size, 1, 'pool entry stays open for the new pairing')
-  t.is(getOnlyRelayPoolEntry(clientNode).socket, relaySocket, 'same relay transport remains pooled')
+  t.is(
+    getOnlyRelayPoolConnection(clientNode).socket,
+    relaySocket,
+    'same relay transport remains pooled'
+  )
   t.absent(relaySocket.destroying, 'relay transport is not closing')
 
   secondPairing.release()
