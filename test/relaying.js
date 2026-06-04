@@ -1282,18 +1282,15 @@ test('direct upgrade keeps other pooled relay pairings alive', async function (t
 
   await relayTransportServer.listen()
 
-  let resolveUpgradeServerSocket = null
-  const upgradeServerSocketOpened = new Promise((resolve) => {
-    resolveUpgradeServerSocket = resolve
-  })
+  let upgradeServerSocket = null
   const upgradeServer = serverNode.createServer(
     {
       relayThrough: relayTransportServer.publicKey,
       shareLocalAddress: false
     },
     function (socket) {
+      upgradeServerSocket = socket
       socket.on('error', (err) => t.comment(err.message))
-      resolveUpgradeServerSocket(socket)
       socket.on('data', (data) => socket.write(data))
       socket.on('end', () => socket.end())
     }
@@ -1301,18 +1298,15 @@ test('direct upgrade keeps other pooled relay pairings alive', async function (t
 
   await upgradeServer.listen(DHT.keyPair())
 
-  let resolveRelayOnlyServerSocket = null
-  const relayOnlyServerSocketOpened = new Promise((resolve) => {
-    resolveRelayOnlyServerSocket = resolve
-  })
+  let relayOnlyServerSocket = null
   const relayOnlyServer = serverNode.createServer(
     {
       relayThrough: relayTransportServer.publicKey,
       shareLocalAddress: false
     },
     function (socket) {
+      relayOnlyServerSocket = socket
       socket.on('error', (err) => t.comment(err.message))
-      resolveRelayOnlyServerSocket(socket)
       socket.on('data', (data) => socket.write(data))
       socket.on('end', () => socket.end())
     }
@@ -1332,12 +1326,7 @@ test('direct upgrade keeps other pooled relay pairings alive', async function (t
   upgradeClientSocket.on('error', (err) => t.comment(err.message))
   relayOnlyClientSocket.on('error', (err) => t.comment(err.message))
 
-  const [upgradeServerSocket, relayOnlyServerSocket] = await Promise.all([
-    upgradeServerSocketOpened,
-    relayOnlyServerSocketOpened,
-    once(upgradeClientSocket, 'open'),
-    once(relayOnlyClientSocket, 'open')
-  ])
+  await Promise.all([once(upgradeClientSocket, 'open'), once(relayOnlyClientSocket, 'open')])
   await Promise.all([relaySocketsOpened, relayStreamsPaired])
 
   t.is(relaySockets.length, 2, 'both app connections share the relay transport sockets')
