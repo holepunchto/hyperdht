@@ -1061,6 +1061,7 @@ test('relay pool keeps transport open for pairings started during delayed unpair
   t.is(secondPairing.socket, relaySocket, 'new pairing reuses the pending relay transport')
 
   await waitFor(() => relay._pairing.size === 2)
+  // The delayed unpair should remove only the first pairing.
   await waitFor(() => relay._pairing.size === 1)
   t.is(clientNode._relayPool._connections.size, 1, 'pool connection stays open for the new pairing')
   t.is(
