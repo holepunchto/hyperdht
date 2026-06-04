@@ -1058,7 +1058,6 @@ test('relay pool keeps transport open for pairings started during delayed unpair
   secondPairing.release()
   secondStream.destroy()
 
-  await clientNode._relayPool.destroy()
   await waitFor(() => clientNode._relayPool._connections.size === 0)
 
   await clientNode.destroy()
