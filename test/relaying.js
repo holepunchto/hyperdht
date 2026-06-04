@@ -605,11 +605,9 @@ test('relay connections through same node reuse transport sockets', async functi
     resolveRelaySockets = resolve
   })
 
-  const serverSockets = []
-  let resolveServerSockets = null
-  const serverSocketsOpened = new Promise((resolve) => {
-    resolveServerSockets = resolve
-  })
+  let firstServerSocket = null
+  let secondServerSocket = null
+  let reconnectedServerSocket = null
 
   const relay = new RelayServer({
     createStream(opts) {
@@ -660,8 +658,9 @@ test('relay connections through same node reuse transport sockets', async functi
       relayThrough: relayTransportServer.publicKey
     },
     function (socket) {
-      serverSockets.push(socket)
-      if (serverSockets.length === 2) resolveServerSockets()
+      if (firstServerSocket === null) firstServerSocket = socket
+      else if (secondServerSocket === null) secondServerSocket = socket
+      else reconnectedServerSocket = socket
 
       socket.on('data', (data) => socket.write(data))
       socket.on('end', () => socket.end())
@@ -670,77 +669,71 @@ test('relay connections through same node reuse transport sockets', async functi
 
   await appServer.listen()
 
-  const clientSockets = [
-    clientNode.connect(appServer.publicKey, {
-      localConnection: false,
-      relayThrough: relayTransportServer.publicKey
-    }),
-    clientNode.connect(appServer.publicKey, {
-      localConnection: false,
-      relayThrough: relayTransportServer.publicKey
-    })
-  ]
+  const firstClientSocket = clientNode.connect(appServer.publicKey, {
+    localConnection: false,
+    relayThrough: relayTransportServer.publicKey
+  })
+  await once(firstClientSocket, 'open')
 
-  await Promise.all([
-    relaySocketsOpened,
-    relayStreamsPaired,
-    serverSocketsOpened,
-    ...clientSockets.map((socket) => once(socket, 'open'))
-  ])
+  const secondClientSocket = clientNode.connect(appServer.publicKey, {
+    localConnection: false,
+    relayThrough: relayTransportServer.publicKey
+  })
+  await once(secondClientSocket, 'open')
+
+  await Promise.all([relaySocketsOpened, relayStreamsPaired])
 
   t.is(relaySockets.length, 2, 'both peers reuse one transport socket to the relay')
 
-  const replies = clientSockets.map((socket) => once(socket, 'data'))
-  clientSockets[0].write(Buffer.from('hello 1'))
-  clientSockets[1].write(Buffer.from('hello 2'))
+  const firstReply = once(firstClientSocket, 'data')
+  const secondReply = once(secondClientSocket, 'data')
+  firstClientSocket.write(Buffer.from('hello 1'))
+  secondClientSocket.write(Buffer.from('hello 2'))
 
-  t.alike((await replies[0])[0], Buffer.from('hello 1'), 'first relayed connection carries data')
-  t.alike((await replies[1])[0], Buffer.from('hello 2'), 'second relayed connection carries data')
+  t.alike(await firstReply, [Buffer.from('hello 1')], 'first relayed connection carries data')
+  t.alike(await secondReply, [Buffer.from('hello 2')], 'second relayed connection carries data')
 
-  const firstServerClosed = Promise.race(serverSockets.map((socket) => once(socket, 'close')))
-  await endAndCloseSocket(clientSockets[0])
+  const firstServerClosed = once(firstServerSocket, 'close')
+  await endAndCloseSocket(firstClientSocket)
   await firstServerClosed
   await firstPairingReleased
   t.is(closedRelayStreams, 2, 'closing one app connection releases only its relay pairing')
 
-  const secondReply = once(clientSockets[1], 'data')
-  clientSockets[1].write(Buffer.from('still relayed'))
+  const afterFirstClosedReply = once(secondClientSocket, 'data')
+  secondClientSocket.write(Buffer.from('still relayed'))
   t.alike(
-    (await secondReply)[0],
-    Buffer.from('still relayed'),
+    await afterFirstClosedReply,
+    [Buffer.from('still relayed')],
     'second relayed connection stays usable after first closes'
   )
 
-  await endAndCloseSocket(clientSockets[1])
+  await endAndCloseSocket(secondClientSocket)
 
-  for (const socket of serverSockets) {
-    if (!socket.destroyed) await once(socket, 'close')
-  }
+  if (!secondServerSocket.destroyed) await once(secondServerSocket, 'close')
 
   await waitFor(() => closedRelaySockets === 2)
   t.is(closedRelaySockets, 2, 'shared relay transports close after all pairings close')
 
-  const reconnectedServerSocket = waitFor(() => serverSockets.length === 3)
+  const reconnectedServerSocketOpened = waitFor(() => reconnectedServerSocket !== null)
   const reconnectedClientSocket = clientNode.connect(appServer.publicKey, {
     localConnection: false,
     relayThrough: relayTransportServer.publicKey
   })
 
-  await Promise.all([once(reconnectedClientSocket, 'open'), reconnectedServerSocket])
+  await Promise.all([once(reconnectedClientSocket, 'open'), reconnectedServerSocketOpened])
   await waitFor(() => relaySockets.length === 4)
   t.is(relaySockets.length, 4, 'reconnect creates fresh relay transport sockets')
 
   const reconnectedReply = once(reconnectedClientSocket, 'data')
   reconnectedClientSocket.write(Buffer.from('reconnected'))
   t.alike(
-    (await reconnectedReply)[0],
-    Buffer.from('reconnected'),
+    await reconnectedReply,
+    [Buffer.from('reconnected')],
     'reconnected relay path carries data'
   )
 
   await endAndCloseSocket(reconnectedClientSocket)
-  const lastServerSocket = serverSockets[serverSockets.length - 1]
-  if (!lastServerSocket.destroyed) await once(lastServerSocket, 'close')
+  if (!reconnectedServerSocket.destroyed) await once(reconnectedServerSocket, 'close')
 
   await clientNode.destroy()
   await serverNode.destroy()
