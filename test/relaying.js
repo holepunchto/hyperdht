@@ -932,7 +932,11 @@ test('relay pool reuses transport and takes lowest relay keepalive', async funct
 
   t.is(thirdPairing.socket, firstSocket, 'higher keepalive value reuses transport')
   t.is(firstSocket.keepAlive, 1000, 'shared transport keeps lower keepalive')
-  t.is(clientNode._relayPool._connections.size, 1, 'higher keepalive value reuses existing connection')
+  t.is(
+    clientNode._relayPool._connections.size,
+    1,
+    'higher keepalive value reuses existing connection'
+  )
 
   for (const { pairing, stream } of pairings) {
     pairing.release()
