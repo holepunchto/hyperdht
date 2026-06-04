@@ -965,7 +965,7 @@ test('relay pool does not reuse closing transport sockets', async function (t) {
   await relayNode.destroy()
 })
 
-test('relay pool keys transport reuse by relay keepalive', async function (t) {
+test('relay pool reuses transport and takes lowest relay keepalive', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const relayNode = createDHT({ bootstrap })
@@ -1001,20 +1001,20 @@ test('relay pool keys transport reuse by relay keepalive', async function (t) {
     return pairing
   }
 
-  const firstPairing = pair(1000)
+  const firstPairing = pair(30000)
   const firstSocket = firstPairing.socket
 
-  const secondPairing = pair(30000)
+  const secondPairing = pair(1000)
 
-  t.not(secondPairing.socket, firstSocket, 'different keepalive values do not share transport')
-  t.is(firstSocket.keepAlive, 1000, 'existing transport keepalive is preserved')
-  t.is(secondPairing.socket.keepAlive, 30000, 'new transport uses its requested keepalive')
-  t.is(clientNode._relayPool._entries.size, 2, 'different keepalive values use separate entries')
+  t.is(secondPairing.socket, firstSocket, 'different keepalive values reuse transport')
+  t.is(firstSocket.keepAlive, 1000, 'shared transport takes lower keepalive')
+  t.is(clientNode._relayPool._entries.size, 1, 'different keepalive values use one entry')
 
-  const thirdPairing = pair(1000)
+  const thirdPairing = pair(30000)
 
-  t.is(thirdPairing.socket, firstSocket, 'same keepalive value reuses transport')
-  t.is(clientNode._relayPool._entries.size, 2, 'same keepalive value reuses existing entry')
+  t.is(thirdPairing.socket, firstSocket, 'higher keepalive value reuses transport')
+  t.is(firstSocket.keepAlive, 1000, 'shared transport keeps lower keepalive')
+  t.is(clientNode._relayPool._entries.size, 1, 'higher keepalive value reuses existing entry')
 
   for (const { pairing, stream } of pairings) {
     pairing.release()
