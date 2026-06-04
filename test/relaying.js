@@ -216,9 +216,9 @@ async function waitFor(fn, timeout = 2000) {
 }
 
 function getOnlyRelayPoolConnection(node) {
-  const entries = [...node._relayPool._entries.values()]
-  if (entries.length !== 1) throw new Error('Expected exactly one relay pool connection')
-  return entries[0]
+  const connections = [...node._relayPool._connections.values()]
+  if (connections.length !== 1) throw new Error('Expected exactly one relay pool connection')
+  return connections[0]
 }
 
 function captureDelayedRelayUnpairTimer(t) {
@@ -831,8 +831,8 @@ test('relay pool closes app streams when shared transports close', async functio
     ...clientSockets.map((socket) => once(socket, 'open'))
   ])
 
-  t.is(clientNode._relayPool._entries.size, 1, 'client has one shared relay pool entry')
-  t.is(serverNode._relayPool._entries.size, 1, 'server has one shared relay pool entry')
+  t.is(clientNode._relayPool._connections.size, 1, 'client has one shared relay pool connection')
+  t.is(serverNode._relayPool._connections.size, 1, 'server has one shared relay pool connection')
 
   const closed = [
     ...clientSockets.map((socket) => once(socket, 'close')),
@@ -844,8 +844,8 @@ test('relay pool closes app streams when shared transports close', async functio
 
   await Promise.all(closed)
   t.pass('active app streams close when shared relay transports close')
-  t.is(clientNode._relayPool._entries.size, 0, 'client relay pool entry is removed')
-  t.is(serverNode._relayPool._entries.size, 0, 'server relay pool entry is removed')
+  t.is(clientNode._relayPool._connections.size, 0, 'client relay pool connection is removed')
+  t.is(serverNode._relayPool._connections.size, 0, 'server relay pool connection is removed')
 
   const reconnectedServerSocket = waitFor(() => serverSockets.length === 3)
   const reconnectedClientSocket = clientNode.connect(appServer.publicKey, {
@@ -906,9 +906,9 @@ test('relay pool unpairs if pairing aborts before remote pairs', async function 
   rawStream.destroy()
 
   await waitFor(() => relay._pairing.size === 0)
-  await waitFor(() => clientNode._relayPool._entries.size === 0)
+  await waitFor(() => clientNode._relayPool._connections.size === 0)
   t.is(relay._pairing.size, 0, 'pending half-pairing is unpaired')
-  t.is(clientNode._relayPool._entries.size, 0, 'relay pool closes after aborted pairing')
+  t.is(clientNode._relayPool._connections.size, 0, 'relay pool closes after aborted pairing')
 
   await clientNode.destroy()
   await relayNode.destroy()
@@ -944,7 +944,7 @@ test('relay pool does not reuse closing transport sockets', async function (t) {
   })
   const closingSocket = firstPairing.socket
 
-  // Simulate the close-event race where the pool entry still exists but its transport is closing.
+  // Simulate the close-event race where the pool connection still exists but its transport is closing.
   closingSocket.destroy()
 
   const secondStream = clientNode.createRawStream({ framed: true })
@@ -1008,13 +1008,13 @@ test('relay pool reuses transport and takes lowest relay keepalive', async funct
 
   t.is(secondPairing.socket, firstSocket, 'different keepalive values reuse transport')
   t.is(firstSocket.keepAlive, 1000, 'shared transport takes lower keepalive')
-  t.is(clientNode._relayPool._entries.size, 1, 'different keepalive values use one entry')
+  t.is(clientNode._relayPool._connections.size, 1, 'different keepalive values use one connection')
 
   const thirdPairing = pair(30000)
 
   t.is(thirdPairing.socket, firstSocket, 'higher keepalive value reuses transport')
   t.is(firstSocket.keepAlive, 1000, 'shared transport keeps lower keepalive')
-  t.is(clientNode._relayPool._entries.size, 1, 'higher keepalive value reuses existing entry')
+  t.is(clientNode._relayPool._connections.size, 1, 'higher keepalive value reuses existing connection')
 
   for (const { pairing, stream } of pairings) {
     pairing.release()
@@ -1128,7 +1128,7 @@ test('relay pool keeps transport open for pairings started during delayed unpair
   delayedUnpair.fire()
 
   await waitFor(() => relay._pairing.size === 1)
-  t.is(clientNode._relayPool._entries.size, 1, 'pool entry stays open for the new pairing')
+  t.is(clientNode._relayPool._connections.size, 1, 'pool connection stays open for the new pairing')
   t.is(
     getOnlyRelayPoolConnection(clientNode).socket,
     relaySocket,
@@ -1140,7 +1140,7 @@ test('relay pool keeps transport open for pairings started during delayed unpair
   secondStream.destroy()
 
   await waitFor(() => relay._pairing.size === 0)
-  await waitFor(() => clientNode._relayPool._entries.size === 0)
+  await waitFor(() => clientNode._relayPool._connections.size === 0)
 
   await clientNode.destroy()
   await relayNode.destroy()
@@ -1403,8 +1403,8 @@ test('direct upgrade keeps other pooled relay pairings alive', async function (t
   await Promise.all([relaySocketsOpened, relayStreamsPaired])
 
   t.is(relaySockets.length, 2, 'both app connections share the relay transport sockets')
-  t.is(clientNode._relayPool._entries.size, 1, 'client has one shared relay pool entry')
-  t.is(serverNode._relayPool._entries.size, 1, 'server has one shared relay pool entry')
+  t.is(clientNode._relayPool._connections.size, 1, 'client has one shared relay pool connection')
+  t.is(serverNode._relayPool._connections.size, 1, 'server has one shared relay pool connection')
 
   const beforeUpgrade = once(relayOnlyClientSocket, 'data')
   relayOnlyClientSocket.write(Buffer.from('before direct upgrade'))
