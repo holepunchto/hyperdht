@@ -181,6 +181,76 @@ test('createServer + connect - force holepunch', async function (t) {
   await b.destroy()
 })
 
+test('createServer + connect - failed LAN ping falls back to holepunch', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  // The test nodes bind to loopback, which deterministically enters the
+  // same-LAN shortcut. This does not model NAT; the injected ping failure
+  // below verifies that a blocked LAN shortcut still falls through to normal
+  // holepunch.
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  await a.fullyBootstrapped()
+  await b.fullyBootstrapped()
+
+  const lc = t.test('socket lifecycle')
+  lc.plan(5)
+
+  const server = a.createServer(function (socket) {
+    lc.pass('server side opened')
+
+    socket.once('data', function (data) {
+      lc.alike(data, Buffer.from('hello'))
+      socket.end('world')
+    })
+  })
+
+  await server.listen()
+
+  const serverPort = a.io.serverSocket.address().port
+  const ping = b.ping.bind(b)
+  let blockedLanPing = false
+
+  b.ping = function (addr, opts) {
+    if (addr.host === '127.0.0.1' && addr.port === serverPort) {
+      blockedLanPing = true
+      return Promise.reject(new Error('LAN ping blocked'))
+    }
+    return ping(addr, opts)
+  }
+
+  const socket = b.connect(server.publicKey, {
+    fastOpen: false,
+    holepunch() {
+      lc.pass('client used normal holepunch')
+      return true
+    }
+  })
+
+  socket.once('open', function () {
+    lc.pass('client side opened')
+    socket.write('hello')
+  })
+
+  socket.once('data', function (data) {
+    lc.alike(data, Buffer.from('world'))
+    socket.end()
+  })
+
+  socket.once('error', function (err) {
+    lc.fail('client should not error: ' + err.code)
+  })
+
+  await lc
+
+  t.ok(blockedLanPing, 'exercised the LAN ping failure path')
+
+  await server.close()
+  await a.destroy()
+  await b.destroy()
+})
+
 test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
 
