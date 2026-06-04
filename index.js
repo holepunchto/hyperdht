@@ -10,7 +10,7 @@ const Router = require('./lib/router')
 const Cache = require('xache')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, BOOTSTRAP_NODES, KNOWN_NODES, COMMANDS } = require('./lib/constants')
+const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
@@ -26,7 +26,7 @@ class HyperDHT extends DHT {
   constructor(opts = {}) {
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
-    const nodes = opts.nodes || KNOWN_NODES
+    const nodes = opts.nodes || []
 
     super({ ...opts, port, bootstrap, nodes, filterNode })
 
