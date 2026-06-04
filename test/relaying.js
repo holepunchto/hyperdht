@@ -1024,8 +1024,8 @@ test('relay pool keeps transport open for pairings started during delayed unpair
   const relaySocket = firstPairing.socket
   const relayConnection = firstPairing.connection
 
-  // Simulate direct upgrade for the first pairing, leaving its unpair delayed.
-  firstPairing.closePairing()
+  // Simulate direct upgrade for the first pairing with a shorter delayed unpair.
+  firstPairing._release(true, 1000)
   firstStream.destroy()
 
   t.is(relayConnection.pendingReleaseTimers.size, 1, 'first pairing schedules delayed unpair')
@@ -1041,6 +1041,7 @@ test('relay pool keeps transport open for pairings started during delayed unpair
   t.is(secondPairing.socket, relaySocket, 'new pairing reuses the pending relay transport')
 
   await waitFor(() => relay._pairing.size === 2)
+  await waitFor(() => relay._pairing.size === 1)
   t.is(clientNode._relayPool._connections.size, 1, 'pool connection stays open for the new pairing')
   t.is(
     getOnlyRelayPoolConnection(clientNode).socket,
