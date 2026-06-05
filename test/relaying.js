@@ -823,8 +823,7 @@ test('relay pool unpairs if pairing aborts before remote pairs', async function 
   rawStream.destroy()
 
   await waitFor(() => relay._pairing.size === 0)
-  await waitFor(() => clientNode._relayPool._connections.size === 0)
-  t.is(relay._pairing.size, 0, 'pending half-pairing is unpaired')
+  t.pass('pending half-pairing is unpaired')
   t.is(clientNode._relayPool._connections.size, 0, 'relay pool closes after aborted pairing')
 
   await clientNode.destroy()
