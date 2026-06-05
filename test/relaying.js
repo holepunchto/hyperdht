@@ -538,12 +538,8 @@ test('relay connections through same node reuse transport sockets', async functi
 
   const relaySockets = []
   let closedRelaySockets = 0
-  let resolveRelaySockets = null
-  const relaySocketsOpened = new Promise((resolve) => {
-    resolveRelaySockets = resolve
-  })
 
-  let firstServerSocket = null
+  let serverSocketCount = 0
   let secondServerSocket = null
   let reconnectedServerSocket = null
 
@@ -555,12 +551,7 @@ test('relay connections through same node reuse transport sockets', async functi
 
   t.teardown(() => relay.close())
 
-  const relayStreams = []
   let closedRelayStreams = 0
-  let resolveRelayStreamsPaired = null
-  const relayStreamsPaired = new Promise((resolve) => {
-    resolveRelayStreamsPaired = resolve
-  })
   let resolveFirstPairingReleased = null
   const firstPairingReleased = new Promise((resolve) => {
     resolveFirstPairingReleased = resolve
@@ -571,14 +562,9 @@ test('relay connections through same node reuse transport sockets', async functi
     socket.once('close', function () {
       closedRelaySockets++
     })
-    // Wait until both peers have opened their shared relay transport sockets.
-    if (relaySockets.length === 2) resolveRelaySockets()
 
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session.on('pair', function (_, __, stream) {
-      relayStreams.push(stream)
-      if (relayStreams.length === 4) resolveRelayStreamsPaired()
-
       stream.once('close', function () {
         closedRelayStreams++
         if (closedRelayStreams === 2) resolveFirstPairingReleased()
@@ -596,9 +582,9 @@ test('relay connections through same node reuse transport sockets', async functi
       relayThrough: relayTransportServer.publicKey
     },
     function (socket) {
-      if (firstServerSocket === null) firstServerSocket = socket
-      else if (secondServerSocket === null) secondServerSocket = socket
-      else reconnectedServerSocket = socket
+      serverSocketCount++
+      if (serverSocketCount === 2) secondServerSocket = socket
+      else if (serverSocketCount === 3) reconnectedServerSocket = socket
 
       socket.on('data', (data) => socket.write(data))
       socket.on('end', () => socket.end())
@@ -618,8 +604,6 @@ test('relay connections through same node reuse transport sockets', async functi
     relayThrough: relayTransportServer.publicKey
   })
   await once(secondClientSocket, 'open')
-
-  await Promise.all([relaySocketsOpened, relayStreamsPaired])
 
   t.is(relaySockets.length, 2, 'both peers reuse one transport socket to the relay')
 
