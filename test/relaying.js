@@ -702,16 +702,7 @@ test('relay pool closes app streams when shared transports close', async functio
   const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const relaySockets = []
-  let resolveRelaySockets = null
-  const relaySocketsOpened = new Promise((resolve) => {
-    resolveRelaySockets = resolve
-  })
-
   const serverSockets = []
-  let resolveServerSockets = null
-  const serverSocketsOpened = new Promise((resolve) => {
-    resolveServerSockets = resolve
-  })
 
   const relay = new RelayServer({
     createStream(opts) {
@@ -723,7 +714,6 @@ test('relay pool closes app streams when shared transports close', async functio
 
   const relayTransportServer = relayNode.createServer(function (socket) {
     relaySockets.push(socket)
-    if (relaySockets.length === 2) resolveRelaySockets()
 
     const session = relay.accept(socket, { id: socket.remotePublicKey })
     session.on('error', () => {})
@@ -739,7 +729,6 @@ test('relay pool closes app streams when shared transports close', async functio
     },
     function (socket) {
       serverSockets.push(socket)
-      if (serverSockets.length === 2) resolveServerSockets()
 
       socket.on('data', (data) => socket.write(data))
       socket.on('end', () => socket.end())
@@ -759,11 +748,7 @@ test('relay pool closes app streams when shared transports close', async functio
     })
   ]
 
-  await Promise.all([
-    relaySocketsOpened,
-    serverSocketsOpened,
-    ...clientSockets.map((socket) => once(socket, 'open'))
-  ])
+  await Promise.all(clientSockets.map((socket) => once(socket, 'open')))
 
   t.is(clientNode._relayPool._connections.size, 1, 'client has one shared relay pool connection')
   t.is(serverNode._relayPool._connections.size, 1, 'server has one shared relay pool connection')
