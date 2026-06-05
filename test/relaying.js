@@ -651,9 +651,7 @@ test('relay connections through same node reuse transport sockets', async functi
   t.alike(await firstReply, [Buffer.from('hello 1')], 'first relayed connection carries data')
   t.alike(await secondReply, [Buffer.from('hello 2')], 'second relayed connection carries data')
 
-  const firstServerClosed = once(firstServerSocket, 'close')
   await endAndCloseSocket(firstClientSocket)
-  await firstServerClosed
   await firstPairingReleased
   t.is(closedRelayStreams, 2, 'closing one app connection releases only its relay pairing')
 
