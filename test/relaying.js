@@ -670,14 +670,12 @@ test('relay connections through same node reuse transport sockets', async functi
   await waitFor(() => closedRelaySockets === 2)
   t.is(closedRelaySockets, 2, 'shared relay transports close after all pairings close')
 
-  const reconnectedServerSocketOpened = waitFor(() => reconnectedServerSocket !== null)
   const reconnectedClientSocket = clientNode.connect(appServer.publicKey, {
     localConnection: false,
     relayThrough: relayTransportServer.publicKey
   })
 
-  await Promise.all([once(reconnectedClientSocket, 'open'), reconnectedServerSocketOpened])
-  await waitFor(() => relaySockets.length === 4)
+  await once(reconnectedClientSocket, 'open')
   t.is(relaySockets.length, 4, 'reconnect creates fresh relay transport sockets')
 
   const reconnectedReply = once(reconnectedClientSocket, 'data')
@@ -783,14 +781,12 @@ test('relay pool closes app streams when shared transports close', async functio
   t.is(clientNode._relayPool._connections.size, 0, 'client relay pool connection is removed')
   t.is(serverNode._relayPool._connections.size, 0, 'server relay pool connection is removed')
 
-  const reconnectedServerSocket = waitFor(() => serverSockets.length === 3)
   const reconnectedClientSocket = clientNode.connect(appServer.publicKey, {
     localConnection: false,
     relayThrough: relayTransportServer.publicKey
   })
 
-  await Promise.all([once(reconnectedClientSocket, 'open'), reconnectedServerSocket])
-  await waitFor(() => relaySockets.length === 4)
+  await once(reconnectedClientSocket, 'open')
   t.is(relaySockets.length, 4, 'later reconnect creates fresh relay transports')
 
   const reply = once(reconnectedClientSocket, 'data')
