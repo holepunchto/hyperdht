@@ -902,8 +902,6 @@ test('relay pool reuses transport and takes lowest relay keepalive', async funct
 
   await relayTransportServer.listen()
 
-  const pairings = []
-
   function pair(keepAlive) {
     const stream = clientNode.createRawStream({ framed: true })
     const pairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
@@ -913,7 +911,6 @@ test('relay pool reuses transport and takes lowest relay keepalive', async funct
       keepAlive
     })
 
-    pairings.push({ pairing, stream })
     return pairing
   }
 
@@ -935,11 +932,6 @@ test('relay pool reuses transport and takes lowest relay keepalive', async funct
     1,
     'higher keepalive value reuses existing connection'
   )
-
-  for (const { pairing, stream } of pairings) {
-    pairing.release()
-    stream.destroy()
-  }
 
   await clientNode.destroy()
   await relayNode.destroy()
