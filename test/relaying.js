@@ -202,24 +202,6 @@ test('relay connections through node, server side, client abort notifies remote'
   await c.destroy()
 })
 
-async function waitFor(fn, timeout = 2000) {
-  const started = Date.now()
-
-  while (!fn()) {
-    if (Date.now() - started > timeout) {
-      throw new Error('Timed out waiting for test condition')
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 20))
-  }
-}
-
-function getOnlyRelayPoolConnection(node) {
-  const connections = [...node._relayPool._connections.values()]
-  if (connections.length !== 1) throw new Error('Expected exactly one relay pool connection')
-  return connections[0]
-}
-
 test('relay connections through node, client side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -1358,26 +1340,6 @@ test.skip('relay several connections through node with pool', async function (t)
   await c.destroy()
 })
 
-function pausePunching(t, pausedNodes) {
-  const punch = Holepuncher.prototype._punch
-  let resume = null
-  const punchingResumed = new Promise((resolve) => {
-    resume = resolve
-  })
-
-  Holepuncher.prototype._punch = async function () {
-    if (pausedNodes.includes(this.dht)) await punchingResumed
-    return punch.call(this)
-  }
-
-  t.teardown(() => {
-    resume()
-    Holepuncher.prototype._punch = punch
-  })
-
-  return resume
-}
-
 test.skip('server does not support connection relaying', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -1415,3 +1377,41 @@ test.skip('server does not support connection relaying', async function (t) {
   await b.destroy()
   await c.destroy()
 })
+
+async function waitFor(fn, timeout = 2000) {
+  const started = Date.now()
+
+  while (!fn()) {
+    if (Date.now() - started > timeout) {
+      throw new Error('Timed out waiting for test condition')
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}
+
+function getOnlyRelayPoolConnection(node) {
+  const connections = [...node._relayPool._connections.values()]
+  if (connections.length !== 1) throw new Error('Expected exactly one relay pool connection')
+  return connections[0]
+}
+
+function pausePunching(t, pausedNodes) {
+  const punch = Holepuncher.prototype._punch
+  let resume = null
+  const punchingResumed = new Promise((resolve) => {
+    resume = resolve
+  })
+
+  Holepuncher.prototype._punch = async function () {
+    if (pausedNodes.includes(this.dht)) await punchingResumed
+    return punch.call(this)
+  }
+
+  t.teardown(() => {
+    resume()
+    Holepuncher.prototype._punch = punch
+  })
+
+  return resume
+}
