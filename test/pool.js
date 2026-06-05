@@ -1,4 +1,5 @@
 const test = require('brittle')
+const { once } = require('events')
 const { swarm } = require('./helpers')
 
 test('connection pool, client side', async function (t) {
@@ -113,3 +114,33 @@ test('connection pool, client and server side', async function (t) {
 
   await server.close()
 })
+
+test('connection pool ignores destroying streams', async function (t) {
+  const [a, b] = await swarm(t)
+
+  const server = a.createServer((socket) => {
+    socket.on('error', noop).resume()
+  })
+
+  await server.listen()
+
+  const pool = b.pool()
+  const first = b.connect(server.publicKey, { pool })
+  first.on('error', noop)
+
+  await once(first, 'open')
+
+  first.destroy()
+  t.ok(first.destroying, 'pooled stream is destroying')
+
+  const second = b.connect(server.publicKey, { pool })
+  second.on('error', noop)
+
+  t.is(second === first, false, 'destroying stream is not reused')
+
+  second.destroy()
+
+  await server.close()
+})
+
+function noop() {}
