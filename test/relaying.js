@@ -1203,30 +1203,17 @@ test('direct upgrade keeps other pooled relay pairings alive', async function (t
 
   const relaySockets = []
   let closedRelaySockets = 0
-  let resolveRelaySockets = null
-  const relaySocketsOpened = new Promise((resolve) => {
-    resolveRelaySockets = resolve
-  })
 
-  const relayStreams = []
   let closedRelayStreams = 0
-  let resolveRelayStreamsPaired = null
-  const relayStreamsPaired = new Promise((resolve) => {
-    resolveRelayStreamsPaired = resolve
-  })
 
   const relayTransportServer = relayNode.createServer(function (socket) {
     relaySockets.push(socket)
     socket.once('close', function () {
       closedRelaySockets++
     })
-    if (relaySockets.length === 2) resolveRelaySockets()
 
     const session = relayServer.accept(socket, { id: socket.remotePublicKey })
     session.on('pair', function (_, __, stream) {
-      relayStreams.push(stream)
-      if (relayStreams.length === 4) resolveRelayStreamsPaired()
-
       stream.once('close', function () {
         closedRelayStreams++
       })
@@ -1281,7 +1268,6 @@ test('direct upgrade keeps other pooled relay pairings alive', async function (t
   relayOnlyClientSocket.on('error', (err) => t.comment(err.message))
 
   await Promise.all([once(upgradeClientSocket, 'open'), once(relayOnlyClientSocket, 'open')])
-  await Promise.all([relaySocketsOpened, relayStreamsPaired])
 
   t.is(relaySockets.length, 2, 'both app connections share the relay transport sockets')
   t.is(clientNode._relayPool._connections.size, 1, 'client has one shared relay pool connection')
