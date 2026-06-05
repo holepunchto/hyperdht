@@ -839,10 +839,6 @@ test('relay pool does not reuse closing transport sockets', async function (t) {
 
   t.not(secondPairing.socket, closingSocket, 'new pairing gets a fresh relay transport')
 
-  firstStream.destroy()
-  secondStream.destroy()
-  secondPairing.release()
-
   await clientNode.destroy()
   await relayNode.destroy()
 })
