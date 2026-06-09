@@ -47,18 +47,20 @@ test('connection pool, server side', async function (t) {
   const open = t.test('open')
   open.plan(2)
   let atLeastOneOpen = false
+  let isStream1 = false
 
   {
     const socket = b.connect(server.publicKey)
     socket
       .on('open', () => {
         if (atLeastOneOpen) return
-
         open.pass('1st stream opened')
         atLeastOneOpen = true
+        isStream1 = true
       })
-      .on('error', () => {
-        open.pass('1st stream errored')
+      .on('error', noop)
+      .on('close', () => {
+        if (isStream1) open.pass('1st stream closed')
       })
       .end()
   }
@@ -71,8 +73,9 @@ test('connection pool, server side', async function (t) {
         open.pass('2nd stream opened')
         atLeastOneOpen = true
       })
-      .on('error', () => {
-        open.pass('2nd stream errored')
+      .on('error', noop)
+      .on('close', () => {
+        if (!isStream1) open.pass('2nd stream closed')
       })
       .end()
   }
@@ -113,3 +116,5 @@ test('connection pool, client and server side', async function (t) {
 
   await server.close()
 })
+
+function noop() {}
