@@ -8,6 +8,7 @@ const SocketPool = require('./lib/socket-pool')
 const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Cache = require('xache')
+const NamespacedDB = require('namespaced-native')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
 const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
@@ -47,6 +48,7 @@ class HyperDHT extends DHT {
     }
     this.rawStreams = new RawStreamSet(this)
     this.plugins = new Map()
+    this.db = new NamespacedDB({ path: opts.dbPath || DB_PATH, opts: opts.dbOpts })
 
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
@@ -128,7 +130,8 @@ class HyperDHT extends DHT {
     }
     this._router.destroy()
     if (this._persistent) this._persistent.destroy()
-    for (const plugin of this.plugins.values()) plugin.destroy()
+    for (const plugin of this.plugins.values()) await plugin.destroy()
+    await this.db.close({ force })
     await this.rawStreams.clear()
     await this._socketPool.destroy()
     await super.destroy()
@@ -517,9 +520,9 @@ class HyperDHT extends DHT {
     )
   }
 
-  register(name, plugin) {
+  async register(name, plugin) {
     this.plugins.set(name, plugin)
-    plugin.onregister(this)
+    await plugin.onregister(this)
   }
 }
 
