@@ -329,6 +329,76 @@ Having persistent nodes in different places makes the network more decentralized
 
 For more information: [`examples/isolated-dht.mjs`](examples/isolated-dht.mjs)
 
+## Synaptic Routing (Dragon P2P)
+
+A lightweight Hebbian weight system for peer connections. Instead of rigid role assignments, each connection maintains a "synaptic weight" that increases on success and decreases on failure. The network self-organizes organically.
+
+### How it works
+
+Every peer connection gets a weight between 0 and 1. When packets flow successfully (low latency, high bandwidth), the weight goes up. When packets fail or get dropped, the weight goes down. That's it. No central coordinator, no broadcast announcements, no "I am CORE" logic.
+
+The math behind it:
+
+```
+weight(t+1) = (1 - λ) × weight(t) + α × quality - β × failure
+```
+
+Where `λ` is decay (old routes fade), `α` is reward rate, `β` is penalty rate. β is deliberately higher than α so bad connections get cut fast.
+
+### Why this matters
+
+1. **DDoS resistance.** When a node gets overloaded, it signals backpressure. Neighbors detect this instantly and route around it. No special "guardian" slot needed. The network isolates the problem organically.
+
+2. **No battery drain on mobile.** A node only actively uses 2-3 routes at any time (sparse activation). The rest sit in a low-power state. No need to maintain 20 active tunnels with pings.
+
+3. **Emergent backbone.** Nodes that are fast and reliable naturally accumulate higher weights. Other nodes route through them. The backbone forms itself without anyone announcing "I am a hub."
+
+4. **No roles to attack.** There's no CORE or EDGE flag anywhere. An attacker can't target "hub nodes" because the topology is invisible — it only exists as local weight values that each node tracks privately.
+
+### Usage
+
+The synaptic weight system is built into HyperDHT and works automatically. If you want to hook into it:
+
+```js
+const node = new DHT()
+
+// Listen for weight updates on peer connections
+node.on('peer-weight', ({ publicKey, latency, bandwidth }) => {
+  console.log('Peer', publicKey.toString('hex').slice(0, 8), 'latency:', latency, 'ms')
+})
+
+// Signal backpressure when you're overloaded
+node.applyBackpressure(somePublicKey, true)  // tell neighbors to slow down
+node.applyBackpressure(somePublicKey, false) // tell neighbors you're fine again
+
+// Use weight-based routing for your own peer selection
+const peers = [
+  { weight: 0.9, host: '1.2.3.4', port: 49737 },
+  { weight: 0.3, host: '5.6.7.8', port: 49737 }
+]
+const best = node.routePacket(target, peers)
+```
+
+You can also tweak the hyperparameters:
+
+```js
+const node = new DHT({
+  synaptic: {
+    lambda: 0.01,   // decay rate (how fast old routes fade)
+    alpha: 0.1,     // reward rate for good connections
+    beta: 0.5,      // penalty rate for failures (keep > alpha)
+    delta: 0.3,     // backpressure penalty
+    threshold: 0.02 // minimum weight to consider a route alive
+  }
+})
+```
+
+### What this replaces
+
+Previously, P2P networks relied on either rigid role assignments (SMA-style CORE/EDGE tiers) or heavy ML inference (Brain Router) to handle routing. Both approaches have tradeoffs — rigid roles flap during attacks, and ML eats CPU cycles.
+
+This is closer to how ant colonies or neural networks solve the same problem. Local rules, global emergence. No single point of failure, no global state, no GPU required.
+
 ## License
 
 MIT

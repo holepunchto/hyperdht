@@ -14,6 +14,7 @@ const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
+const SynapticWeight = require('./lib/synaptic-weight')
 const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 
 const DEFAULTS = {
@@ -51,6 +52,7 @@ class HyperDHT extends DHT {
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
     this._persistent = null
+    this._synaptic = new SynapticWeight(opts.synaptic || {})
     this._validatedLocalAddresses = new Map()
     this._relayAddressesCache = new Cache(relayAddresses)
 
@@ -520,6 +522,31 @@ class HyperDHT extends DHT {
   register(name, plugin) {
     this.plugins.set(name, plugin)
     plugin.onregister(this)
+  }
+
+  updatePeerWeight(publicKey, latency, bandwidth) {
+    if (this._persistent) {
+      this._synaptic._lastLatency = latency
+      this._synaptic._lastBandwidth = bandwidth
+    }
+    this.emit('peer-weight', { publicKey, latency, bandwidth })
+  }
+
+  applyBackpressure(publicKey, isOverloaded) {
+    this.emit('backpressure', { publicKey, isOverloaded })
+  }
+
+  getSynaptic() {
+    return this._synaptic
+  }
+
+  routePacket(target, peers) {
+    if (!peers || peers.length === 0) return null
+    const peerObjs = peers.map(p => ({
+      weight: p.weight !== undefined ? p.weight : 0.5,
+      ...p
+    }))
+    return this._synaptic.routePeer(peerObjs)
   }
 }
 
