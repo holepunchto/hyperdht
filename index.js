@@ -152,11 +152,13 @@ class HyperDHT extends DHT {
     for (const server of this.listening) resuming.push(server.resume())
     log('Resuming hyperdht servers')
     await Promise.allSettled(resuming)
+    if (this._routingTableSnapshotter) this._routingTableSnapshotter.resume()
     log('Done, hyperdht fully resumed')
   }
 
   async suspend({ log = noop } = {}) {
     this._connectable = false // just so nothing gets connected during suspension
+    if (this._routingTableSnapshotter) this._routingTableSnapshotter.suspend()
     const suspending = []
     for (const server of this.listening) suspending.push(server.suspend())
     log('Suspending all hyperdht servers')
