@@ -273,11 +273,16 @@ test('relay connections through node, server side', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({
+    bootstrap,
+    quickFirewall: false,
+    ephemeral: true,
+    connectionKeepAlive: 12345
+  })
   const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(5)
+  lc.plan(6)
 
   const relay = new RelayServer({
     createStream(opts) {
@@ -296,6 +301,7 @@ test('relay connections through node, server side', async function (t) {
 
   const bServer = b.createServer({ relayThrough: aServer.publicKey }, function (socket) {
     lc.pass('server socket opened')
+    lc.is(socket.keepAlive, 12345, 'server relayed socket inherits connectionKeepAlive')
     socket
       .on('data', (data) => {
         lc.alike(data, Buffer.from('hello world'))
