@@ -57,7 +57,7 @@ class HyperDHT extends DHT {
     }
     this.rawStreams = new RawStreamSet(this)
     this.plugins = new Map()
-    this.db = new NamespacedDB({ path: opts.dbPath || DB_PATH, opts: opts.dbOpts })
+    this.db = new NamespacedDB({ path: opts.dbPath || DB_PATH })
 
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
