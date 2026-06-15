@@ -11,7 +11,15 @@ const Cache = require('xache')
 const NamespacedDB = require('namespaced-native')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, BOOTSTRAP_NODES, COMMANDS, DB_PATH } = require('./lib/constants')
+const Snapshotter = require('./lib/snapshotter')
+const {
+  FIREWALL,
+  BOOTSTRAP_NODES,
+  COMMANDS,
+  DB_PATH,
+  DB_NS,
+  SNAPSHOT_KEYS
+} = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
@@ -20,7 +28,8 @@ const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 const DEFAULTS = {
   ...DHT.DEFAULTS,
   connectionKeepAlive: 5000,
-  randomPunchInterval: 20000
+  randomPunchInterval: 20000,
+  routingTableSnapshotInterval: 120000
 }
 
 class HyperDHT extends DHT {
@@ -63,6 +72,8 @@ class HyperDHT extends DHT {
     this._randomPunches = 0
     this._randomPunchLimit = 1 // set to one for extra safety for now
 
+    this._routingTableSnapshotter = null
+
     this.once('persistent', () => {
       this._persistent = new Persistent(this, persistent)
       for (const plugin of this.plugins.values()) plugin.onpersistent()
@@ -75,6 +86,37 @@ class HyperDHT extends DHT {
     this.on('network-update', () => {
       if (!this.online) return
       for (const server of this.listening) server.notifyOnline()
+    })
+
+    this.once('ready', async () => {
+      try {
+        const k = b4a.from(SNAPSHOT_KEYS.ROUTING_TABLE)
+
+        if (opts.warmBootstrap) {
+          const n = await this.db.namespace(DB_NS.SNAPSHOTS)
+          const s = await n.get(k)
+          const cached = s !== null ? JSON.parse(b4a.toString(s)) : []
+
+          if (cached.length > 0) {
+            for (const node of cached) this.addNode(node)
+            await this.findNode(this.table.id).finished()
+          }
+        }
+
+        this._routingTableSnapshotter = new Snapshotter(
+          this,
+          DB_NS.SNAPSHOTS,
+          k,
+          opts.routingTableSnapshotInterval || DEFAULTS.routingTableSnapshotInterval,
+          () => {
+            return b4a.from(JSON.stringify(this.toArray({ limit: this.table.k })))
+          }
+        )
+
+        await this._routingTableSnapshotter.start()
+      } catch (err) {
+        safetyCatch(err)
+      }
     })
   }
 
@@ -131,6 +173,7 @@ class HyperDHT extends DHT {
     this._router.destroy()
     if (this._persistent) this._persistent.destroy()
     for (const plugin of this.plugins.values()) await plugin.destroy()
+    if (this._routingTableSnapshotter) await this._routingTableSnapshotter.stop()
     await this.db.close({ force })
     await this.rawStreams.clear()
     await this._socketPool.destroy()
