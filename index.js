@@ -89,6 +89,8 @@ class HyperDHT extends DHT {
     })
 
     this.once('ready', async () => {
+      if (this.destroyed) return
+
       try {
         const k = b4a.from(SNAPSHOT_KEYS.ROUTING_TABLE)
 
@@ -136,6 +138,11 @@ class HyperDHT extends DHT {
 
   pool() {
     return new ConnectionPool(this)
+  }
+
+  async fullyBootstrapped() {
+    await super.fullyBootstrapped()
+    await this.db.ready()
   }
 
   async resume({ log = noop } = {}) {
