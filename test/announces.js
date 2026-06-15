@@ -52,13 +52,20 @@ test('announce to group and lookup', async function (t) {
   {
     const result = await toArray(b.lookup(target))
     t.ok(result.length > 0, 'has at least one result')
-    t.alike(result[0].peers.length, 2, 'two peers')
+
+    // Sort result by number of peers to first is more likely to have both announcements
+    // The test can return different set of nodes per lookup for announcing so
+    // two nodes can have gotten each one of the two announcements. This is
+    // expected in real execution as we don't know the network. Sorting makes
+    // the test stable.
+    const sortedByPeers = result.sort((a, b) => b.peers.length - a.peers.length)
+    t.alike(sortedByPeers[0].peers.length, 2, 'two peers')
     t.alike(
-      [result[0].peers[0].publicKey, result[0].peers[1].publicKey].sort(),
+      [sortedByPeers[0].peers[0].publicKey, sortedByPeers[0].peers[1].publicKey].sort(),
       [keyPair1.publicKey, keyPair2.publicKey].sort()
     )
 
-    const latest = result[0].peers[result[0].peers[0].publicKey.equals(keyPair2.publicKey) ? 0 : 1]
+    const latest = sortedByPeers[0].peers[sortedByPeers[0].peers[0].publicKey.equals(keyPair2.publicKey) ? 0 : 1]
 
     t.is(latest.relayAddresses.length, 1, 'announced one relay')
     t.alike(latest.relayAddresses[0], { host: '1.2.3.4', port: 1234 })
