@@ -74,6 +74,10 @@ class HyperDHT extends DHT {
 
     this._routingTableSnapshotter = null
 
+    this._warmBootstrapped = new Promise((resolve) => {
+      this._resolveWarmBootstrapped = resolve
+    })
+
     this.once('persistent', () => {
       this._persistent = new Persistent(this, persistent)
       for (const plugin of this.plugins.values()) plugin.onpersistent()
@@ -90,35 +94,21 @@ class HyperDHT extends DHT {
 
     this.once('ready', async () => {
       if (this.destroyed) return
+      const k = b4a.from(SNAPSHOT_KEYS.ROUTING_TABLE)
+      if (opts.warmBootstrap) await this._warmBootstrap(k)
 
-      try {
-        const k = b4a.from(SNAPSHOT_KEYS.ROUTING_TABLE)
-
-        if (opts.warmBootstrap) {
-          const n = await this.db.namespace(DB_NS.SNAPSHOTS)
-          const s = await n.get(k)
-          const cached = s !== null ? JSON.parse(b4a.toString(s)) : []
-
-          if (cached.length > 0) {
-            for (const node of cached) this.addNode(node)
-            await this.findNode(this.table.id).finished()
-          }
+      this._routingTableSnapshotter = new Snapshotter(
+        this,
+        DB_NS.SNAPSHOTS,
+        k,
+        opts.routingTableSnapshotInterval || DEFAULTS.routingTableSnapshotInterval,
+        () => {
+          return b4a.from(JSON.stringify(this.toArray({ limit: this.table.k })))
         }
+      )
 
-        this._routingTableSnapshotter = new Snapshotter(
-          this,
-          DB_NS.SNAPSHOTS,
-          k,
-          opts.routingTableSnapshotInterval || DEFAULTS.routingTableSnapshotInterval,
-          () => {
-            return b4a.from(JSON.stringify(this.toArray({ limit: this.table.k })))
-          }
-        )
-
-        await this._routingTableSnapshotter.start()
-      } catch (err) {
-        safetyCatch(err)
-      }
+      this._routingTableSnapshotter.start()
+      this._resolveWarmBootstrapped()
     })
   }
 
@@ -140,9 +130,21 @@ class HyperDHT extends DHT {
     return new ConnectionPool(this)
   }
 
+  async _warmBootstrap(key) {
+    const n = await this.db.namespace(DB_NS.SNAPSHOTS)
+    const s = await n.get(key)
+    const cached = s !== null ? JSON.parse(b4a.toString(s)) : []
+
+    if (cached.length > 0) {
+      for (const node of cached) this.addNode(node)
+      await this.findNode(this.table.id).finished()
+    }
+  }
+
   async fullyBootstrapped() {
     await super.fullyBootstrapped()
     await this.db.ready()
+    await this._warmBootstrapped
   }
 
   async resume({ log = noop } = {}) {
@@ -174,6 +176,7 @@ class HyperDHT extends DHT {
   }
 
   async destroy({ force = false } = {}) {
+    this._resolveWarmBootstrapped()
     if (!force) {
       const closing = []
       for (const server of this.listening) closing.push(server.close())
