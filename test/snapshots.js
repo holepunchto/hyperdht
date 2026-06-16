@@ -1,5 +1,8 @@
 const test = require('brittle')
 const b4a = require('b4a')
+const tmp = require('test-tmp')
+const NamespacedDB = require('namespaced-native')
+const DHT = require('../')
 const { swarm } = require('./helpers')
 const { DB_NS, SNAPSHOT_KEYS } = require('../lib/constants')
 
@@ -9,8 +12,8 @@ test('routing table snapshot write', async function (t) {
   const peer = await testnet.createNode(t)
   await peer.fullyBootstrapped()
 
-  // Snapshotter writes immediately on start, before the first sleep, so 5s is generous
-  await new Promise((resolve) => setTimeout(resolve, 5000))
+  // Snapshotter's first write is immediately upon fullyBootstrapped, so 2s is generous
+  await new Promise((resolve) => setTimeout(resolve, 2000))
 
   const ns = await peer.db.namespace(DB_NS.SNAPSHOTS)
   const s = await ns.get(b4a.from(SNAPSHOT_KEYS.ROUTING_TABLE))
@@ -19,7 +22,60 @@ test('routing table snapshot write', async function (t) {
   const snapshot = JSON.parse(b4a.toString(s))
   t.ok(snapshot.length > 0)
 
-  const table = new Set(peer.toArray().map((node) => `${node.host}:${node.port}`))
+  const actualRoutingTable = new Set(peer.toArray().map(({ host, port }) => `${host}:${port}`))
 
-  for (const node of snapshot) t.ok(table.has(`${node.host}:${node.port}`))
+  for (const { host, port } of snapshot) t.ok(actualRoutingTable.has(`${host}:${port}`))
+})
+
+test('warm bootstrap from restored routing table', async function (t) {
+  const testnet = await swarm(t, 4)
+
+  const snapshot = testnet.nodes.map((node) => {
+    const { host, port } = node.address()
+    return { host, port }
+  })
+
+  const dbPath = await tmp(t)
+  const db = new NamespacedDB({ path: dbPath })
+  const ns = await db.namespace(DB_NS.SNAPSHOTS)
+
+  await ns.put([
+    {
+      key: b4a.from(SNAPSHOT_KEYS.ROUTING_TABLE),
+      value: b4a.from(JSON.stringify(snapshot))
+    }
+  ])
+
+  await db.close()
+
+  const node = new DHT({
+    dbPath,
+    warmBootstrap: true,
+    bootstrap: [],
+    host: '127.0.0.1',
+    ephemeral: true
+  })
+
+  t.teardown(() => node.destroy())
+
+  await node.fullyBootstrapped()
+
+  const actualRoutingTable = new Set(node.toArray().map(({ host, port }) => `${host}:${port}`))
+
+  for (const { host, port } of snapshot) t.ok(actualRoutingTable.has(`${host}:${port}`))
+
+  // Control subject - warm bootstrap with no routing table snapshot
+  const control = new DHT({
+    dbPath: await tmp(t),
+    warmBootstrap: true,
+    bootstrap: [],
+    host: '127.0.0.1',
+    ephemeral: true
+  })
+
+  t.teardown(() => control.destroy())
+
+  await control.fullyBootstrapped()
+
+  t.is(control.toArray().length, 0)
 })
