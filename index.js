@@ -75,7 +75,7 @@ class HyperDHT extends DHT {
     this._routingTableSnapshotter = null
 
     this._warmBootstrapped = new Promise((resolve) => {
-      this._resolveWarmBootstrapped = resolve
+      this._warmBootstrapDone = resolve
     })
 
     this.once('persistent', () => {
@@ -95,7 +95,14 @@ class HyperDHT extends DHT {
     this.once('ready', async () => {
       if (this.destroyed) return
       const k = b4a.from(SNAPSHOT_KEYS.ROUTING_TABLE)
-      if (opts.warmBootstrap) await this._warmBootstrap(k)
+
+      try {
+        if (opts.warmBootstrap) await this._warmBootstrap(k)
+      } catch {
+        // Do nothing, warm bootstrap is best effort
+      } finally {
+        this._warmBootstrapDone()
+      }
 
       this._routingTableSnapshotter = new Snapshotter(
         this,
@@ -108,7 +115,6 @@ class HyperDHT extends DHT {
       )
 
       this._routingTableSnapshotter.start()
-      this._resolveWarmBootstrapped()
     })
   }
 
@@ -176,7 +182,7 @@ class HyperDHT extends DHT {
   }
 
   async destroy({ force = false } = {}) {
-    this._resolveWarmBootstrapped()
+    this._warmBootstrapDone()
     if (!force) {
       const closing = []
       for (const server of this.listening) closing.push(server.close())
