@@ -14,20 +14,14 @@ test('snapshotter successive writes', async function (t) {
   const key = b4a.from('test-successive-writes')
   const count = []
 
-  await new Promise((resolve) => {
-    const s = new Snapshotter(node, 'test-namespace', key, 10, () => {
-      count.push(count.length + 1)
-
-      if (count.length === 5) {
-        s.stop()
-        resolve()
-      }
-
-      return b4a.from(JSON.stringify(count))
-    })
-
-    s.start()
+  const s = new Snapshotter(node, 'test-namespace', key, 10, () => {
+    count.push(count.length + 1)
+    if (count.length === 5) s.stop()
+    return b4a.from(JSON.stringify(count))
   })
+
+  s.start()
+  await s.done
 
   t.alike(count, [1, 2, 3, 4, 5])
 
@@ -35,6 +29,47 @@ test('snapshotter successive writes', async function (t) {
   const result = await n.get(key)
 
   t.alike(JSON.parse(b4a.toString(result)), [1, 2, 3, 4, 5])
+})
+
+test('snapshotter suspend - resume', async function (t) {
+  const node = new DHT({ dbPath: await tmp(t), bootstrap: [], ephemeral: true })
+  t.teardown(() => node.destroy())
+
+  const key = b4a.from('test-suspend-resume')
+  const count = []
+
+  const s = new Snapshotter(node, 'test-namespace', key, 10, () => {
+    count.push(count.length + 1)
+
+    if (count.length === 2) {
+      s.suspend()
+    } else if (count.length === 5) {
+      s.stop()
+    }
+
+    return b4a.from(JSON.stringify(count))
+  })
+
+  s.start()
+
+  // 2s is generous against a 10ms write interval - if suspend failed to pause the write
+  // loop, we'd expect to see those writes reflected
+  await new Promise((resolve) => setTimeout(resolve, 2000))
+
+  t.alike(count, [1, 2])
+
+  const n = await node.db.namespace('test-namespace')
+  const first = await n.get(key)
+
+  t.alike(JSON.parse(b4a.toString(first)), [1, 2])
+
+  s.resume()
+  await s.done
+
+  t.alike(count, [1, 2, 3, 4, 5])
+
+  const second = await n.get(key)
+  t.alike(JSON.parse(b4a.toString(second)), [1, 2, 3, 4, 5])
 })
 
 test('routing table snapshot write', async function (t) {
