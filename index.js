@@ -104,6 +104,8 @@ class HyperDHT extends DHT {
         this._warmBootstrapDone()
       }
 
+      if (this.destroyed) return
+
       this._routingTableSnapshotter = new Snapshotter(
         this,
         DB_NS.SNAPSHOTS,
