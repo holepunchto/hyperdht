@@ -113,7 +113,7 @@ test('plugin put - get', async function (t) {
   for (const node of nodes) {
     const p = new TestPlugin(node)
     pluginClients.push(p)
-    node.register(p.name, p)
+    await node.register(p.name, p)
   }
 
   const put = await pluginClients[30].put('myTestValue')
