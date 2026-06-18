@@ -528,11 +528,29 @@ test('relay connections through node, client and server side', async function (t
 })
 
 test('relay connection upgrades to direct connection', async function (t) {
+  await testRelayUpgrade(t)
+})
+
+test('relay connection upgrades to direct connection without keepalive', async function (t) {
+  await testRelayUpgrade(t, { connectionKeepAlive: false, confirmWithAppData: true })
+})
+
+async function testRelayUpgrade(t, opts = {}) {
   const { bootstrap } = await swarm(t)
 
   const relayNode = createDHT({ bootstrap })
-  const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const serverNode = createDHT({
+    bootstrap,
+    quickFirewall: false,
+    ephemeral: true,
+    connectionKeepAlive: opts.connectionKeepAlive
+  })
+  const clientNode = createDHT({
+    bootstrap,
+    quickFirewall: false,
+    ephemeral: true,
+    connectionKeepAlive: opts.connectionKeepAlive
+  })
 
   const resumePunching = pausePunching(t, [serverNode, clientNode])
 
@@ -612,6 +630,21 @@ test('relay connection upgrades to direct connection', async function (t) {
   const relaySocketsClosed = relaySockets.map((socket) => once(socket, 'close'))
 
   resumePunching()
+
+  if (opts.confirmWithAppData) {
+    await clientUpgraded
+
+    t.ok(
+      relaySockets.every((socket) => !socket.destroyed),
+      'relay stays open until direct traffic confirms the upgrade'
+    )
+
+    // Without keepalive, the passive upgrade is confirmed by the next app write.
+    const appData = once(clientSocket, 'data')
+    clientSocket.write(Buffer.from('after upgrade'))
+    t.alike((await appData)[0], Buffer.from('after upgrade'), 'app data confirms direct path')
+  }
+
   await Promise.all([clientUpgraded, serverUpgraded])
   await Promise.all(relaySocketsClosed)
   t.pass('relay transport sockets close after direct upgrade')
@@ -627,9 +660,11 @@ test('relay connection upgrades to direct connection', async function (t) {
     'client switches to the server address'
   )
 
-  const afterUpgrade = once(clientSocket, 'data')
-  clientSocket.write(Buffer.from('after upgrade'))
-  t.alike((await afterUpgrade)[0], Buffer.from('after upgrade'), 'direct path carries data')
+  if (!opts.confirmWithAppData) {
+    const afterUpgrade = once(clientSocket, 'data')
+    clientSocket.write(Buffer.from('after upgrade'))
+    t.alike((await afterUpgrade)[0], Buffer.from('after upgrade'), 'direct path carries data')
+  }
 
   await endAndCloseSocket(clientSocket)
   if (!serverSocket.destroyed) await once(serverSocket, 'close')
@@ -637,7 +672,7 @@ test('relay connection upgrades to direct connection', async function (t) {
   await relayNode.destroy()
   await serverNode.destroy()
   await clientNode.destroy()
-})
+}
 
 test.skip('relay several connections through node with pool', async function (t) {
   const { bootstrap } = await swarm(t)
