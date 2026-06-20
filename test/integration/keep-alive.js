@@ -3,6 +3,7 @@ const DHT = require('../../')
 const path = require('path')
 const { swarm, spawnFixture } = require('../helpers')
 const b4a = require('b4a')
+const tmp = require('test-tmp')
 
 // Server is run in a separate proces to make sure that we can forcefully close it.
 // If the server called `socket.destroy()` that would send an unacked packet back
@@ -15,7 +16,8 @@ test('Client use keepalive to detect disconnect - separated by processes', async
 
   const clientTest = t.test('client')
   const { bootstrap } = await swarm(t)
-  const node = new DHT({ bootstrap })
+  const dbPath = await tmp(t)
+  const node = new DHT({ bootstrap, dbPath })
   const keyPair = DHT.keyPair()
   const publicKey = b4a.toString(keyPair.publicKey, 'hex')
   const secretKey = b4a.toString(keyPair.secretKey, 'hex')

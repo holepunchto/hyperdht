@@ -8,9 +8,18 @@ const SocketPool = require('./lib/socket-pool')
 const Persistent = require('./lib/persistent')
 const Router = require('./lib/router')
 const Cache = require('xache')
+const NamespacedDB = require('namespaced-native')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
+const Snapshotter = require('./lib/snapshotter')
+const {
+  FIREWALL,
+  BOOTSTRAP_NODES,
+  COMMANDS,
+  DB_PATH,
+  DB_NS,
+  SNAPSHOT_KEYS
+} = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
@@ -19,7 +28,8 @@ const { STREAM_NOT_CONNECTED } = require('./lib/errors')
 const DEFAULTS = {
   ...DHT.DEFAULTS,
   connectionKeepAlive: 5000,
-  randomPunchInterval: 20000
+  randomPunchInterval: 20000,
+  routingTableSnapshotInterval: 120000
 }
 
 class HyperDHT extends DHT {
@@ -47,6 +57,7 @@ class HyperDHT extends DHT {
     }
     this.rawStreams = new RawStreamSet(this)
     this.plugins = new Map()
+    this.db = new NamespacedDB({ path: opts.dbPath || DB_PATH })
 
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
@@ -61,6 +72,12 @@ class HyperDHT extends DHT {
     this._randomPunches = 0
     this._randomPunchLimit = 1 // set to one for extra safety for now
 
+    this._routingTableSnapshotter = null
+
+    this._warmBootstrapped = new Promise((resolve) => {
+      this._warmBootstrapDone = resolve
+    })
+
     this.once('persistent', () => {
       this._persistent = new Persistent(this, persistent)
       for (const plugin of this.plugins.values()) plugin.onpersistent()
@@ -73,6 +90,33 @@ class HyperDHT extends DHT {
     this.on('network-update', () => {
       if (!this.online) return
       for (const server of this.listening) server.notifyOnline()
+    })
+
+    this.once('ready', async () => {
+      if (this.destroyed) return
+      const k = b4a.from(SNAPSHOT_KEYS.ROUTING_TABLE)
+
+      try {
+        if (opts.warmBootstrap) await this._warmBootstrap(k)
+      } catch {
+        // Do nothing, warm bootstrap is best effort
+      } finally {
+        this._warmBootstrapDone()
+      }
+
+      if (this.destroyed) return
+
+      this._routingTableSnapshotter = new Snapshotter(
+        this,
+        DB_NS.SNAPSHOTS,
+        k,
+        opts.routingTableSnapshotInterval || DEFAULTS.routingTableSnapshotInterval,
+        () => {
+          return b4a.from(JSON.stringify(this.toArray({ limit: this.table.k })))
+        }
+      )
+
+      this._routingTableSnapshotter.start()
     })
   }
 
@@ -94,6 +138,23 @@ class HyperDHT extends DHT {
     return new ConnectionPool(this)
   }
 
+  async _warmBootstrap(key) {
+    const n = await this.db.namespace(DB_NS.SNAPSHOTS)
+    const s = await n.get(key)
+    const cached = s !== null ? JSON.parse(b4a.toString(s)) : []
+
+    if (cached.length > 0) {
+      for (const node of cached) this.addNode(node)
+      await this.findNode(this.table.id).finished()
+    }
+  }
+
+  async fullyBootstrapped() {
+    await super.fullyBootstrapped()
+    await this.db.ready()
+    await this._warmBootstrapped
+  }
+
   async resume({ log = noop } = {}) {
     if (this._deferRandomPunch) this._lastRandomPunch = Date.now()
     await super.resume({ log })
@@ -101,11 +162,13 @@ class HyperDHT extends DHT {
     for (const server of this.listening) resuming.push(server.resume())
     log('Resuming hyperdht servers')
     await Promise.allSettled(resuming)
+    if (this._routingTableSnapshotter) this._routingTableSnapshotter.resume()
     log('Done, hyperdht fully resumed')
   }
 
   async suspend({ log = noop } = {}) {
     this._connectable = false // just so nothing gets connected during suspension
+    if (this._routingTableSnapshotter) this._routingTableSnapshotter.suspend()
     const suspending = []
     for (const server of this.listening) suspending.push(server.suspend())
     log('Suspending all hyperdht servers')
@@ -121,6 +184,7 @@ class HyperDHT extends DHT {
   }
 
   async destroy({ force = false } = {}) {
+    this._warmBootstrapDone()
     if (!force) {
       const closing = []
       for (const server of this.listening) closing.push(server.close())
@@ -128,7 +192,9 @@ class HyperDHT extends DHT {
     }
     this._router.destroy()
     if (this._persistent) this._persistent.destroy()
-    for (const plugin of this.plugins.values()) plugin.destroy()
+    for (const plugin of this.plugins.values()) await plugin.destroy()
+    if (this._routingTableSnapshotter) await this._routingTableSnapshotter.stop()
+    await this.db.close({ force })
     await this.rawStreams.clear()
     await this._socketPool.destroy()
     await super.destroy()
@@ -517,9 +583,9 @@ class HyperDHT extends DHT {
     )
   }
 
-  register(name, plugin) {
+  async register(name, plugin) {
     this.plugins.set(name, plugin)
-    plugin.onregister(this)
+    await plugin.onregister(this)
   }
 }
 

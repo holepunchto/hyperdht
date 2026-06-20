@@ -4,6 +4,7 @@ const { Server: RelayServer } = require('blind-relay')
 const DHT = require('../../')
 const path = require('path')
 const b4a = require('b4a')
+const tmp = require('test-tmp')
 
 /*
   When a peer connects to a relay server, there's two sockets established. One for data (between two peers)
@@ -28,8 +29,8 @@ test('When Server is killed, Client should detect this - through relay', async (
   const SOCKET_KEEPALIVE = 10 * RELAY_KEEPALIVE
 
   const clientKeyPair = DHT.keyPair()
-  const clientNode = new DHT()
-  const relayNode = new DHT()
+  const clientNode = new DHT({ dbPath: await tmp(t) })
+  const relayNode = new DHT({ dbPath: await tmp(t) })
   const relayKeyPair = DHT.keyPair()
   const serverKeyPair = DHT.keyPair()
   const serverPublicKey = b4a.toString(serverKeyPair.publicKey, 'hex')

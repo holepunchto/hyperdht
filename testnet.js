@@ -1,6 +1,7 @@
+const tmp = require('test-tmp')
 const DHT = require('.')
 
-module.exports = async function createTestnet(size = 10, opts = {}) {
+module.exports = async function createTestnet(size = 10, opts = {}, dhtOpts = {}) {
   const swarm = []
   const teardown =
     typeof opts === 'function' ? opts : opts.teardown ? opts.teardown.bind(opts) : noop
@@ -8,15 +9,18 @@ module.exports = async function createTestnet(size = 10, opts = {}) {
   const port = opts.port || 0
   const bootstrap = opts.bootstrap ? [...opts.bootstrap] : []
   const bindHost = host === '127.0.0.1' ? '127.0.0.1' : '0.0.0.0'
+  const t = opts.t || null
 
   if (size === 0) return new Testnet(swarm)
 
   const first = new DHT({
+    ...dhtOpts,
     ephemeral: false,
     firewalled: false,
     bootstrap,
     port,
-    host: bindHost
+    host: bindHost,
+    dbPath: t ? await tmp(t) : null
   })
 
   await first.fullyBootstrapped()
@@ -27,10 +31,12 @@ module.exports = async function createTestnet(size = 10, opts = {}) {
 
   while (swarm.length < size) {
     const node = new DHT({
+      ...dhtOpts,
       ephemeral: false,
       firewalled: false,
       bootstrap,
-      host: bindHost
+      host: bindHost,
+      dbPath: t ? await tmp(t) : null
     })
 
     await node.fullyBootstrapped()
@@ -50,12 +56,14 @@ class Testnet {
     this.bootstrap = bootstrap
   }
 
-  createNode(opts = {}) {
+  async createNode(t, opts = {}) {
+    const dbPath = await tmp(t)
     const node = new DHT({
       ephemeral: true,
       bootstrap: this.bootstrap,
       host: '127.0.0.1',
-      ...opts
+      ...opts,
+      dbPath
     })
 
     this.nodes.push(node)
