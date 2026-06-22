@@ -823,6 +823,66 @@ test('relay pool does not reuse closing transport sockets', async function (t) {
   await relayNode.destroy()
 })
 
+test('relay pool destroys non-reusable transport before replacing it', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const firstStream = clientNode.createRawStream({ framed: true })
+  const firstPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: firstStream,
+    keepAlive: 5000
+  })
+  const firstConnection = firstPairing.connection
+  const firstSocket = firstPairing.socket
+
+  await waitFor(() => relay._pairing.size === 1)
+
+  const firstClientClosed = once(firstConnection.client, 'close')
+  firstConnection.client.destroy()
+  await firstClientClosed
+
+  t.ok(firstConnection.client.closed, 'first relay client is closed')
+  t.absent(firstSocket.destroyed, 'first relay transport is still open')
+  t.absent(firstSocket.destroying, 'first relay transport is not already closing')
+
+  const secondStream = clientNode.createRawStream({ framed: true })
+  const secondPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: secondStream,
+    keepAlive: 5000
+  })
+
+  t.not(secondPairing.socket, firstSocket, 'new pairing gets a fresh relay transport')
+  t.ok(firstConnection.destroyed, 'replaced relay pool connection is destroyed')
+  t.ok(firstSocket.destroyed || firstSocket.destroying, 'replaced relay transport is closing')
+
+  await waitFor(() => firstSocket.destroyed)
+  t.is(clientNode._relayPool._connections.size, 1, 'only fresh relay pool connection remains')
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
 test('relay pool reuses transport and takes lowest relay keepalive', async function (t) {
   const { bootstrap } = await swarm(t)
 
