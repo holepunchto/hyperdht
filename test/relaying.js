@@ -530,7 +530,8 @@ test('relay connections through node, client and server side', async function (t
 test('relay connection upgrades to direct connection', async function (t) {
   for (const opts of [
     { name: 'default keepalive' },
-    { name: 'without keepalive', connectionKeepAlive: false, confirmWithAppData: true }
+    { name: 'without keepalive', connectionKeepAlive: false, confirmWithAppData: true },
+    { name: 'idle without keepalive', connectionKeepAlive: false }
   ]) {
     t.comment(opts.name)
     const { bootstrap } = await swarm(t)
