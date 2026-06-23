@@ -1,6 +1,7 @@
 const test = require('brittle')
 const { once } = require('events')
 const RelayServer = require('blind-relay').Server
+const NoiseSecretStream = require('@hyperswarm/secret-stream')
 const Holepuncher = require('../lib/holepuncher')
 const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 
@@ -273,16 +274,11 @@ test('relay connections through node, server side', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = createDHT({
-    bootstrap,
-    quickFirewall: false,
-    ephemeral: true,
-    connectionKeepAlive: 12345
-  })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(6)
+  lc.plan(5)
 
   const relay = new RelayServer({
     createStream(opts) {
@@ -301,7 +297,6 @@ test('relay connections through node, server side', async function (t) {
 
   const bServer = b.createServer({ relayThrough: aServer.publicKey }, function (socket) {
     lc.pass('server socket opened')
-    lc.is(socket.keepAlive, 12345, 'server relayed socket inherits connectionKeepAlive')
     socket
       .on('data', (data) => {
         lc.alike(data, Buffer.from('hello world'))
@@ -453,11 +448,18 @@ test('relay connections through node, client and server side', async function (t
   const { bootstrap } = await swarm(t)
 
   const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
-  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({
+    bootstrap,
+    quickFirewall: false,
+    ephemeral: true,
+    connectionKeepAlive: 12345
+  })
   const c = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
   const lc = t.test('socket lifecycle')
   lc.plan(5)
+  const relayKeepAlive = t.test('relay keepalive')
+  relayKeepAlive.plan(1)
   const testRelay = t.test('relay server')
   testRelay.plan(2) // One each for the initiator and the follower
   const testRelayInitiator = t.test('relay initiator')
@@ -492,7 +494,18 @@ test('relay connections through node, client and server side', async function (t
     {
       holepunch: false, // To ensure it relies only on relaying
       shareLocalAddress: false, // To help ensure it relies only on relaying (otherwise it can connect directly over LAN, without even trying to holepunch)
-      relayThrough: aServer.publicKey
+      relayThrough: aServer.publicKey,
+      createSecretStream(isInitiator, rawStream, opts) {
+        if (!isInitiator) {
+          relayKeepAlive.is(
+            opts.keepAlive,
+            12345,
+            'server relayed stream inherits connectionKeepAlive'
+          )
+        }
+
+        return new NoiseSecretStream(isInitiator, rawStream, opts)
+      }
     },
     function (socket) {
       lc.pass('server socket opened')
@@ -521,6 +534,7 @@ test('relay connections through node, client and server side', async function (t
     .end('hello world')
 
   await lc
+  await relayKeepAlive
 
   await c.destroy()
   await b.destroy()
