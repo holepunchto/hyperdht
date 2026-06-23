@@ -528,151 +528,149 @@ test('relay connections through node, client and server side', async function (t
 })
 
 test('relay connection upgrades to direct connection', async function (t) {
-  await testRelayUpgrade(t)
-})
+  for (const opts of [
+    { name: 'default keepalive' },
+    { name: 'without keepalive', connectionKeepAlive: false, confirmWithAppData: true }
+  ]) {
+    t.comment(opts.name)
+    const { bootstrap } = await swarm(t)
 
-test('relay connection upgrades to direct connection without keepalive', async function (t) {
-  await testRelayUpgrade(t, { connectionKeepAlive: false, confirmWithAppData: true })
-})
+    const relayNode = createDHT({ bootstrap })
+    const serverNode = createDHT({
+      bootstrap,
+      quickFirewall: false,
+      ephemeral: true,
+      connectionKeepAlive: opts.connectionKeepAlive
+    })
+    const clientNode = createDHT({
+      bootstrap,
+      quickFirewall: false,
+      ephemeral: true,
+      connectionKeepAlive: opts.connectionKeepAlive
+    })
 
-async function testRelayUpgrade(t, opts = {}) {
-  const { bootstrap } = await swarm(t)
+    const resumePunching = pausePunching(t, [serverNode, clientNode])
 
-  const relayNode = createDHT({ bootstrap })
-  const serverNode = createDHT({
-    bootstrap,
-    quickFirewall: false,
-    ephemeral: true,
-    connectionKeepAlive: opts.connectionKeepAlive
-  })
-  const clientNode = createDHT({
-    bootstrap,
-    quickFirewall: false,
-    ephemeral: true,
-    connectionKeepAlive: opts.connectionKeepAlive
-  })
+    const relayServer = new RelayServer({
+      createStream(opts) {
+        return relayNode.createRawStream({ ...opts, framed: true })
+      }
+    })
 
-  const resumePunching = pausePunching(t, [serverNode, clientNode])
+    t.teardown(() => relayServer.close())
 
-  const relayServer = new RelayServer({
-    createStream(opts) {
-      return relayNode.createRawStream({ ...opts, framed: true })
-    }
-  })
+    const relaySockets = []
+    let resolveRelaySockets = null
+    const relaySocketsOpened = new Promise((resolve) => {
+      resolveRelaySockets = resolve
+    })
 
-  t.teardown(() => relayServer.close())
+    const relayTransportServer = relayNode.createServer(function (socket) {
+      relaySockets.push(socket)
+      // Wait until both client and server have opened their relay transport sockets.
+      if (relaySockets.length === 2) resolveRelaySockets(relaySockets)
 
-  const relaySockets = []
-  let resolveRelaySockets = null
-  const relaySocketsOpened = new Promise((resolve) => {
-    resolveRelaySockets = resolve
-  })
+      const session = relayServer.accept(socket, { id: socket.remotePublicKey })
+      session.on('error', (err) => t.comment(err.message))
+    })
 
-  const relayTransportServer = relayNode.createServer(function (socket) {
-    relaySockets.push(socket)
-    // Wait until both client and server have opened their relay transport sockets.
-    if (relaySockets.length === 2) resolveRelaySockets(relaySockets)
+    await relayTransportServer.listen()
 
-    const session = relayServer.accept(socket, { id: socket.remotePublicKey })
-    session.on('error', (err) => t.comment(err.message))
-  })
+    let resolveServerSocket = null
+    const serverSocketOpened = new Promise((resolve) => {
+      resolveServerSocket = resolve
+    })
 
-  await relayTransportServer.listen()
+    const appServer = serverNode.createServer(
+      {
+        relayThrough: relayTransportServer.publicKey,
+        shareLocalAddress: false
+      },
+      function (socket) {
+        resolveServerSocket(socket)
 
-  let resolveServerSocket = null
-  const serverSocketOpened = new Promise((resolve) => {
-    resolveServerSocket = resolve
-  })
-
-  const appServer = serverNode.createServer(
-    {
-      relayThrough: relayTransportServer.publicKey,
-      shareLocalAddress: false
-    },
-    function (socket) {
-      resolveServerSocket(socket)
-
-      socket.on('data', (data) => socket.write(data))
-      socket.on('end', () => socket.end())
-    }
-  )
-
-  await appServer.listen()
-
-  const clientSocket = clientNode.connect(appServer.publicKey, {
-    fastOpen: false,
-    localConnection: false
-  })
-
-  const [serverSocket] = await Promise.all([serverSocketOpened, once(clientSocket, 'open')])
-  await relaySocketsOpened
-
-  t.is(relaySockets.length, 2, 'both peers opened relay transport sockets')
-
-  t.not(
-    serverSocket.rawStream.remotePort,
-    clientSocket.rawStream.localPort,
-    'server starts on the relayed stream'
-  )
-  t.not(
-    clientSocket.rawStream.remotePort,
-    serverSocket.rawStream.localPort,
-    'client starts on the relayed stream'
-  )
-
-  // The relayed connection should already be usable before the direct path wins.
-  const beforeUpgrade = once(clientSocket, 'data')
-  clientSocket.write(Buffer.from('before upgrade'))
-  t.alike((await beforeUpgrade)[0], Buffer.from('before upgrade'), 'relay path carries data')
-
-  const clientUpgraded = once(clientSocket.rawStream, 'remote-changed')
-  const serverUpgraded = once(serverSocket.rawStream, 'remote-changed')
-  const relaySocketsClosed = relaySockets.map((socket) => once(socket, 'close'))
-
-  resumePunching()
-
-  if (opts.confirmWithAppData) {
-    await clientUpgraded
-
-    t.ok(
-      relaySockets.every((socket) => !socket.destroyed),
-      'relay stays open until direct traffic confirms the upgrade'
+        socket.on('data', (data) => socket.write(data))
+        socket.on('end', () => socket.end())
+      }
     )
 
-    // Without keepalive, the passive upgrade is confirmed by the next app write.
-    const appData = once(clientSocket, 'data')
-    clientSocket.write(Buffer.from('after upgrade'))
-    t.alike((await appData)[0], Buffer.from('after upgrade'), 'app data confirms direct path')
+    await appServer.listen()
+
+    const clientSocket = clientNode.connect(appServer.publicKey, {
+      fastOpen: false,
+      localConnection: false
+    })
+
+    const [serverSocket] = await Promise.all([serverSocketOpened, once(clientSocket, 'open')])
+    await relaySocketsOpened
+
+    t.is(relaySockets.length, 2, 'both peers opened relay transport sockets')
+
+    t.not(
+      serverSocket.rawStream.remotePort,
+      clientSocket.rawStream.localPort,
+      'server starts on the relayed stream'
+    )
+    t.not(
+      clientSocket.rawStream.remotePort,
+      serverSocket.rawStream.localPort,
+      'client starts on the relayed stream'
+    )
+
+    // The relayed connection should already be usable before the direct path wins.
+    const beforeUpgrade = once(clientSocket, 'data')
+    clientSocket.write(Buffer.from('before upgrade'))
+    t.alike((await beforeUpgrade)[0], Buffer.from('before upgrade'), 'relay path carries data')
+
+    const clientUpgraded = once(clientSocket.rawStream, 'remote-changed')
+    const serverUpgraded = once(serverSocket.rawStream, 'remote-changed')
+    const relaySocketsClosed = relaySockets.map((socket) => once(socket, 'close'))
+
+    resumePunching()
+
+    if (opts.confirmWithAppData) {
+      await clientUpgraded
+
+      t.ok(
+        relaySockets.every((socket) => !socket.destroyed),
+        'relay stays open until direct traffic confirms the upgrade'
+      )
+
+      // Without keepalive, the passive upgrade is confirmed by the next app write.
+      const appData = once(clientSocket, 'data')
+      clientSocket.write(Buffer.from('after upgrade'))
+      t.alike((await appData)[0], Buffer.from('after upgrade'), 'app data confirms direct path')
+    }
+
+    await Promise.all([clientUpgraded, serverUpgraded])
+    await Promise.all(relaySocketsClosed)
+    t.pass('relay transport sockets close after direct upgrade')
+
+    t.is(
+      serverSocket.rawStream.remotePort,
+      clientSocket.rawStream.localPort,
+      'server switches to the client address'
+    )
+    t.is(
+      clientSocket.rawStream.remotePort,
+      serverSocket.rawStream.localPort,
+      'client switches to the server address'
+    )
+
+    if (!opts.confirmWithAppData) {
+      const afterUpgrade = once(clientSocket, 'data')
+      clientSocket.write(Buffer.from('after upgrade'))
+      t.alike((await afterUpgrade)[0], Buffer.from('after upgrade'), 'direct path carries data')
+    }
+
+    await endAndCloseSocket(clientSocket)
+    if (!serverSocket.destroyed) await once(serverSocket, 'close')
+
+    await relayNode.destroy()
+    await serverNode.destroy()
+    await clientNode.destroy()
   }
-
-  await Promise.all([clientUpgraded, serverUpgraded])
-  await Promise.all(relaySocketsClosed)
-  t.pass('relay transport sockets close after direct upgrade')
-
-  t.is(
-    serverSocket.rawStream.remotePort,
-    clientSocket.rawStream.localPort,
-    'server switches to the client address'
-  )
-  t.is(
-    clientSocket.rawStream.remotePort,
-    serverSocket.rawStream.localPort,
-    'client switches to the server address'
-  )
-
-  if (!opts.confirmWithAppData) {
-    const afterUpgrade = once(clientSocket, 'data')
-    clientSocket.write(Buffer.from('after upgrade'))
-    t.alike((await afterUpgrade)[0], Buffer.from('after upgrade'), 'direct path carries data')
-  }
-
-  await endAndCloseSocket(clientSocket)
-  if (!serverSocket.destroyed) await once(serverSocket, 'close')
-
-  await relayNode.destroy()
-  await serverNode.destroy()
-  await clientNode.destroy()
-}
+})
 
 test.skip('relay several connections through node with pool', async function (t) {
   const { bootstrap } = await swarm(t)
