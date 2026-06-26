@@ -1,9 +1,47 @@
 const test = require('brittle')
-const { once } = require('events')
+const { EventEmitter, once } = require('events')
 const RelayServer = require('blind-relay').Server
 const NoiseSecretStream = require('@hyperswarm/secret-stream')
 const Holepuncher = require('../lib/holepuncher')
+const { confirmDirectUpgrade } = require('../lib/relay-connection')
 const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
+
+test('direct upgrade confirmation ignores repeated relayed messages', function (t) {
+  const rawStream = new RawStream()
+  let closed = 0
+
+  const state = {
+    relayTimeout: null,
+    relayToken: Buffer.alloc(0),
+    relaySocket: {
+      end() {
+        closed++
+      }
+    },
+    relayClient: {},
+    validUpgrade: false
+  }
+
+  confirmDirectUpgrade(state, rawStream, null)
+
+  rawStream.emit('message', Buffer.from('relayed 1'))
+  rawStream.emit('message', Buffer.from('relayed 2'))
+
+  t.is(closed, 0, 'repeated relayed messages do not close the relay')
+  t.ok(state.relaySocket, 'relay state is kept for relayed messages')
+  t.is(rawStream.sent, 1, 'sends one direct confirmation nudge')
+})
+
+class RawStream extends EventEmitter {
+  constructor() {
+    super()
+    this.sent = 0
+  }
+
+  trySend() {
+    this.sent++
+  }
+}
 
 test('relay connections through node, client side', async function (t) {
   const { bootstrap } = await swarm(t)
