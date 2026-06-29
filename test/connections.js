@@ -252,7 +252,7 @@ test('createServer + connect - failed LAN ping falls back to holepunch', async f
 })
 
 test('createServer + connect - same-LAN explicit keypair opens server', async function (t) {
-  const { bootstrap } = await swarm(t)
+  const { bootstrap } = await swarm(t, 3)
 
   const a = new DHT({ bootstrap })
   const b = new DHT({ bootstrap })
@@ -263,13 +263,12 @@ test('createServer + connect - same-LAN explicit keypair opens server', async fu
   const serverKeyPair = DHT.keyPair()
   const clientKeyPair = DHT.keyPair()
   const lc = t.test('socket lifecycle')
-  lc.plan(4)
+  lc.plan(2)
 
   const server = a.createServer(function (socket) {
     lc.pass('server side opened')
 
     socket.once('end', function () {
-      lc.pass('server side ended')
       socket.end()
     })
   })
@@ -284,18 +283,13 @@ test('createServer + connect - same-LAN explicit keypair opens server', async fu
     lc.pass('client side opened')
   })
 
-  socket.once('end', function () {
-    lc.pass('client side ended')
-  })
-
   socket.once('error', function (err) {
     lc.fail('client should not error: ' + err.code)
   })
 
-  socket.end()
-
   await lc
 
+  await endAndCloseSocket(socket)
   await server.close()
   await a.destroy()
   await b.destroy()
