@@ -251,6 +251,55 @@ test('createServer + connect - failed LAN ping falls back to holepunch', async f
   await b.destroy()
 })
 
+test(
+  'createServer + connect - same-LAN explicit keypair opens server',
+  { timeout: 15000 },
+  async function (t) {
+    const { bootstrap } = await swarm(t)
+
+    const a = new DHT({ bootstrap })
+    const b = new DHT({ bootstrap })
+
+    await a.fullyBootstrapped()
+    await b.fullyBootstrapped()
+
+    const serverKeyPair = DHT.keyPair()
+    const clientKeyPair = DHT.keyPair()
+
+    let resolveServerOpened = null
+    const serverOpened = new Promise((resolve) => {
+      resolveServerOpened = resolve
+    })
+
+    const server = a.createServer(function (socket) {
+      socket.on('error', () => {})
+      socket.once('end', () => socket.end())
+      resolveServerOpened(socket)
+    })
+
+    await server.listen(serverKeyPair)
+
+    const socket = b.connect(serverKeyPair.publicKey, {
+      keyPair: clientKeyPair
+    })
+
+    socket.once('error', function (err) {
+      t.fail('client should not error: ' + err.code)
+    })
+
+    await withTimeout(once(socket, 'open'), 5000, 'client side did not open')
+    t.pass('client side opened')
+
+    await withTimeout(serverOpened, 5000, 'server side did not open')
+    t.pass('server side opened')
+
+    await endAndCloseSocket(socket)
+    await server.close()
+    await a.destroy()
+    await b.destroy()
+  }
+)
+
 test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
 
@@ -884,3 +933,18 @@ test('create server with handshakeClearWait opt', async function (t) {
     t.is(server.handshakeClearWait, 10000, 'expected default')
   }
 })
+
+async function withTimeout(promise, ms, message) {
+  let timeout = null
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error(message)), ms)
+      })
+    ])
+  } finally {
+    clearTimeout(timeout)
+  }
+}
