@@ -22,7 +22,64 @@ const DEFAULTS = {
   randomPunchInterval: 20000
 }
 
+/**
+ * Options for creating a HyperDHT node.
+ * @typedef {Object} HyperDHTOptions
+ * @property {Array<string>} [bootstrap] - Bootstrap server addresses (`'host:port'`). Defaults to the Holepunch public bootstrap nodes.
+ * @property {{publicKey: Buffer, secretKey: Buffer}} [keyPair] - Default key pair used for `server.listen()` and `connect()`.
+ * @property {number|false} [connectionKeepAlive=5000] - Keep-alive interval in ms for all opened sockets. Set `false` to disable.
+ * @property {number} [randomPunchInterval=20000] - Minimum ms between random holepunches.
+ */
+
+/**
+ * Options for `node.createServer()`.
+ * @typedef {Object} CreateServerOptions
+ * @property {function(Buffer, object): boolean} [firewall] - Called with `(remotePublicKey, remoteHandshakePayload)`. Return `true` to block, `false` to allow.
+ * @property {function(number, number, Array, Array): boolean} [holepunch] - Called before holepunching begins. Return `false` to abort.
+ * @property {Buffer|Array<Buffer>|function(): Buffer|null} [relayThrough] - Optionally relay through a specific peer — pass a public key (Buffer), an array of public keys to pick from, or a function returning one.
+ * @property {number} [relayKeepAlive=5000] - Keep-alive interval in ms for the relay socket.
+ */
+
+/**
+ * Options for `node.connect()`.
+ * @typedef {Object} ConnectOptions
+ * @property {Array<{host: string, port: number}>} [nodes] - Known DHT nodes close to the remote — speeds up connecting.
+ * @property {Array<{host: string, port: number}>} [relayAddresses] - Relay server addresses to hole-punch through when a direct connection cannot be established.
+ * @property {{publicKey: Buffer, secretKey: Buffer}} [keyPair] - Key pair to use for this connection. Defaults to `node.defaultKeyPair`.
+ * @property {Buffer|Array<Buffer>|function(): Buffer|null} [relayThrough] - Optionally relay through a specific peer — pass a public key (Buffer), an array of public keys to pick from, or a function returning one.
+ */
+
+/**
+ * Options for `node.mutableGet()`.
+ * @typedef {Object} MutableGetOptions
+ * @property {number} [seq=0] - Only return values whose `seq` is >= this number.
+ * @property {boolean} [latest=true] - If `true`, scan the whole query and return the highest `seq` seen.
+ * @property {function(object): boolean} [refresh] - Called with the latest result; return `true` to re-store it, extending its TTL.
+ */
+
+/**
+ * Options for `node.mutablePut()`.
+ * @typedef {Object} MutablePutOptions
+ * @property {number} [seq=0] - Sequence number for this value. Must be greater than the current stored `seq` to overwrite.
+ * @property {function(number, Buffer, object): Promise<Buffer>} [signMutable] - Custom signing function. Defaults to the built-in Ed25519 signer.
+ */
+
 class HyperDHT extends DHT {
+  /**
+   * Create a new DHT node.
+   * @param {HyperDHTOptions} [opts]
+   * @example
+   * {
+   *   // Optionally overwrite the default bootstrap servers, just need to be an array of any known dht node(s)
+   *   // Defaults to Pear.config.dht.bootstrap in a Pear app or ['88.99.3.86@node1.hyperdht.org:49737', '142.93.90.113@node2.hyperdht.org:49737', '138.68.147.8@node3.hyperdht.org:49737'] elsewhere
+   *   // Supports suggested-IP to avoid DNS calls: [suggested-IP@]<host>:<port>
+   *   bootstrap: ['host:port'],
+   *   keyPair, // set the default key pair to use for server.listen and connect
+   *   connectionKeepAlive, // set a default keep-alive (in ms) on all opened sockets. Defaults to 5000. Set false to turn off (advanced usage).
+   *   randomPunchInterval: 20000 // set a default time for interval between punches (in ms). Defaults to 20000.
+   *
+   * }
+   */
   constructor(opts = {}) {
     const port = opts.port || 49737
     const bootstrap = opts.bootstrap || BOOTSTRAP_NODES
@@ -78,10 +135,37 @@ class HyperDHT extends DHT {
 
   static DEFAULTS = DEFAULTS
 
+  /**
+   * Connect to a remote server. Similar to `createServer` this performs UDP
+   * holepunching for P2P connectivity.
+   * @param {Buffer|string} remotePublicKey - Public key of the server to connect to (Buffer, hex string, or z-base32 string).
+   * @param {ConnectOptions} [opts]
+   * @returns {NoiseSecretStream} An encrypted duplex stream — use `socket.on('open', ...)` to know when it is ready.
+   * @example
+   * {
+   *   nodes: [...], // optional array of close dht nodes to speed up connecting
+   *   keyPair // optional key pair to use when connection (defaults to node.defaultKeyPair)
+   * }
+   */
   connect(remotePublicKey, opts) {
     return connect(this, remotePublicKey, opts)
   }
 
+  /**
+   * Create a new server for accepting incoming encrypted P2P connections.
+   * @param {CreateServerOptions} [opts]
+   * @param {function(NoiseSecretStream): void} [onconnection] - Shorthand listener for the `'connection'` event.
+   * @returns {Server} A server object — call `server.listen(keyPair)` to start accepting connections.
+   * @example
+   * {
+   *   firewall (remotePublicKey, remoteHandshakePayload) {
+   *     // validate if you want a connection from remotePublicKey
+   *     // if you do return false, else return true
+   *     // remoteHandshakePayload contains their ip and some more info
+   *     return true
+   *   }
+   * }
+   */
   createServer(opts, onconnection) {
     if (typeof opts === 'function') return this.createServer({}, opts)
     if (opts && opts.onconnection) onconnection = opts.onconnection
@@ -120,6 +204,15 @@ class HyperDHT extends DHT {
     this._connectable = true
   }
 
+  /**
+   * Fully destroy this DHT node.
+   * @param {object} [options] - Pass `{ force: true }` to skip waiting for servers to unannounce before closing.
+   * @returns {Promise<void>} Resolves when the node is fully shut down.
+   * @example
+   * await node.destroy()
+   * // or, to skip graceful unannounce:
+   * await node.destroy({ force: true })
+   */
   async destroy({ force = false } = {}) {
     if (!force) {
       const closing = []
@@ -191,6 +284,22 @@ class HyperDHT extends DHT {
     return this.query({ target, command: COMMANDS.FIND_PEER, value: null }, opts)
   }
 
+  /**
+   * Look for peers in the DHT on the given topic. Topic should be a 32 byte
+   * buffer (normally a hash of something).
+   * @param {Buffer} target
+   * @param {object} [opts] - Options forwarded to `dht-rpc`.
+   * @returns {QueryStream} An async-iterable query stream whose values are `{ from, to, peers }` objects.
+   * @example
+   * {
+   *   // Who sent the response?
+   *   from: { id, host, port },
+   *   // What address they responded to (i.e. your address)
+   *   to: { host, port },
+   *   // List of peers announcing under this topic
+   *   peers: [ { publicKey, nodes: [{ host, port }, ...] } ]
+   * }
+   */
   lookup(target, opts = {}) {
     opts = { ...opts, map: mapLookup }
     return this.query({ target, command: COMMANDS.LOOKUP, value: null }, opts)
@@ -239,10 +348,33 @@ class HyperDHT extends DHT {
     }
   }
 
+  /**
+   * Unannounce a key-pair.
+   * @param {Buffer} target - 32-byte topic buffer previously used in `announce()`.
+   * @param {{publicKey: Buffer, secretKey: Buffer}} keyPair - The Ed25519 key pair to unannounce.
+   * @param {object} [opts] - Options forwarded to `dht-rpc`.
+   * @returns {Promise<void>} Resolves when the unannounce query has completed.
+   * @example
+   * const topic = DHT.hash(Buffer.from('my-topic'))
+   * await node.unannounce(topic, keyPair)
+   */
   unannounce(target, keyPair, opts = {}) {
     return this.lookupAndUnannounce(target, keyPair, opts).finished()
   }
 
+  /**
+   * Announce that you are listening on a key-pair to the DHT under a specific
+   * topic.
+   * @param {Buffer} target - 32-byte topic buffer to announce under.
+   * @param {{publicKey: Buffer, secretKey: Buffer}} keyPair - The Ed25519 key pair to announce with.
+   * @param {Array<{host: string, port: number}>} [relayAddresses] - Up to 3 DHT relay node addresses to include in the announcement.
+   * @param {object} [opts] - Options forwarded to `dht-rpc`.
+   * @returns {QueryStream} An async-iterable query stream (same shape as `lookup()`).
+   * @example
+   * const topic = DHT.hash(Buffer.from('my-topic'))
+   * const stream = node.announce(topic, keyPair)
+   * await stream.finished()
+   */
   announce(target, keyPair, relayAddresses, opts = {}) {
     const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
     const bump = opts.bump || 0
@@ -265,6 +397,16 @@ class HyperDHT extends DHT {
     }
   }
 
+  /**
+   * Fetch an immutable value from the DHT. When successful, it returns the value
+   * corresponding to the hash.
+   * @param {Buffer} target - 32-byte hash of the value to fetch (returned by `immutablePut()`).
+   * @param {object} [opts] - Options forwarded to `dht-rpc`.
+   * @returns {Promise<{token: Buffer, from: object, to: object, value: Buffer}|null>} The result node or `null` if not found.
+   * @example
+   * const result = await node.immutableGet(hash)
+   * if (result) console.log(result.value.toString())
+   */
   async immutableGet(target, opts = {}) {
     opts = { ...opts, map: mapImmutable }
 
@@ -280,6 +422,17 @@ class HyperDHT extends DHT {
     return null
   }
 
+  /**
+   * Store an immutable value in the DHT. When successful, the hash of the value
+   * is returned.
+   * @param {Buffer} value - The value to store (a Buffer).
+   * @param {object} [opts] - Options forwarded to `dht-rpc`.
+   * @returns {Promise<{hash: Buffer, closestNodes: Array<object>}>} Object with the 32-byte `hash` and the `closestNodes` that stored the value.
+   * @example
+   * const { hash } = await node.immutablePut(Buffer.from('hello world'))
+   * const result = await node.immutableGet(hash)
+   * console.log(result.value.toString()) // 'hello world'
+   */
   async immutablePut(value, opts = {}) {
     const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, value)
@@ -301,6 +454,15 @@ class HyperDHT extends DHT {
     return { hash: target, closestNodes: query.closestNodes }
   }
 
+  /**
+   * Fetch a mutable value from the DHT.
+   * @param {Buffer} publicKey - Ed25519 public key of the key pair used to sign the value with `mutablePut()`.
+   * @param {MutableGetOptions} [opts] - Fetch options.
+   * @returns {Promise<{token: Buffer, from: object, to: object, seq: number, value: Buffer, signature: Buffer}|null>} The latest matching result, or `null` if not found.
+   * @example
+   * const result = await node.mutableGet(keyPair.publicKey)
+   * if (result) console.log(result.value.toString(), 'seq:', result.seq)
+   */
   async mutableGet(publicKey, opts = {}) {
     let refresh = opts.refresh || null
     let signed = null
@@ -354,6 +516,17 @@ class HyperDHT extends DHT {
     }
   }
 
+  /**
+   * Store a mutable value in the DHT.
+   * @param {{publicKey: Buffer, secretKey: Buffer}} keyPair - Ed25519 key pair used to sign the value.
+   * @param {Buffer} value - The value to store (a Buffer).
+   * @param {MutablePutOptions} [opts] - Put options.
+   * @returns {Promise<{publicKey: Buffer, closestNodes: Array<object>, seq: number, signature: Buffer}>} The stored record metadata.
+   * @example
+   * const keyPair = DHT.keyPair()
+   * const { seq } = await node.mutablePut(keyPair, Buffer.from('v1'), { seq: 0 })
+   * console.log('stored at seq', seq)
+   */
   async mutablePut(keyPair, value, opts = {}) {
     const signMutable = opts.signMutable || Persistent.signMutable
 
