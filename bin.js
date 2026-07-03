@@ -53,8 +53,6 @@ async function startNodes(cnt, bootstrap) {
     const node = new HyperDHT({ host, port, anyPort: !port, bootstrap })
     await node.ready()
 
-    all.push(node)
-
     const id = all.push(node) - 1
     console.log('Node #' + id + ' bound to', node.address())
 
