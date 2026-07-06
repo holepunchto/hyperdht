@@ -903,6 +903,62 @@ test('relay pool destroys non-reusable transport before replacing it', async fun
   await relayNode.destroy()
 })
 
+test('relay pool connection destroy waits for close if transport errors', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const rawStream = clientNode.createRawStream({ framed: true })
+  const pairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: rawStream,
+    keepAlive: 5000
+  })
+
+  await waitFor(() => relay._pairing.size === 1)
+
+  const connection = pairing.connection
+  const socket = connection.socket
+  let closed = false
+
+  socket.once('close', () => {
+    closed = true
+  })
+
+  const destroy = socket.destroy.bind(socket)
+  socket.destroy = function (...args) {
+    socket.destroy = destroy
+    socket.emit('error', new Error('synthetic destroy error'))
+    setTimeout(() => destroy(...args), 50)
+    return socket
+  }
+
+  await t.execution(connection.destroy(), 'destroy ignores transport error while waiting for close')
+  t.ok(closed, 'destroy resolves after transport closes')
+  t.ok(socket.destroyed, 'transport is destroyed')
+
+  rawStream.destroy()
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
 test('relay pool reuses transport and takes lowest relay keepalive', async function (t) {
   const { bootstrap } = await swarm(t)
 
