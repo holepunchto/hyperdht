@@ -252,6 +252,8 @@ test('createServer + connect - failed LAN ping falls back to holepunch', async f
 })
 
 test('createServer + connect - same-LAN explicit keypair opens server', async function (t) {
+  // Regression: advertising the prepunch socket as the server address can make
+  // the client mark punching done before the LAN shortcut opens the stream.
   const { bootstrap } = await swarm(t, 3)
 
   const a = new DHT({ bootstrap })
