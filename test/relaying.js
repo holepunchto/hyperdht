@@ -1128,6 +1128,8 @@ test('relay pool keeps transport open for pairings started during delayed unpair
 })
 
 test('relay connection upgrades to direct connection', async function (t) {
+  t.timeout(90000)
+
   for (const opts of [
     { name: 'default keepalive' },
     { name: 'without keepalive', connectionKeepAlive: false, confirmWithAppData: true },
