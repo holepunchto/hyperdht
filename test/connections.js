@@ -251,6 +251,52 @@ test('createServer + connect - failed LAN ping falls back to holepunch', async f
   await b.destroy()
 })
 
+test('createServer + connect - same-LAN explicit keypair opens server', async function (t) {
+  // Regression: advertising the prepunch socket as the server address can make
+  // the client mark punching done before the LAN shortcut opens the stream.
+  const { bootstrap } = await swarm(t, 3)
+
+  const a = new DHT({ bootstrap })
+  const b = new DHT({ bootstrap })
+
+  await a.fullyBootstrapped()
+  await b.fullyBootstrapped()
+
+  const serverKeyPair = DHT.keyPair()
+  const clientKeyPair = DHT.keyPair()
+  const lc = t.test('socket lifecycle')
+  lc.plan(2)
+
+  const server = a.createServer(function (socket) {
+    lc.pass('server side opened')
+
+    socket.once('end', function () {
+      socket.end()
+    })
+  })
+
+  await server.listen(serverKeyPair)
+
+  const socket = b.connect(serverKeyPair.publicKey, {
+    keyPair: clientKeyPair
+  })
+
+  socket.once('open', function () {
+    lc.pass('client side opened')
+  })
+
+  socket.once('error', function (err) {
+    lc.fail('client should not error: ' + err.code)
+  })
+
+  await lc
+
+  await endAndCloseSocket(socket)
+  await server.close()
+  await a.destroy()
+  await b.destroy()
+})
+
 test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
 
