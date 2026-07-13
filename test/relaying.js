@@ -1,8 +1,11 @@
 const test = require('brittle')
 const { once } = require('events')
-const RelayServer = require('blind-relay').Server
+const BlindRelay = require('blind-relay')
+const RelayServer = BlindRelay.Server
 const NoiseSecretStream = require('@hyperswarm/secret-stream')
+const DHT = require('../')
 const Holepuncher = require('../lib/holepuncher')
+const NoiseWrap = require('../lib/noise-wrap')
 const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 
 test('relay connections through node, client side', async function (t) {
@@ -200,18 +203,6 @@ test('relay connections through node, server side, client abort notifies remote'
   await b.destroy()
   await c.destroy()
 })
-
-async function waitFor(fn, timeout = 2000) {
-  const started = Date.now()
-
-  while (!fn()) {
-    if (Date.now() - started > timeout) {
-      throw new Error('Timed out waiting for test condition')
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 20))
-  }
-}
 
 test('relay connections through node, client side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
@@ -541,7 +532,677 @@ test('relay connections through node, client and server side', async function (t
   await a.destroy()
 })
 
+test('relay connections through same node reuse transport sockets', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relaySockets = []
+  let closedRelaySockets = 0
+
+  let serverSocketCount = 0
+  let secondServerSocket = null
+  let reconnectedServerSocket = null
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  let closedRelayStreams = 0
+  let resolveFirstPairingReleased = null
+  const firstPairingReleased = new Promise((resolve) => {
+    resolveFirstPairingReleased = resolve
+  })
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    relaySockets.push(socket)
+    socket.once('close', function () {
+      closedRelaySockets++
+    })
+
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('pair', function (_, __, stream) {
+      stream.once('close', function () {
+        closedRelayStreams++
+        if (closedRelayStreams === 2) resolveFirstPairingReleased()
+      })
+    })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const appServer = serverNode.createServer(
+    {
+      holepunch: false,
+      shareLocalAddress: false,
+      relayThrough: relayTransportServer.publicKey
+    },
+    function (socket) {
+      serverSocketCount++
+      if (serverSocketCount === 2) secondServerSocket = socket
+      else if (serverSocketCount === 3) reconnectedServerSocket = socket
+
+      socket.on('data', (data) => socket.write(data))
+      socket.on('end', () => socket.end())
+    }
+  )
+
+  await appServer.listen()
+
+  const firstClientSocket = clientNode.connect(appServer.publicKey, {
+    localConnection: false,
+    relayThrough: relayTransportServer.publicKey
+  })
+  await once(firstClientSocket, 'open')
+
+  const secondClientSocket = clientNode.connect(appServer.publicKey, {
+    localConnection: false,
+    relayThrough: relayTransportServer.publicKey
+  })
+  await once(secondClientSocket, 'open')
+
+  t.is(relaySockets.length, 2, 'both peers reuse one transport socket to the relay')
+
+  const firstReply = once(firstClientSocket, 'data')
+  const secondReply = once(secondClientSocket, 'data')
+  firstClientSocket.write(Buffer.from('hello 1'))
+  secondClientSocket.write(Buffer.from('hello 2'))
+
+  t.alike(await firstReply, [Buffer.from('hello 1')], 'first relayed connection carries data')
+  t.alike(await secondReply, [Buffer.from('hello 2')], 'second relayed connection carries data')
+
+  await endAndCloseSocket(firstClientSocket)
+  await firstPairingReleased
+  t.is(closedRelayStreams, 2, 'closing one app connection releases only its relay pairing')
+
+  const afterFirstClosedReply = once(secondClientSocket, 'data')
+  secondClientSocket.write(Buffer.from('still relayed'))
+  t.alike(
+    await afterFirstClosedReply,
+    [Buffer.from('still relayed')],
+    'second relayed connection stays usable after first closes'
+  )
+
+  await endAndCloseSocket(secondClientSocket)
+
+  if (!secondServerSocket.destroyed) await once(secondServerSocket, 'close')
+
+  await waitFor(() => closedRelaySockets === 2)
+  t.is(closedRelaySockets, 2, 'shared relay transports close after all pairings close')
+
+  const reconnectedClientSocket = clientNode.connect(appServer.publicKey, {
+    localConnection: false,
+    relayThrough: relayTransportServer.publicKey
+  })
+
+  await once(reconnectedClientSocket, 'open')
+  t.is(relaySockets.length, 4, 'reconnect creates fresh relay transport sockets')
+
+  const reconnectedReply = once(reconnectedClientSocket, 'data')
+  reconnectedClientSocket.write(Buffer.from('reconnected'))
+  t.alike(
+    await reconnectedReply,
+    [Buffer.from('reconnected')],
+    'reconnected relay path carries data'
+  )
+
+  await endAndCloseSocket(reconnectedClientSocket)
+  if (!reconnectedServerSocket.destroyed) await once(reconnectedServerSocket, 'close')
+
+  await clientNode.destroy()
+  await serverNode.destroy()
+  await relayNode.destroy()
+})
+
+test('server cleans up duplicate pending relay tokens', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  let first = null
+
+  t.teardown(async function () {
+    if (first && first.relayTimeout) clearTimeout(first.relayTimeout)
+
+    await serverNode.destroy()
+    await relayNode.destroy()
+  })
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    // Keep the transport open without completing the blind-relay pairing.
+    socket.on('error', () => {})
+  })
+
+  await relayTransportServer.listen()
+
+  const token = BlindRelay.token()
+  const server = serverNode.createServer({
+    handshakeClearWait: 50,
+    shareLocalAddress: false
+  })
+
+  await server.listen()
+
+  const peerAddress = { host: '127.0.0.2', port: 49152 }
+  const req = {
+    to: serverNode.address(),
+    socket: serverNode.io.serverSocket
+  }
+
+  const attackerKeyPair = DHT.keyPair()
+  const payload = {
+    error: 0,
+    firewall: DHT.FIREWALL.CONSISTENT,
+    udx: { reusableSocket: false, id: 1, seq: 0 },
+    relayThrough: { publicKey: relayTransportServer.publicKey, token }
+  }
+  const createNoise = () => new NoiseWrap(attackerKeyPair, server.publicKey).send(payload)
+
+  await server._onpeerhandshake({ noise: await createNoise(), peerAddress }, req)
+  first = server._holepunches.find(Boolean)
+
+  t.ok(first && first.relayPairing, 'first relay pairing remains pending')
+
+  const secondNoise = await createNoise()
+  const secondAttempt = server._onpeerhandshake({ noise: secondNoise, peerAddress }, req)
+  const second = server._holepunches.find((handshake) => handshake && handshake !== first)
+  const secondKey = secondNoise.toString('hex')
+  const secondReply = await secondAttempt
+
+  t.is(secondReply, null, 'duplicate handshake has no reply')
+  t.ok(second, 'captured duplicate handshake state')
+  t.is(serverNode.stats.relaying.aborts, 1, 'duplicate relay pairing counts as aborted')
+
+  if ([...serverNode.rawStreams].includes(second.rawStream)) {
+    await once(second.rawStream, 'close')
+  }
+
+  await waitFor(() => !server._connects.has(secondKey))
+
+  t.absent(
+    [...serverNode.rawStreams].includes(second.rawStream),
+    'duplicate raw stream is released'
+  )
+  t.absent(server._holepunches.includes(second), 'duplicate handshake slot is cleared')
+})
+
+test('relay pool closes app streams when shared transports close', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relaySockets = []
+  const serverSockets = []
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    relaySockets.push(socket)
+
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', () => {})
+  })
+
+  await relayTransportServer.listen()
+
+  const appServer = serverNode.createServer(
+    {
+      holepunch: false,
+      shareLocalAddress: false,
+      relayThrough: relayTransportServer.publicKey
+    },
+    function (socket) {
+      serverSockets.push(socket)
+
+      socket.on('data', (data) => socket.write(data))
+      socket.on('end', () => socket.end())
+    }
+  )
+
+  await appServer.listen()
+
+  const clientSockets = [
+    clientNode.connect(appServer.publicKey, {
+      localConnection: false,
+      relayThrough: relayTransportServer.publicKey
+    }),
+    clientNode.connect(appServer.publicKey, {
+      localConnection: false,
+      relayThrough: relayTransportServer.publicKey
+    })
+  ]
+
+  await Promise.all(clientSockets.map((socket) => once(socket, 'open')))
+
+  t.is(clientNode._relayPool._connections.size, 1, 'client has one shared relay pool connection')
+  t.is(serverNode._relayPool._connections.size, 1, 'server has one shared relay pool connection')
+
+  const closed = [
+    ...clientSockets.map((socket) => once(socket, 'close')),
+    ...serverSockets.map((socket) => once(socket, 'close'))
+  ]
+
+  getOnlyRelayPoolConnection(clientNode).socket.destroy()
+  getOnlyRelayPoolConnection(serverNode).socket.destroy()
+
+  await Promise.all(closed)
+  t.pass('active app streams close when shared relay transports close')
+  t.is(clientNode._relayPool._connections.size, 0, 'client relay pool connection is removed')
+  t.is(serverNode._relayPool._connections.size, 0, 'server relay pool connection is removed')
+
+  const reconnectedClientSocket = clientNode.connect(appServer.publicKey, {
+    localConnection: false,
+    relayThrough: relayTransportServer.publicKey
+  })
+
+  await once(reconnectedClientSocket, 'open')
+  t.is(relaySockets.length, 4, 'later reconnect creates fresh relay transports')
+
+  const reply = once(reconnectedClientSocket, 'data')
+  reconnectedClientSocket.write(Buffer.from('fresh relay'))
+  t.alike((await reply)[0], Buffer.from('fresh relay'), 'fresh relay transport carries data')
+
+  await endAndCloseSocket(reconnectedClientSocket)
+  const lastServerSocket = serverSockets[serverSockets.length - 1]
+  if (!lastServerSocket.destroyed) await once(lastServerSocket, 'close')
+
+  await clientNode.destroy()
+  await serverNode.destroy()
+  await relayNode.destroy()
+})
+
+test('relay pool unpairs if pairing aborts before remote pairs', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const rawStream = clientNode.createRawStream({ framed: true })
+  const pairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: rawStream,
+    keepAlive: 5000
+  })
+
+  await waitFor(() => relay._pairing.size === 1)
+  t.is(relay._pairing.size, 1, 'relay has one pending half-pairing')
+
+  pairing.release()
+  rawStream.destroy()
+
+  await waitFor(() => relay._pairing.size === 0)
+  t.pass('pending half-pairing is unpaired')
+  t.is(clientNode._relayPool._connections.size, 0, 'relay pool closes after aborted pairing')
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
+test('relay pool does not reuse closing transport sockets', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const firstStream = clientNode.createRawStream({ framed: true })
+  const firstPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: firstStream,
+    keepAlive: 5000
+  })
+  const closingSocket = firstPairing.socket
+
+  // Simulate the close-event race where the pool connection still exists but its transport is closing.
+  closingSocket.destroy()
+
+  const secondStream = clientNode.createRawStream({ framed: true })
+  const secondPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: secondStream,
+    keepAlive: 5000
+  })
+
+  t.not(secondPairing.socket, closingSocket, 'new pairing gets a fresh relay transport')
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
+test('relay pool destroys non-reusable transport before replacing it', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const firstStream = clientNode.createRawStream({ framed: true })
+  const firstPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: firstStream,
+    keepAlive: 5000
+  })
+  const firstConnection = firstPairing.connection
+  const firstSocket = firstPairing.socket
+
+  await waitFor(() => relay._pairing.size === 1)
+
+  const firstClientClosed = once(firstConnection.client, 'close')
+  firstConnection.client.destroy()
+  await firstClientClosed
+
+  t.ok(firstConnection.client.closed, 'first relay client is closed')
+  t.absent(firstSocket.destroyed, 'first relay transport is still open')
+  t.absent(firstSocket.destroying, 'first relay transport is not already closing')
+
+  const secondStream = clientNode.createRawStream({ framed: true })
+  const secondPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: secondStream,
+    keepAlive: 5000
+  })
+
+  t.not(secondPairing.socket, firstSocket, 'new pairing gets a fresh relay transport')
+  t.ok(firstConnection.destroyed, 'replaced relay pool connection is destroyed')
+  t.ok(firstSocket.destroyed || firstSocket.destroying, 'replaced relay transport is closing')
+
+  await waitFor(() => firstSocket.destroyed)
+  t.is(clientNode._relayPool._connections.size, 1, 'only fresh relay pool connection remains')
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
+test('relay pool connection destroy waits for close if transport errors', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const rawStream = clientNode.createRawStream({ framed: true })
+  const pairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: rawStream,
+    keepAlive: 5000
+  })
+
+  await waitFor(() => relay._pairing.size === 1)
+
+  const connection = pairing.connection
+  const socket = connection.socket
+  let closed = false
+
+  socket.once('close', () => {
+    closed = true
+  })
+
+  const destroy = socket.destroy.bind(socket)
+  socket.destroy = function (...args) {
+    socket.destroy = destroy
+    socket.emit('error', new Error('synthetic destroy error'))
+    setTimeout(() => destroy(...args), 50)
+    return socket
+  }
+
+  await t.execution(connection.destroy(), 'destroy ignores transport error while waiting for close')
+  t.ok(closed, 'destroy resolves after transport closes')
+  t.ok(socket.destroyed, 'transport is destroyed')
+
+  rawStream.destroy()
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
+test('relay pool reuses transport and takes lowest relay keepalive', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  function pair(keepAlive) {
+    const stream = clientNode.createRawStream({ framed: true })
+    const pairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+      isInitiator: true,
+      token: BlindRelay.token(),
+      stream,
+      keepAlive
+    })
+
+    return pairing
+  }
+
+  const firstPairing = pair(30000)
+  const firstSocket = firstPairing.socket
+
+  const secondPairing = pair(1000)
+
+  t.is(secondPairing.socket, firstSocket, 'different keepalive values reuse transport')
+  t.is(firstSocket.keepAlive, 1000, 'shared transport takes lower keepalive')
+  t.is(clientNode._relayPool._connections.size, 1, 'different keepalive values use one connection')
+
+  const thirdPairing = pair(30000)
+
+  t.is(thirdPairing.socket, firstSocket, 'higher keepalive value reuses transport')
+  t.is(firstSocket.keepAlive, 1000, 'shared transport keeps lower keepalive')
+  t.is(
+    clientNode._relayPool._connections.size,
+    1,
+    'higher keepalive value reuses existing connection'
+  )
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
+test('relay pool unrefs and clears delayed direct-upgrade unpairs', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const rawStream = clientNode.createRawStream({ framed: true })
+  const pairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: rawStream,
+    keepAlive: 5000
+  })
+
+  await waitFor(() => relay._pairing.size === 1)
+
+  // closePairing is the direct-upgrade cleanup path that schedules delayed unpair.
+  const connection = pairing.connection
+  pairing.closePairing()
+  rawStream.destroy()
+
+  t.is(connection.pendingReleaseTimers.size, 1, 'delayed unpair timer is added')
+  const [timer] = connection.pendingReleaseTimers
+  t.absent(timer.hasRef(), 'delayed unpair timer is unrefed')
+
+  await clientNode._relayPool.destroy()
+  t.is(connection.pendingReleaseTimers.size, 0, 'delayed unpair timer is cleared on pool destroy')
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
+test('relay pool keeps transport open for pairings started during delayed unpair', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    const session = relay.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  const firstStream = clientNode.createRawStream({ framed: true })
+  const firstPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: firstStream,
+    keepAlive: 5000
+  })
+
+  await waitFor(() => relay._pairing.size === 1)
+
+  const relaySocket = firstPairing.socket
+  const relayConnection = firstPairing.connection
+
+  // Simulate direct upgrade for the first pairing with a shorter delayed unpair.
+  firstPairing._release(true, 1000)
+  firstStream.destroy()
+
+  t.is(relayConnection.pendingReleaseTimers.size, 1, 'first pairing schedules delayed unpair')
+
+  const secondStream = clientNode.createRawStream({ framed: true })
+  const secondPairing = clientNode._relayPool.pair(relayTransportServer.publicKey, {
+    isInitiator: true,
+    token: BlindRelay.token(),
+    stream: secondStream,
+    keepAlive: 5000
+  })
+
+  t.is(secondPairing.socket, relaySocket, 'new pairing reuses the pending relay transport')
+
+  await waitFor(() => relay._pairing.size === 2)
+  // The delayed unpair should remove only the first pairing.
+  await waitFor(() => relay._pairing.size === 1)
+  t.is(clientNode._relayPool._connections.size, 1, 'pool connection stays open for the new pairing')
+  t.is(
+    getOnlyRelayPoolConnection(clientNode).socket,
+    relaySocket,
+    'same relay transport remains pooled'
+  )
+  t.absent(relaySocket.destroying, 'relay transport is not closing')
+
+  await clientNode.destroy()
+  await relayNode.destroy()
+})
+
 test('relay connection upgrades to direct connection', async function (t) {
+  t.timeout(90000)
+
   for (const opts of [
     { name: 'default keepalive' },
     { name: 'without keepalive', connectionKeepAlive: false, confirmWithAppData: true },
@@ -687,6 +1348,164 @@ test('relay connection upgrades to direct connection', async function (t) {
   }
 })
 
+test('direct upgrade keeps other pooled relay pairings alive', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const resumePunching = pausePunching(t, [serverNode, clientNode])
+
+  const relayServer = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relayServer.close())
+
+  const relaySockets = []
+  let closedRelaySockets = 0
+
+  let closedRelayStreams = 0
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    relaySockets.push(socket)
+    socket.once('close', function () {
+      closedRelaySockets++
+    })
+
+    const session = relayServer.accept(socket, { id: socket.remotePublicKey })
+    session.on('pair', function (_, __, stream) {
+      stream.once('close', function () {
+        closedRelayStreams++
+      })
+    })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  let upgradeServerSocket = null
+  const upgradeServer = serverNode.createServer(
+    {
+      relayThrough: relayTransportServer.publicKey,
+      shareLocalAddress: false
+    },
+    function (socket) {
+      upgradeServerSocket = socket
+      socket.on('error', (err) => t.comment(err.message))
+      socket.on('data', (data) => socket.write(data))
+      socket.on('end', () => socket.end())
+    }
+  )
+
+  await upgradeServer.listen(DHT.keyPair())
+
+  let relayOnlyServerSocket = null
+  const relayOnlyServer = serverNode.createServer(
+    {
+      relayThrough: relayTransportServer.publicKey,
+      shareLocalAddress: false
+    },
+    function (socket) {
+      relayOnlyServerSocket = socket
+      socket.on('error', (err) => t.comment(err.message))
+      socket.on('data', (data) => socket.write(data))
+      socket.on('end', () => socket.end())
+    }
+  )
+
+  await relayOnlyServer.listen(DHT.keyPair())
+
+  const upgradeClientSocket = clientNode.connect(upgradeServer.publicKey, {
+    fastOpen: false,
+    localConnection: false
+  })
+  const relayOnlyClientSocket = clientNode.connect(relayOnlyServer.publicKey, {
+    fastOpen: false,
+    holepunch: () => false,
+    localConnection: false
+  })
+  upgradeClientSocket.on('error', (err) => t.comment(err.message))
+  relayOnlyClientSocket.on('error', (err) => t.comment(err.message))
+
+  await Promise.all([once(upgradeClientSocket, 'open'), once(relayOnlyClientSocket, 'open')])
+
+  t.is(relaySockets.length, 2, 'both app connections share the relay transport sockets')
+  t.is(clientNode._relayPool._connections.size, 1, 'client has one shared relay pool connection')
+  t.is(serverNode._relayPool._connections.size, 1, 'server has one shared relay pool connection')
+
+  const beforeUpgrade = once(relayOnlyClientSocket, 'data')
+  relayOnlyClientSocket.write(Buffer.from('before direct upgrade'))
+  t.alike(
+    (await beforeUpgrade)[0],
+    Buffer.from('before direct upgrade'),
+    'relay-only connection carries data before another pairing upgrades'
+  )
+
+  let relayOnlyClientUpgraded = false
+  let relayOnlyServerUpgraded = false
+  relayOnlyClientSocket.rawStream.once('remote-changed', () => {
+    relayOnlyClientUpgraded = true
+  })
+  relayOnlyServerSocket.rawStream.once('remote-changed', () => {
+    relayOnlyServerUpgraded = true
+  })
+
+  const clientUpgraded = once(upgradeClientSocket.rawStream, 'remote-changed')
+  const serverUpgraded = once(upgradeServerSocket.rawStream, 'remote-changed')
+
+  resumePunching()
+  await Promise.all([clientUpgraded, serverUpgraded])
+  await waitFor(() => closedRelayStreams === 2, 12000)
+
+  t.is(closedRelayStreams, 2, 'direct upgrade releases only its relay pairing')
+  t.is(closedRelaySockets, 0, 'shared relay transports stay open for the other pairing')
+  t.absent(relayOnlyClientUpgraded, 'relay-only client does not upgrade to direct')
+  t.absent(relayOnlyServerUpgraded, 'relay-only server does not upgrade to direct')
+  t.not(
+    relayOnlyServerSocket.rawStream.remotePort,
+    relayOnlyClientSocket.rawStream.localPort,
+    'relay-only server stays on the relayed stream'
+  )
+  t.not(
+    relayOnlyClientSocket.rawStream.remotePort,
+    relayOnlyServerSocket.rawStream.localPort,
+    'relay-only client stays on the relayed stream'
+  )
+
+  const directReply = once(upgradeClientSocket, 'data')
+  upgradeClientSocket.write(Buffer.from('after direct upgrade'))
+  t.alike(
+    (await directReply)[0],
+    Buffer.from('after direct upgrade'),
+    'upgraded direct connection carries data'
+  )
+
+  const relayedReply = once(relayOnlyClientSocket, 'data')
+  relayOnlyClientSocket.write(Buffer.from('still relayed'))
+  t.alike(
+    (await relayedReply)[0],
+    Buffer.from('still relayed'),
+    'other pooled relay pairing stays usable after direct upgrade'
+  )
+
+  await endAndCloseSocket(upgradeClientSocket)
+  if (!upgradeServerSocket.destroyed) await once(upgradeServerSocket, 'close')
+
+  await endAndCloseSocket(relayOnlyClientSocket)
+  if (!relayOnlyServerSocket.destroyed) await once(relayOnlyServerSocket, 'close')
+
+  await waitFor(() => closedRelaySockets === 2, 12000)
+  t.is(closedRelaySockets, 2, 'shared relay transports close after remaining pairing closes')
+
+  await relayNode.destroy()
+  await serverNode.destroy()
+  await clientNode.destroy()
+})
+
 test.skip('relay several connections through node with pool', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -757,26 +1576,6 @@ test.skip('relay several connections through node with pool', async function (t)
   await c.destroy()
 })
 
-function pausePunching(t, pausedNodes) {
-  const punch = Holepuncher.prototype._punch
-  let resume = null
-  const punchingResumed = new Promise((resolve) => {
-    resume = resolve
-  })
-
-  Holepuncher.prototype._punch = async function () {
-    if (pausedNodes.includes(this.dht)) await punchingResumed
-    return punch.call(this)
-  }
-
-  t.teardown(() => {
-    resume()
-    Holepuncher.prototype._punch = punch
-  })
-
-  return resume
-}
-
 test.skip('server does not support connection relaying', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -814,3 +1613,41 @@ test.skip('server does not support connection relaying', async function (t) {
   await b.destroy()
   await c.destroy()
 })
+
+async function waitFor(fn, timeout = 2000) {
+  const started = Date.now()
+
+  while (!fn()) {
+    if (Date.now() - started > timeout) {
+      throw new Error('Timed out waiting for test condition')
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 20))
+  }
+}
+
+function getOnlyRelayPoolConnection(node) {
+  const connections = [...node._relayPool._connections.values()]
+  if (connections.length !== 1) throw new Error('Expected exactly one relay pool connection')
+  return connections[0]
+}
+
+function pausePunching(t, pausedNodes) {
+  const punch = Holepuncher.prototype._punch
+  let resume = null
+  const punchingResumed = new Promise((resolve) => {
+    resume = resolve
+  })
+
+  Holepuncher.prototype._punch = async function () {
+    if (pausedNodes.includes(this.dht)) await punchingResumed
+    return punch.call(this)
+  }
+
+  t.teardown(() => {
+    resume()
+    Holepuncher.prototype._punch = punch
+  })
+
+  return resume
+}
