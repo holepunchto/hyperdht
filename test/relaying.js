@@ -5,6 +5,7 @@ const RelayServer = BlindRelay.Server
 const NoiseSecretStream = require('@hyperswarm/secret-stream')
 const DHT = require('../')
 const Holepuncher = require('../lib/holepuncher')
+const NoiseWrap = require('../lib/noise-wrap')
 const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 
 test('relay connections through node, client side', async function (t) {
@@ -658,6 +659,78 @@ test('relay connections through same node reuse transport sockets', async functi
   await clientNode.destroy()
   await serverNode.destroy()
   await relayNode.destroy()
+})
+
+test('server cleans up duplicate pending relay tokens', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  let first = null
+
+  t.teardown(async function () {
+    if (first && first.relayTimeout) clearTimeout(first.relayTimeout)
+
+    await serverNode.destroy()
+    await relayNode.destroy()
+  })
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    // Keep the transport open without completing the blind-relay pairing.
+    socket.on('error', () => {})
+  })
+
+  await relayTransportServer.listen()
+
+  const token = BlindRelay.token()
+  const server = serverNode.createServer({
+    handshakeClearWait: 50,
+    shareLocalAddress: false
+  })
+
+  await server.listen()
+
+  const peerAddress = { host: '127.0.0.2', port: 49152 }
+  const req = {
+    to: serverNode.address(),
+    socket: serverNode.io.serverSocket
+  }
+
+  const attackerKeyPair = DHT.keyPair()
+  const payload = {
+    error: 0,
+    firewall: DHT.FIREWALL.CONSISTENT,
+    udx: { reusableSocket: false, id: 1, seq: 0 },
+    relayThrough: { publicKey: relayTransportServer.publicKey, token }
+  }
+  const createNoise = () => new NoiseWrap(attackerKeyPair, server.publicKey).send(payload)
+
+  await server._onpeerhandshake({ noise: await createNoise(), peerAddress }, req)
+  first = server._holepunches.find(Boolean)
+
+  t.ok(first && first.relayPairing, 'first relay pairing remains pending')
+
+  const secondNoise = await createNoise()
+  const secondAttempt = server._onpeerhandshake({ noise: secondNoise, peerAddress }, req)
+  const second = server._holepunches.find((handshake) => handshake && handshake !== first)
+  const secondKey = secondNoise.toString('hex')
+  const secondReply = await secondAttempt
+
+  t.is(secondReply, null, 'duplicate handshake has no reply')
+  t.ok(second, 'captured duplicate handshake state')
+  t.is(serverNode.stats.relaying.aborts, 1, 'duplicate relay pairing counts as aborted')
+
+  if ([...serverNode.rawStreams].includes(second.rawStream)) {
+    await once(second.rawStream, 'close')
+  }
+
+  await waitFor(() => !server._connects.has(secondKey))
+
+  t.absent(
+    [...serverNode.rawStreams].includes(second.rawStream),
+    'duplicate raw stream is released'
+  )
+  t.absent(server._holepunches.includes(second), 'duplicate handshake slot is cleared')
 })
 
 test('relay pool closes app streams when shared transports close', async function (t) {
