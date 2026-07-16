@@ -136,3 +136,25 @@ test('socket pool ignores closing reusable routes', async function (t) {
 
   await node.destroy()
 })
+
+test('socket pool replaces closing reusable routes', async function (t) {
+  const node = createDHT({ bootstrap: [], ephemeral: true })
+  const routes = node._socketPool.routes
+  const publicKey = Buffer.alloc(32, 1)
+
+  const closingSocket = new EventEmitter()
+  const closingStream = new EventEmitter()
+  closingStream.socket = closingSocket
+
+  routes.add(publicKey, closingStream)
+  closingSocket.closing = true
+
+  const replacementSocket = new EventEmitter()
+  const replacementStream = new EventEmitter()
+  replacementStream.socket = replacementSocket
+
+  routes.add(publicKey, replacementStream)
+  t.is(routes.get(publicKey).socket, replacementSocket, 'closing route is replaced')
+
+  await node.destroy()
+})
