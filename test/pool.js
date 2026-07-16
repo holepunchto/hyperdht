@@ -1,5 +1,6 @@
 const test = require('brittle')
-const { swarm } = require('./helpers')
+const { EventEmitter } = require('events')
+const { swarm, createDHT } = require('./helpers')
 
 test('connection pool, client side', async function (t) {
   const [a, b] = await swarm(t)
@@ -113,3 +114,47 @@ test('connection pool, client and server side', async function (t) {
 })
 
 function noop() {}
+
+test('socket pool ignores closing reusable routes', async function (t) {
+  const node = createDHT({ bootstrap: [], ephemeral: true })
+  const routes = node._socketPool.routes
+  const publicKey = Buffer.alloc(32, 1)
+
+  const socket = new EventEmitter()
+
+  const rawStream = new EventEmitter()
+  rawStream.socket = socket
+
+  routes.add(publicKey, rawStream)
+  t.ok(routes.get(publicKey), 'route is registered')
+
+  socket.closing = true
+  t.absent(routes.get(publicKey), 'closing socket route is ignored')
+  // Reset closing so the next lookup proves the stale route was removed.
+  socket.closing = false
+  t.absent(routes.get(publicKey), 'closing socket route is removed')
+
+  await node.destroy()
+})
+
+test('socket pool replaces closing reusable routes', async function (t) {
+  const node = createDHT({ bootstrap: [], ephemeral: true })
+  const routes = node._socketPool.routes
+  const publicKey = Buffer.alloc(32, 1)
+
+  const closingSocket = new EventEmitter()
+  const closingStream = new EventEmitter()
+  closingStream.socket = closingSocket
+
+  routes.add(publicKey, closingStream)
+  closingSocket.closing = true
+
+  const replacementSocket = new EventEmitter()
+  const replacementStream = new EventEmitter()
+  replacementStream.socket = replacementSocket
+
+  routes.add(publicKey, replacementStream)
+  t.is(routes.get(publicKey).socket, replacementSocket, 'closing route is replaced')
+
+  await node.destroy()
+})
