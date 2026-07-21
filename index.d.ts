@@ -52,16 +52,16 @@ export class HyperDHT {
 
   pool(): any
 
-  resume(options?: any): Promise<void>
+  resume(options?: any): Promise<any>
 
-  suspend(options?: any): Promise<void>
+  suspend(options?: any): Promise<any>
 
   /**
    * Fully destroy this DHT node.
    */
-  destroy(options?: any): Promise<void>
+  destroy(options?: any): Promise<any>
 
-  validateLocalAddresses(addresses: any): Promise<void>
+  validateLocalAddresses(addresses: any): Promise<any>
 
   findPeer(publicKey: any, opts?: any): any
 
@@ -86,22 +86,22 @@ export class HyperDHT {
   /**
    * Fetch an immutable value from the DHT. When successful, it returns the value corresponding to the hash.
    */
-  immutableGet(target: any, opts?: any): Promise<void>
+  immutableGet(target: any, opts?: any): Promise<any>
 
   /**
    * Store an immutable value in the DHT. When successful, the hash of the value is returned.
    */
-  immutablePut(value: any, opts?: any): Promise<void>
+  immutablePut(value: any, opts?: any): Promise<any>
 
   /**
    * Fetch a mutable value from the DHT.
    */
-  mutableGet(publicKey: any, opts?: any): Promise<void>
+  mutableGet(publicKey: any, opts?: any): Promise<any>
 
   /**
    * Store a mutable value in the DHT.
    */
-  mutablePut(keyPair: any, value: any, opts?: any): Promise<void>
+  mutablePut(keyPair: any, value: any, opts?: any): Promise<any>
 
   onrequest(req: any): any
 
@@ -128,64 +128,9 @@ export class HyperDHT {
   plugins: any
 
   /**
-   * Use this method to generate the required keypair for DHT operations.
-   * @returns Returns an object with `{publicKey, secretKey}`.
-   */
-  keyPair(seed?: any): any
-
-  /**
    * If you want to run your own Hyperswarm network use this method to easily create a bootstrap node.
    */
-  bootstrapper(port: any, host: any, options?: any): any
-
-  /**
-   * Make the server listen on a keyPair. To connect to this server use keyPair.publicKey as the connect address.
-   */
-  listen(keyPair: any): Promise<void>
-
-  /**
-   * Refresh the server, causing it to reannounce its address. This is automatically called on network changes.
-   */
-  refresh(): any
-
-  /**
-   * You can also get this info from `node.remoteAddress()` minus the public key.
-   * @returns Returns an object containing the address of the server:
-   */
-  address(): any
-
-  /**
-   * Stop listening.
-   */
-  close(): Promise<void>
-
-  /**
-   * The public key of the remote peer.
-   */
-  remotePublicKey(): any
-
-  /**
-   * The public key of the local socket.
-   */
-  publicKey(): any
-
-  /**
-   * Emitted when a new encrypted connection has passed the firewall check.
-   * @param socket - `socket` is a [NoiseSecretStream](https://github.com/holepunchto/hyperswarm-secret-stream) instance.
-   */
-  on(event: 'connection', listener: (...args: any[]) => void): this
-  /**
-   * Emitted when the server is fully listening on a keyPair.
-   */
-  on(event: 'listening', listener: (...args: any[]) => void): this
-  /**
-   * Emitted when the server is fully closed.
-   */
-  on(event: 'close', listener: (...args: any[]) => void): this
-  /**
-   * Emitted when the encrypted connection has been fully established with the server.
-   */
-  on(event: 'open', listener: (...args: any[]) => void): this
+  static bootstrapper(port: any, host: any, options?: any): any
 }
 
 export default HyperDHT
