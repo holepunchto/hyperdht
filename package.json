@@ -3,6 +3,7 @@
   "version": "6.33.0",
   "description": "The DHT powering Hyperswarm",
   "main": "index.js",
+  "types": "index.d.ts",
   "browser": "browser.js",
   "bin": {
     "hyperdht": "./bin.js"
