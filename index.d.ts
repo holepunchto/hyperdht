@@ -42,13 +42,13 @@ export class HyperDHT {
    * Connect to a remote server. Similar to `createServer` this performs UDP holepunching for P2P connectivity.
    * @param opts - Options
    */
-  connect(remotePublicKey: any, opts?: HyperDHTConnectOptions): any
+  connect(remotePublicKey: any, opts?: HyperDHTConnectOptions): HyperDHTSocket
 
   /**
    * Create a new server for accepting incoming encrypted P2P connections.
    * @param opts - Options
    */
-  createServer(opts?: any, onconnection?: any): any
+  createServer(opts?: any, onconnection?: any): Server
 
   pool(): any
 
@@ -131,6 +131,60 @@ export class HyperDHT {
    * If you want to run your own Hyperswarm network use this method to easily create a bootstrap node.
    */
   static bootstrapper(port: any, host: any, options?: any): any
+}
+
+declare class Server {
+  /**
+   * Make the server listen on a keyPair. To connect to this server use keyPair.publicKey as the connect address.
+   */
+  listen(keyPair: any): Promise<any>
+
+  /**
+   * Refresh the server, causing it to reannounce its address. This is automatically called on network changes.
+   */
+  refresh(): any
+
+  /**
+   * You can also get this info from `node.remoteAddress()` minus the public key.
+   * @returns Returns an object containing the address of the server:
+   */
+  address(): any
+
+  /**
+   * Stop listening.
+   */
+  close(): Promise<any>
+
+  /**
+   * Emitted when a new encrypted connection has passed the firewall check.
+   * @param socket - `socket` is a [NoiseSecretStream](https://github.com/holepunchto/hyperswarm-secret-stream) instance.
+   */
+  on(event: 'connection', listener: (...args: any[]) => void): this
+  /**
+   * Emitted when the server is fully listening on a keyPair.
+   */
+  on(event: 'listening', listener: (...args: any[]) => void): this
+  /**
+   * Emitted when the server is fully closed.
+   */
+  on(event: 'close', listener: (...args: any[]) => void): this
+}
+
+declare class HyperDHTSocket {
+  /**
+   * The public key of the remote peer.
+   */
+  remotePublicKey: any
+
+  /**
+   * The public key of the local socket.
+   */
+  publicKey: any
+
+  /**
+   * Emitted when the encrypted connection has been fully established with the server.
+   */
+  on(event: 'open', listener: (...args: any[]) => void): this
 }
 
 export default HyperDHT
