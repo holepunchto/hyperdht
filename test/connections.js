@@ -3,6 +3,9 @@ const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 const { encode } = require('hypercore-id-encoding')
 const { once } = require('events')
 const DHT = require('../')
+const NoiseWrap = require('../lib/noise-wrap')
+const { FIREWALL, ERROR } = require('../lib/constants')
+const { unslabbedHash } = require('../lib/crypto')
 
 test('createServer + connect - once defaults', async function (t) {
   t.plan(2)
@@ -929,4 +932,48 @@ test('create server with handshakeClearWait opt', async function (t) {
     const server = a.createServer({})
     t.is(server.handshakeClearWait, 10000, 'expected default')
   }
+})
+
+test('peer cant flood w/ handshakes', async function (t) {
+  const [a, b] = await swarm(t, 2)
+  const server = a.createServer()
+  await server.listen()
+
+  t.is(server._connects.size, 0, 'server starts w/ 0 connections')
+  t.is(server._holepunches.length, 0, 'server starts w/ 0 holepunches')
+
+  // Create a single noise handshake to reuse across many requests
+  const handshake = new NoiseWrap(b.defaultKeyPair, server.publicKey)
+  const rawStream = b.createRawStream({ framed: true, firewall: () => false })
+  const noise = await handshake.send({
+    error: ERROR.NONE,
+    firewall: FIREWALL.UNKNOWN,
+    holepunch: null,
+    addresses4: [],
+    addresses6: [],
+    udx: {
+      reusableSocket: false,
+      id: rawStream.id,
+      seq: 0
+    },
+    secretStream: {},
+    relayThrough: null
+  })
+
+  const target = unslabbedHash(server.publicKey)
+  const to = { host: server.address().host, port: server.address().port }
+
+  const totalRequests = 10
+  const requests = []
+  for (let i = 0; i < totalRequests; i++) {
+    requests.push(b._router.peerHandshake(target, { noise, socket: null }, to))
+  }
+
+  await Promise.all(requests)
+
+  t.is(server._connects.size, 1, 'server only registered 1 connect')
+  t.is(server._holepunches.length, 1, 'server only registered 1 holepunch')
+
+  rawStream.destroy()
+  await server.close()
 })
