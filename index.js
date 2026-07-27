@@ -29,7 +29,8 @@ const DEFAULTS = {
   ...DHT.DEFAULTS,
   connectionKeepAlive: 5000,
   randomPunchInterval: 20000,
-  routingTableSnapshotInterval: 120000
+  routingTableSnapshotInterval: 120000,
+  dbMaxOpenFiles: 1000
 }
 
 class HyperDHT extends DHT {
@@ -57,7 +58,12 @@ class HyperDHT extends DHT {
     }
     this.rawStreams = new RawStreamSet(this)
     this.plugins = new Map()
-    this.db = new NamespacedDB({ path: opts.dbPath || DB_PATH })
+
+    this.db = new NamespacedDB({
+      path: opts.dbPath || DB_PATH,
+      maxOpenFiles: opts.dbMaxOpenFiles || DEFAULTS.dbMaxOpenFiles,
+      optimizeFiltersForMemory: true
+    })
 
     this._router = new Router(this, router)
     this._socketPool = new SocketPool(this, opts.host || '0.0.0.0')
