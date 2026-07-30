@@ -934,6 +934,22 @@ test('create server with handshakeClearWait opt', async function (t) {
   }
 })
 
+test('_clear deletes the _connects entry even when the slot was reused', async function (t) {
+  const [a] = await swarm(t)
+  const server = a.createServer()
+  await server.listen()
+
+  const hs = { clearing: null }
+  const k = 'aabbcc'
+  server._connects.set(k, Promise.resolve(hs))
+  server._holepunches[0] = { not: hs } // slot reused by another handshake
+
+  server._clear(hs, 0, k)
+
+  t.is(server._connects.has(k), false, 'k removed despite stale slot')
+  await server.close()
+})
+
 test('peer cant flood w/ handshakes', async function (t) {
   const [a, b] = await swarm(t, 2)
   const server = a.createServer()
