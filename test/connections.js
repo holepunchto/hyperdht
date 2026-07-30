@@ -994,7 +994,7 @@ test('peer cant flood w/ handshakes', async function (t) {
   await server.close()
 })
 
-test('a handshake that arrives while the server is already suspended leaks forever', async function (t) {
+test('handshakes that arrive while the server is suspended are cleared', async function (t) {
   const [a] = await swarm(t)
 
   const handshakeClearWait = 100
