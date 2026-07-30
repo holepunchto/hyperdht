@@ -977,3 +977,51 @@ test('peer cant flood w/ handshakes', async function (t) {
   rawStream.destroy()
   await server.close()
 })
+
+test('a handshake that arrives while the server is already suspended leaks forever', async function (t) {
+  const [a] = await swarm(t)
+
+  const handshakeClearWait = 100
+  const server = a.createServer({ handshakeClearWait }, () => {})
+  await server.listen()
+  t.teardown(() => server.close())
+
+  t.is(server._connects.size, 0, 'server starts w/ 0 connections')
+  t.is(server._holepunches.length, 0, 'server starts w/ 0 holepunches')
+
+  // Suspend server so incomming PEER_HANDSHAKEs bail in `_addHandshake()`
+  await server.suspend()
+
+  const handshake = new NoiseWrap(a.defaultKeyPair, server.publicKey)
+  const noise = await handshake.send({
+    error: ERROR.NONE,
+    firewall: FIREWALL.UNKNOWN,
+    holepunch: null,
+    addresses4: [],
+    addresses6: [],
+    udx: { reusableSocket: false, id: 0, seq: 0 },
+    secretStream: {},
+    relayThrough: null
+  })
+
+  const fakePeerAddress = { host: '203.0.113.5', port: 12345 } // unroutable
+  const req = { to: server.address(), from: fakePeerAddress, socket: null }
+
+  const reply = await server._onpeerhandshake({ noise, peerAddress: fakePeerAddress }, req)
+
+  t.absent(reply, 'sanity: the suspended server did not reply to the handshake')
+  t.is(
+    server._connects.size,
+    1,
+    'sanity: _addHandshake still registered itself despite being suspended'
+  )
+  t.is(server._holepunches.length, 1, 'sanity: ... and claimed a holepunch slot for it too')
+
+  // Wait for handshakeClearWait timeout
+  await new Promise((resolve) => setTimeout(resolve, handshakeClearWait + 100))
+
+  await server.resume()
+
+  t.is(server._connects.size, 0, 'the handshake entry should eventually be cleaned up')
+  t.is(server._holepunches.length, 0, '... and so should the holepunch slot')
+})
