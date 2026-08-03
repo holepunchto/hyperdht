@@ -299,49 +299,72 @@ test('createServer + connect - same-LAN explicit keypair opens server', async fu
 })
 
 test(
-  'createServer + connect - unmatched LAN address does not false-open',
+  'createServer + connect - unmatched LAN address skips initial fast-open',
   { timeout: 10000 },
   async function (t) {
     const { bootstrap } = await swarm(t, 3)
-    const serverDHT = new DHT({ bootstrap })
-    const clientDHT = new DHT({ bootstrap, host: '127.0.0.1' })
-    const lc = t.test('socket lifecycle')
-    let accepted = 0
-    let triedUnmatchedLan = false
+    const serverDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+    const clientDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-    lc.plan(2)
+    await serverDHT.fullyBootstrapped()
+    await clientDHT.fullyBootstrapped()
 
-    const server = serverDHT.createServer(function (socket) {
-      accepted++
-      lc.pass('server side opened')
-      socket.once('end', () => socket.end())
-    })
+    const server = serverDHT.createServer()
 
     await server.listen(DHT.keyPair())
 
-    const ping = clientDHT.ping.bind(clientDHT)
-    clientDHT.ping = function (addr, opts) {
-      const localAddresses = Holepuncher.localAddresses(clientDHT.io.serverSocket)
-      if (!Holepuncher.matchAddress(localAddresses, [addr])) triedUnmatchedLan = true
-      return ping(addr, opts)
+    const matchAddress = Holepuncher.matchAddress
+    const openSession = Holepuncher.prototype.openSession
+    const clientPort = clientDHT.io.serverSocket.address().port
+    let triedLan = false
+    let triedHolepunch = false
+    let fastOpened = false
+    let onholepunch
+    const holepunching = new Promise((resolve) => {
+      onholepunch = resolve
+    })
+
+    // Inject an unmatched classification instead of relying on whether the
+    // runner can route from loopback to one of its LAN interfaces.
+    Holepuncher.matchAddress = function (localAddresses, remoteAddresses) {
+      if (localAddresses[0].port === clientPort) return null
+      return matchAddress(localAddresses, remoteAddresses)
+    }
+
+    Holepuncher.prototype.openSession = function (addr, socket) {
+      if (this.dht === clientDHT) {
+        fastOpened = true
+        return Promise.resolve()
+      }
+      return openSession.call(this, addr, socket)
+    }
+
+    t.teardown(() => {
+      Holepuncher.matchAddress = matchAddress
+      Holepuncher.prototype.openSession = openSession
+    })
+
+    clientDHT.ping = function () {
+      triedLan = true
+      return Promise.reject(new Error('stop LAN probe'))
+    }
+
+    clientDHT._router.peerHolepunch = async function () {
+      triedHolepunch = true
+      onholepunch()
+      throw new Error('stop holepunch probe')
     }
 
     const socket = clientDHT.connect(server.publicKey)
+    socket.on('error', () => {})
 
-    socket.once('open', function () {
-      lc.pass('client side opened')
-    })
+    await holepunching
 
-    socket.once('error', function (err) {
-      lc.fail('client should not error: ' + err.code)
-    })
+    t.ok(triedLan, 'client tried the unmatched LAN fallback')
+    t.ok(triedHolepunch, 'client started coordinated holepunching')
+    t.absent(fastOpened, 'client skipped the initial fast-open probe')
 
-    await lc
-
-    t.ok(triedUnmatchedLan, 'client tried the unmatched LAN fallback')
-    t.is(accepted, 1, 'server accepted exactly once')
-
-    await endAndCloseSocket(socket)
+    socket.destroy()
     await server.close()
     await serverDHT.destroy()
     await clientDHT.destroy()
