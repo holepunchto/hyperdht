@@ -3,6 +3,7 @@ const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 const { encode } = require('hypercore-id-encoding')
 const { once } = require('events')
 const DHT = require('../')
+const Holepuncher = require('../lib/holepuncher')
 
 test('createServer + connect - once defaults', async function (t) {
   t.plan(2)
@@ -296,6 +297,56 @@ test('createServer + connect - same-LAN explicit keypair opens server', async fu
   await a.destroy()
   await b.destroy()
 })
+
+test(
+  'createServer + connect - unmatched LAN address does not false-open',
+  { timeout: 10000 },
+  async function (t) {
+    const { bootstrap } = await swarm(t, 3)
+    const serverDHT = new DHT({ bootstrap })
+    const clientDHT = new DHT({ bootstrap, host: '127.0.0.1' })
+    const lc = t.test('socket lifecycle')
+    let accepted = 0
+    let triedUnmatchedLan = false
+
+    lc.plan(2)
+
+    const server = serverDHT.createServer(function (socket) {
+      accepted++
+      lc.pass('server side opened')
+      socket.once('end', () => socket.end())
+    })
+
+    await server.listen(DHT.keyPair())
+
+    const ping = clientDHT.ping.bind(clientDHT)
+    clientDHT.ping = function (addr, opts) {
+      const localAddresses = Holepuncher.localAddresses(clientDHT.io.serverSocket)
+      if (!Holepuncher.matchAddress(localAddresses, [addr])) triedUnmatchedLan = true
+      return ping(addr, opts)
+    }
+
+    const socket = clientDHT.connect(server.publicKey)
+
+    socket.once('open', function () {
+      lc.pass('client side opened')
+    })
+
+    socket.once('error', function (err) {
+      lc.fail('client should not error: ' + err.code)
+    })
+
+    await lc
+
+    t.ok(triedUnmatchedLan, 'client tried the unmatched LAN fallback')
+    t.is(accepted, 1, 'server accepted exactly once')
+
+    await endAndCloseSocket(socket)
+    await server.close()
+    await serverDHT.destroy()
+    await clientDHT.destroy()
+  }
+)
 
 test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
