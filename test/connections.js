@@ -298,10 +298,30 @@ test('createServer + connect - same-LAN explicit keypair opens server', async fu
   await b.destroy()
 })
 
-test(
-  'createServer + connect - unmatched LAN address skips initial fast-open',
-  { timeout: 10000 },
-  async function (t) {
+for (const testCase of [
+  {
+    name: 'unmatched LAN address skips initial fast-open',
+    matched: false,
+    sameHost: true,
+    expectedLan: true,
+    expectedFastOpen: false
+  },
+  {
+    name: 'matched LAN address skips initial fast-open',
+    matched: true,
+    sameHost: true,
+    expectedLan: true,
+    expectedFastOpen: false
+  },
+  {
+    name: 'different observed hosts keep initial fast-open',
+    matched: true,
+    sameHost: false,
+    expectedLan: false,
+    expectedFastOpen: true
+  }
+]) {
+  test(`createServer + connect - ${testCase.name}`, { timeout: 10000 }, async function (t) {
     const { bootstrap } = await swarm(t, 3)
     const serverDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
     const clientDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
@@ -315,7 +335,10 @@ test(
 
     const matchAddress = Holepuncher.matchAddress
     const openSession = Holepuncher.prototype.openSession
+    const peerHandshake = clientDHT._router.peerHandshake
+    const ping = clientDHT.ping
     const clientPort = clientDHT.io.serverSocket.address().port
+    const serverPort = serverDHT.io.serverSocket.address().port
     let triedLan = false
     let triedHolepunch = false
     let fastOpened = false
@@ -324,10 +347,12 @@ test(
       onholepunch = resolve
     })
 
-    // Inject an unmatched classification instead of relying on whether the
-    // runner can route from loopback to one of its LAN interfaces.
+    // Make the address classification deterministic for the client while
+    // preserving the real server-side classification.
     Holepuncher.matchAddress = function (localAddresses, remoteAddresses) {
-      if (localAddresses[0].port === clientPort) return null
+      if (localAddresses[0].port === clientPort) {
+        return testCase.matched ? remoteAddresses[0] : null
+      }
       return matchAddress(localAddresses, remoteAddresses)
     }
 
@@ -339,14 +364,29 @@ test(
       return openSession.call(this, addr, socket)
     }
 
+    clientDHT._router.peerHandshake = async function (...args) {
+      const result = await peerHandshake.apply(this, args)
+      // The local testnet observes loopback for both peers, so inject a
+      // different observation for the non-LAN case.
+      if (!testCase.sameHost) {
+        result.clientAddress = { ...result.clientAddress, host: '127.0.0.2' }
+      }
+      return result
+    }
+
     t.teardown(() => {
       Holepuncher.matchAddress = matchAddress
       Holepuncher.prototype.openSession = openSession
+      clientDHT._router.peerHandshake = peerHandshake
+      clientDHT.ping = ping
     })
 
-    clientDHT.ping = function () {
-      triedLan = true
-      return Promise.reject(new Error('stop LAN probe'))
+    clientDHT.ping = function (addr, ...args) {
+      if (addr.port === serverPort) {
+        triedLan = true
+        return Promise.reject(new Error('stop LAN probe'))
+      }
+      return ping.call(this, addr, ...args)
     }
 
     clientDHT._router.peerHolepunch = async function () {
@@ -360,16 +400,16 @@ test(
 
     await holepunching
 
-    t.ok(triedLan, 'client tried the unmatched LAN fallback')
+    t.is(triedLan, testCase.expectedLan, 'client used the expected LAN policy')
     t.ok(triedHolepunch, 'client started coordinated holepunching')
-    t.absent(fastOpened, 'client skipped the initial fast-open probe')
+    t.is(fastOpened, testCase.expectedFastOpen, 'client used the expected fast-open policy')
 
     socket.destroy()
     await server.close()
     await serverDHT.destroy()
     await clientDHT.destroy()
-  }
-)
+  })
+}
 
 test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
