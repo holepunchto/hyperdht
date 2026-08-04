@@ -184,6 +184,53 @@ test('createServer + connect - force holepunch', async function (t) {
   await b.destroy()
 })
 
+test('createServer + connect - cold local fast-open uses analyzed socket', async function (t) {
+  const { bootstrap } = await swarm(t, 3)
+
+  // Deliberately connect before either endpoint is fully bootstrapped. The
+  // explicit client host reproduces the asymmetric local-address setup where
+  // a probe echo used to select a socket that the server later discarded.
+  const serverDHT = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientDHT = new DHT({
+    bootstrap,
+    host: '127.0.0.1',
+    quickFirewall: false,
+    ephemeral: true
+  })
+
+  const lc = t.test('socket lifecycle')
+  lc.plan(4)
+
+  const server = serverDHT.createServer(function (socket) {
+    lc.pass('server side opened')
+
+    socket.once('end', function () {
+      lc.pass('server side ended')
+      socket.end()
+    })
+  })
+
+  await server.listen()
+
+  const socket = clientDHT.connect(server.publicKey)
+
+  socket.once('open', function () {
+    lc.pass('client side opened')
+  })
+
+  socket.once('end', function () {
+    lc.pass('client side ended')
+  })
+
+  socket.end()
+
+  await lc
+
+  await server.close()
+  await serverDHT.destroy()
+  await clientDHT.destroy()
+})
+
 test('createServer + connect - failed LAN ping falls back to holepunch', async function (t) {
   const { bootstrap } = await swarm(t)
 

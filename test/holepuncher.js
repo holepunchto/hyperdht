@@ -1,5 +1,81 @@
 const test = require('brittle')
+const b4a = require('b4a')
 const Holepuncher = require('../lib/holepuncher.js')
+const { FIREWALL } = require('../lib/constants.js')
+
+test('holepuncher distinguishes probe echoes from fast-open', function (t) {
+  const probe = createInitiator()
+  probe.puncher._onholepunchmessage(b4a.from([0]), probe.address, probe.ref)
+  t.is(probe.puncher.connected, false, 'probe echo does not connect before punching')
+  probe.puncher.destroy()
+
+  const fastOpen = createInitiator()
+  fastOpen.puncher._onholepunchmessage(b4a.from([1]), fastOpen.address, fastOpen.ref)
+  t.is(fastOpen.puncher.connected, true, 'explicit fast-open connects before punching')
+  t.alike(fastOpen.connected, fastOpen.address, 'fast-open selects the responding address')
+  fastOpen.puncher.destroy()
+
+  const punching = createInitiator()
+  punching.puncher.punching = true
+  punching.puncher._onholepunchmessage(b4a.from([0]), punching.address, punching.ref)
+  t.is(punching.puncher.connected, true, 'probe echo connects while punching')
+  t.alike(punching.connected, punching.address, 'punching selects the responding address')
+  punching.puncher.destroy()
+})
+
+test('holepuncher only echoes after the remote starts punching', function (t) {
+  const sent = []
+  const responder = createHolepuncher(false, sent)
+
+  responder.puncher._onholepunchmessage(b4a.from([0]), responder.address, responder.ref)
+  t.is(sent.length, 0, 'uncommitted probe is not echoed')
+
+  responder.puncher.updateRemote({
+    punching: true,
+    firewall: FIREWALL.UNKNOWN,
+    addresses: null,
+    verified: null
+  })
+  responder.puncher._onholepunchmessage(b4a.from([0]), responder.address, responder.ref)
+  t.is(sent.length, 1, 'coordinated punch is echoed')
+
+  responder.puncher.destroy()
+})
+
+function createInitiator() {
+  return createHolepuncher(true, [])
+}
+
+function createHolepuncher(isInitiator, sent) {
+  const socket = {
+    send(message, port, host, ttl) {
+      sent.push({ message, port, host, ttl })
+      return Promise.resolve()
+    }
+  }
+  const ref = { socket, release() {} }
+  const dht = {
+    firewalled: false,
+    nodes: { length: 0, latest: null },
+    _socketPool: { acquire: () => ref }
+  }
+  const puncher = new Holepuncher(dht, {}, isInitiator)
+  const address = { host: '127.0.0.1', port: 1234 }
+  let connected = null
+
+  puncher.onconnect = function (_, port, host) {
+    connected = { host, port }
+  }
+
+  return {
+    puncher,
+    ref,
+    address,
+    get connected() {
+      return connected
+    }
+  }
+}
 
 test('holepuncher match - nothing to match', async function (t) {
   t.is(Holepuncher.matchAddress([], []), null)
