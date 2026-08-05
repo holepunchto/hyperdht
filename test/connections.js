@@ -211,9 +211,9 @@ test('createServer + connect - intentional fast open wins before coordinated pun
     resolveFastOpen = resolve
   })
 
-  // Loopback is fewer than five hops, so its low-TTL probe would reach the
-  // server. Suppress that probe to model it expiring on a real network and
-  // exercise the server's intentional full-TTL fast-open response instead.
+  // Loopback delivers the TTL 5 NAT-opening probe to the server, so its echo
+  // is indistinguishable from the intentional fast-open response. Drop that
+  // probe to isolate the full-TTL response sent by server fast mode.
   Holepuncher.prototype.openSession = function (...args) {
     return this.dht === clientDHT ? Promise.resolve() : openSession.call(this, ...args)
   }
