@@ -185,7 +185,9 @@ test('createServer + connect - force holepunch', async function (t) {
 })
 
 test('createServer + connect - cold local fast-open uses analyzed socket', async function (t) {
-  const { bootstrap } = await swarm(t, 3)
+  // Holepuncher NAT analysis needs four samples. Keep the endpoints cold, but
+  // provide enough local nodes for that analysis to complete deterministically.
+  const { bootstrap } = await swarm(t, 5)
 
   // Deliberately connect before either endpoint is fully bootstrapped. The
   // explicit client host reproduces the asymmetric local-address setup where
@@ -199,9 +201,11 @@ test('createServer + connect - cold local fast-open uses analyzed socket', async
   })
 
   const lc = t.test('socket lifecycle')
-  lc.plan(4)
+  lc.plan(5)
 
-  const server = serverDHT.createServer(function (socket) {
+  let coordinatedPunching = false
+
+  const server = serverDHT.createServer({ shareLocalAddress: false }, function (socket) {
     lc.pass('server side opened')
 
     socket.once('end', function () {
@@ -212,10 +216,17 @@ test('createServer + connect - cold local fast-open uses analyzed socket', async
 
   await server.listen()
 
-  const socket = clientDHT.connect(server.publicKey)
+  const socket = clientDHT.connect(server.publicKey, {
+    localConnection: false,
+    holepunch() {
+      coordinatedPunching = true
+      return true
+    }
+  })
 
   socket.once('open', function () {
     lc.pass('client side opened')
+    lc.is(coordinatedPunching, false, 'client fast-opened before coordinated punching')
   })
 
   socket.once('end', function () {
