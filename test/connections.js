@@ -3,6 +3,7 @@ const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 const { encode } = require('hypercore-id-encoding')
 const { once } = require('events')
 const DHT = require('../')
+const Holepuncher = require('../lib/holepuncher.js')
 
 test('createServer + connect - once defaults', async function (t) {
   t.plan(2)
@@ -179,6 +180,94 @@ test('createServer + connect - force holepunch', async function (t) {
   await server.close()
   await a.destroy()
   await b.destroy()
+})
+
+test('createServer + connect - intentional fast open wins before coordinated punching', async function (t) {
+  const { bootstrap } = await swarm(t)
+  const serverDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  t.teardown(
+    async () => {
+      await clientDHT.destroy()
+      await serverDHT.destroy()
+    },
+    { force: true }
+  )
+
+  await serverDHT.fullyBootstrapped()
+  await clientDHT.fullyBootstrapped()
+
+  const openSession = Holepuncher.prototype.openSession
+  const ping = Holepuncher.prototype.ping
+  const punch = Holepuncher.prototype.punch
+  const onholepunchmessage = Holepuncher.prototype._onholepunchmessage
+
+  let resolveFastOpen
+  let fastOpenSent = false
+  let coordinatedPunching = false
+
+  const fastOpenReceived = new Promise((resolve) => {
+    resolveFastOpen = resolve
+  })
+
+  // Loopback delivers the TTL 5 NAT-opening probe to the server, so its echo
+  // is indistinguishable from the intentional fast-open response. Drop that
+  // probe to isolate the full-TTL response sent by server fast mode.
+  Holepuncher.prototype.openSession = function (...args) {
+    return this.dht === clientDHT ? Promise.resolve() : openSession.call(this, ...args)
+  }
+
+  Holepuncher.prototype._onholepunchmessage = function (...args) {
+    const result = onholepunchmessage.call(this, ...args)
+    if (this.dht === clientDHT && this.isInitiator) resolveFastOpen()
+    return result
+  }
+
+  Holepuncher.prototype.ping = async function (...args) {
+    const result = await ping.call(this, ...args)
+
+    if (this.dht === serverDHT && !this.isInitiator) {
+      fastOpenSent = true
+      await fastOpenReceived
+    }
+
+    return result
+  }
+
+  Holepuncher.prototype.punch = function (...args) {
+    if (this.dht === clientDHT) coordinatedPunching = true
+    return punch.call(this, ...args)
+  }
+
+  t.teardown(
+    () => {
+      resolveFastOpen()
+      Holepuncher.prototype.openSession = openSession
+      Holepuncher.prototype.ping = ping
+      Holepuncher.prototype.punch = punch
+      Holepuncher.prototype._onholepunchmessage = onholepunchmessage
+    },
+    { force: true, order: -1 }
+  )
+
+  const server = serverDHT.createServer({ shareLocalAddress: false }, function (socket) {
+    socket.on('error', () => {})
+  })
+
+  await server.listen()
+
+  const socket = clientDHT.connect(server.publicKey, {
+    localConnection: false
+  })
+
+  await once(socket, 'open')
+
+  t.ok(fastOpenSent, 'server sent its intentional fast-open response')
+  t.is(coordinatedPunching, false, 'connected before coordinated punching')
+
+  socket.destroy()
+  await server.close()
 })
 
 test('createServer + connect - failed LAN ping falls back to holepunch', async function (t) {
