@@ -1,6 +1,44 @@
 const test = require('brittle')
 const Holepuncher = require('../lib/holepuncher.js')
 
+test('holepuncher - intentional fast open connects before coordinated punching', async function (t) {
+  const clientAddress = { host: '198.51.100.1', port: 4000 }
+  const serverAddress = { host: '203.0.113.1', port: 5000 }
+
+  let round = 0
+  let connectedAtRound = null
+
+  const client = createHolepuncher(true)
+  const server = createHolepuncher(false, (message) => {
+    client.holder.onholepunchmessage(message, serverAddress)
+    return Promise.resolve()
+  })
+
+  t.teardown(() => {
+    client.puncher.destroy()
+    server.puncher.destroy()
+  })
+
+  client.puncher.onconnect = () => {
+    connectedAtRound = round
+  }
+
+  t.is(client.puncher.punching, false, 'coordinated punching has not started')
+
+  // This is the intentional fast-open ping sent by the server before the
+  // client starts coordinated punching. If it is ignored, the client has to
+  // wait for a later punching round instead.
+  await server.puncher.ping(clientAddress)
+
+  if (!client.puncher.connected) {
+    round++
+    client.puncher.punching = true
+    await server.puncher.ping(clientAddress)
+  }
+
+  t.is(connectedAtRound, 0, 'fast open avoids waiting for a coordinated punching round')
+})
+
 test('holepuncher match - nothing to match', async function (t) {
   t.is(Holepuncher.matchAddress([], []), null)
 
@@ -192,3 +230,24 @@ test('holepuncher match - custom made', async function (t) {
     'Same subnet (third segment)'
   )
 })
+
+function createHolepuncher(isInitiator, send = noopSend) {
+  const socket = { send }
+  const holder = { socket, release: noop }
+  const dht = {
+    firewalled: false,
+    nodes: { length: 0, latest: null },
+    _socketPool: { acquire: () => holder }
+  }
+
+  return {
+    holder,
+    puncher: new Holepuncher(dht, {}, isInitiator)
+  }
+}
+
+function noopSend() {
+  return Promise.resolve()
+}
+
+function noop() {}
