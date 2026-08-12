@@ -309,6 +309,7 @@ test('createServer + connect - pending LAN survives incomplete NAT analysis', as
   })
 
   const server = serverDHT.createServer(function (socket) {
+    socket.on('error', () => {})
     socket.end('pong')
   })
 
@@ -339,10 +340,13 @@ test('createServer + connect - pending LAN survives incomplete NAT analysis', as
   }
 
   const socket = clientDHT.connect(server.publicKey, { fastOpen: false })
+  socket.on('error', () => {})
 
   const [data] = await once(socket, 'data')
   t.alike(data, Buffer.from('pong'))
   t.ok(delayedLan, 'delayed LAN until the first holepunch request settled')
+
+  await endAndCloseSocket(socket)
 })
 
 test('server choosing to abort holepunch', async function (t) {
