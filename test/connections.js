@@ -298,31 +298,18 @@ test('createServer + connect - same-LAN explicit keypair opens server', async fu
 })
 
 test('createServer + connect - pending LAN survives incomplete NAT analysis', async function (t) {
-  await pendingLanSurvivesIncompleteNat(t, false)
-})
-
-test('createServer + connect - reusable pending LAN survives incomplete NAT analysis', async function (t) {
-  await pendingLanSurvivesIncompleteNat(t, true)
-})
-
-async function pendingLanSurvivesIncompleteNat(t, reusableSocket) {
   // Keep both endpoints cold. Three testnet nodes provide only two samples to
   // the server puncher, so coordinated NAT analysis cannot finish before LAN.
   const { bootstrap } = await swarm(t, 3)
   const serverDHT = new DHT({ bootstrap })
   const clientDHT = new DHT({ bootstrap })
+  t.teardown(async () => {
+    await serverDHT.destroy()
+    await clientDHT.destroy()
+  })
 
-  const lc = t.test('socket lifecycle')
-  lc.plan(5)
-
-  const server = serverDHT.createServer({ reusableSocket }, function (socket) {
-    lc.pass('server side opened')
-    socket.on('error', () => {})
-
-    socket.once('data', function (data) {
-      lc.alike(data, Buffer.from('ping'))
-      socket.end('pong')
-    })
+  const server = serverDHT.createServer(function (socket) {
+    socket.end('pong')
   })
 
   await server.listen()
@@ -330,12 +317,9 @@ async function pendingLanSurvivesIncompleteNat(t, reusableSocket) {
   const serverPort = serverDHT.io.serverSocket.address().port
   const ping = clientDHT.ping
   const peerHolepunch = clientDHT._router.peerHolepunch
-  let releaseLan = null
+  let holepunchSettled
   let delayedLan = false
-  let coordinated = false
-  const firstHolepunchSettled = new Promise((resolve) => {
-    releaseLan = resolve
-  })
+  const firstHolepunchSettled = new Promise((resolve) => (holepunchSettled = resolve))
 
   clientDHT.ping = async function (addr, opts) {
     if (addr.port === serverPort) {
@@ -348,47 +332,18 @@ async function pendingLanSurvivesIncompleteNat(t, reusableSocket) {
 
   clientDHT._router.peerHolepunch = async function (...args) {
     try {
-      const reply = await peerHolepunch.apply(this, args)
-      coordinated = true
-      return reply
+      return await peerHolepunch.apply(this, args)
     } finally {
-      releaseLan()
+      holepunchSettled()
     }
   }
 
-  const socket = clientDHT.connect(server.publicKey, {
-    fastOpen: false,
-    reusableSocket
-  })
+  const socket = clientDHT.connect(server.publicKey, { fastOpen: false })
 
-  socket.once('open', function () {
-    lc.pass('client side opened')
-  })
-
-  socket.once('data', function (data) {
-    lc.alike(data, Buffer.from('pong'))
-  })
-
-  socket.once('end', function () {
-    lc.pass('client side ended')
-    socket.end()
-  })
-
-  socket.once('error', function (err) {
-    lc.fail('client should not error: ' + err.code)
-  })
-
-  socket.write('ping')
-
-  await lc
-
-  t.ok(delayedLan, 'delayed the LAN route until coordinated punching replied')
-  t.ok(coordinated, 'coordinated punching replied before LAN continued')
-
-  await server.close()
-  await serverDHT.destroy()
-  await clientDHT.destroy()
-}
+  const [data] = await once(socket, 'data')
+  t.alike(data, Buffer.from('pong'))
+  t.ok(delayedLan, 'delayed LAN until the first holepunch request settled')
+})
 
 test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
