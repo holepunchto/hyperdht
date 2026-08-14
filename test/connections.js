@@ -297,6 +297,79 @@ test('createServer + connect - same-LAN explicit keypair opens server', async fu
   await b.destroy()
 })
 
+// NOTE This recreates a scenario when the NAT sampler on a remote server can flip OPEN but not report addresses causing the holepunch to abort.
+test.solo(
+  'createServer + connect - remote reports OPEN firewall with no addresses, holepunch fails',
+  async function (t) {
+    const [boot] = await swarm(t)
+
+    const bootstrap = [{ host: '127.0.0.1', port: boot.address().port }]
+    const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+    const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+    await a.fullyBootstrapped()
+    await b.fullyBootstrapped()
+
+    // Force the server (a) into the exact state that produces
+    // "firewall: OPEN, addresses: null" on a real PEER_HOLEPUNCH round:
+    //  - firewalled = false makes its Nat start at FIREWALL.OPEN immediately
+    //    (nat.js: this.firewall = dht.firewalled ? UNKNOWN : OPEN)
+    //  - remoteAddress() returning null removes both the initial-handshake
+    //    fast path (server.js's ourRemoteAddr)
+    //  - blocking session().ping() stops the background NAT auto-sampler
+    //    from ever landing a sample that would otherwise backfill
+    //    nat.addresses and mask the bug
+    a.firewalled = false
+    a.remoteAddress = () => null
+
+    const session = a.session.bind(a)
+    a.session = function () {
+      const s = session()
+      s.ping = () => {
+        console.trace('tried pinging')
+        return Promise.reject(new Error('nat sampling disabled for test'))
+      }
+      return s
+    }
+
+    const lc = t.test('socket lifecycle')
+    lc.plan(3)
+
+    const server = a.createServer({ shareLocalAddress: false }, function () {
+      lc.fail('server should not make a connection')
+    })
+
+    await server.listen()
+
+    const socket = b.connect(server.publicKey, {
+      fastOpen: false,
+      localConnection: false,
+      // Fires once the client has decoded the server's round-1 reply, right
+      // before it would try to punch. Confirms *why* it is about to fail,
+      // independent of whatever error code ends up on the socket.
+      holepunch(remoteFirewall, _, remoteAddresses) {
+        lc.is(remoteFirewall, DHT.FIREWALL.OPEN, 'server reported itself as OPEN')
+        lc.alike(remoteAddresses, [], 'but gave no addresses to actually punch to')
+        return true // let it proceed into the real punch(), which is what actually fails
+      }
+    })
+
+    socket.once('open', function () {
+      lc.pass('client connected')
+    })
+
+    socket.once('error', function (err) {
+      lc.fail('client connection failed: ' + err)
+    })
+
+    await lc
+
+    await server.close()
+    await a.destroy()
+    await b.destroy()
+  }
+)
+
 test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
 
