@@ -1,6 +1,30 @@
 const test = require('brittle')
 const Holepuncher = require('../lib/holepuncher.js')
 
+test('holepuncher only echoes after local punching starts', function (t) {
+  let sent = 0
+  const puncher = Object.assign(Object.create(Holepuncher.prototype), {
+    isInitiator: false,
+    remoteHolepunching: true,
+    punching: false
+  })
+  const ref = {
+    socket: {
+      send() {
+        sent++
+      }
+    }
+  }
+  const address = { host: '127.0.0.1', port: 1234 }
+
+  puncher._onholepunchmessage(null, address, ref)
+  t.is(sent, 0, 'peer intent alone does not enable echoes')
+
+  puncher.punching = true
+  puncher._onholepunchmessage(null, address, ref)
+  t.is(sent, 1, 'echoes after local punching starts')
+})
+
 test('holepuncher match - nothing to match', async function (t) {
   t.is(Holepuncher.matchAddress([], []), null)
 
