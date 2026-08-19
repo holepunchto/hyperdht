@@ -1,7 +1,7 @@
 const test = require('brittle')
 const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 const { encode } = require('hypercore-id-encoding')
-const { once } = require('events')
+const { once, EventEmitter } = require('events')
 const DHT = require('../')
 
 test('createServer + connect - once defaults', async function (t) {
@@ -175,6 +175,65 @@ test('createServer + connect - force holepunch', async function (t) {
   socket.end()
 
   await lc
+
+  await server.close()
+  await a.destroy()
+  await b.destroy()
+})
+
+test('createServer + connect - socket pool bind failure', async function (t) {
+  const [boot] = await swarm(t)
+
+  const bootstrap = [{ host: '127.0.0.1', port: boot.address().port }]
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  await a.fullyBootstrapped()
+  await b.fullyBootstrapped()
+
+  const server = a.createServer({ shareLocalAddress: false }, function () {
+    t.fail('server should not make a connection')
+  })
+
+  await server.listen()
+
+  const bindError = new Error('bind failed')
+  bindError.code = 'TEST_BIND_ERROR'
+
+  const failedSocket = new EventEmitter()
+  let closed = 0
+
+  failedSocket.bind = function () {
+    throw bindError
+  }
+  failedSocket.close = async function () {
+    closed++
+  }
+
+  const poolSize = b._socketPool._sockets.size
+  const createSocket = b.udx.createSocket
+  t.teardown(() => {
+    b.udx.createSocket = createSocket
+  })
+
+  b.udx.createSocket = function () {
+    b.udx.createSocket = createSocket
+    return failedSocket
+  }
+
+  const socket = b.connect(server.publicKey, {
+    fastOpen: false,
+    localConnection: false
+  })
+
+  const error = new Promise((resolve) => socket.once('error', resolve))
+  const close = new Promise((resolve) => socket.once('close', resolve))
+
+  t.is(await error, bindError, 'forwards the bind error')
+  await close
+
+  t.is(closed, 1, 'closes the failed UDX socket')
+  t.is(b._socketPool._sockets.size, poolSize, 'does not add the failed socket to the pool')
 
   await server.close()
   await a.destroy()

@@ -1,6 +1,35 @@
 const test = require('brittle')
 const Holepuncher = require('../lib/holepuncher.js')
 
+test('holepuncher reset keeps the current holder if acquire fails', function (t) {
+  const bindError = new Error('bind failed')
+  bindError.code = 'TEST_BIND_ERROR'
+
+  const holder = { release: noop }
+  const puncher = Object.create(Holepuncher.prototype)
+
+  puncher.dht = {
+    _socketPool: {
+      acquire() {
+        throw bindError
+      }
+    }
+  }
+  puncher._holder = holder
+  puncher._allHolders = [holder]
+
+  let error = null
+  try {
+    puncher._reset()
+  } catch (err) {
+    error = err
+  }
+
+  t.is(error, bindError, 'forwards the acquire error')
+  t.is(puncher._holder, holder, 'keeps the current holder')
+  t.alike(puncher._allHolders, [holder], 'keeps tracking the current holder')
+})
+
 test('holepuncher match - nothing to match', async function (t) {
   t.is(Holepuncher.matchAddress([], []), null)
 
@@ -144,6 +173,8 @@ test.skip('holepuncher match - container on host vs container on virtual machine
 
 test.skip('holepuncher match - host vs container on virtual machine', async function (t) {})
 test.skip('holepuncher match - container on host vs virtual machine', async function (t) {})
+
+function noop() {}
 
 test('holepuncher match - custom made', async function (t) {
   t.is(
