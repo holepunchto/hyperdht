@@ -814,3 +814,87 @@ test.skip('server does not support connection relaying', async function (t) {
   await b.destroy()
   await c.destroy()
 })
+
+test('relayed client that never wins a punch does not leak the server holepuncher', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const Nat = require('../lib/nat')
+  const { FIREWALL } = require('../lib/constants')
+
+  const r = createDHT({ bootstrap, firewalled: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  await Promise.all([r.fullyBootstrapped(), a.fullyBootstrapped(), b.fullyBootstrapped()])
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return r.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  const relayServer = r.createServer(function (socket) {
+    socket.on('error', () => {})
+    relay.accept(socket, { id: socket.remotePublicKey }).on('error', () => {})
+  })
+
+  await relayServer.listen()
+
+  // The client classifies as behind a randomizing NAT (like CGNAT), so the
+  // server rate limits the punch. Scoped to the client node only.
+  Object.defineProperty(Nat.prototype, 'firewall', {
+    configurable: true,
+    get() {
+      return this.dht === b ? FIREWALL.RANDOM : this._testFirewall
+    },
+    set(value) {
+      this._testFirewall = value
+    }
+  })
+  t.teardown(() => {
+    delete Nat.prototype.firewall
+  })
+
+  // Saturate the random-punch budget so the punch is postponed with TRY_LATER
+  a._randomPunches = a._randomPunchLimit
+
+  const server = a.createServer(
+    { shareLocalAddress: false, handshakeClearWait: 100 },
+    function (socket) {
+      socket.on('error', () => {})
+    }
+  )
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey, {
+    relayThrough: relayServer.publicKey,
+    localConnection: false,
+    fastOpen: false // a randomizing NAT would eat the fast-open packets
+  })
+  socket.on('error', () => {})
+
+  // Relay pairing has cleared the initial punch timeout by the time the
+  // connection is emitted, so the postponed puncher is parked
+  const [serverSocket] = await once(server, 'connection')
+  serverSocket.on('error', () => {})
+
+  const hs = server._holepunches.find((h) => h && h.puncher)
+  t.ok(
+    hs !== undefined && hs.prepunching === null,
+    'server parked a puncher for the postponed punch'
+  )
+  t.ok(!hs.puncher.destroyed, 'puncher still holds its socket')
+
+  // A graceful close can land before any relay error propagates, so the
+  // puncher cleanup must not depend on the raw stream error path
+  const punchSocket = hs.puncher.socket
+  hs.rawStream.destroy()
+
+  await once(punchSocket, 'close')
+  t.is(a._socketPool._sockets.size, 0, 'no orphaned holepunch sockets on the server')
+
+  await server.close()
+  await relayServer.close()
+  await Promise.all([r.destroy(), a.destroy(), b.destroy()])
+})
