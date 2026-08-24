@@ -3,6 +3,8 @@ const { once } = require('events')
 const RelayServer = require('blind-relay').Server
 const NoiseSecretStream = require('@hyperswarm/secret-stream')
 const Holepuncher = require('../lib/holepuncher')
+const Nat = require('../lib/nat')
+const { FIREWALL } = require('../lib/constants')
 const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 
 test('relay connections through node, client side', async function (t) {
@@ -813,4 +815,87 @@ test.skip('server does not support connection relaying', async function (t) {
   await a.destroy()
   await b.destroy()
   await c.destroy()
+})
+
+test('server releases the puncher and its quota when starting the punch fails', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const r = createDHT({ bootstrap, firewalled: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  await Promise.all([r.fullyBootstrapped(), a.fullyBootstrapped(), b.fullyBootstrapped()])
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return r.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  const relayServer = r.createServer(function (socket) {
+    socket.on('error', () => {})
+    relay.accept(socket, { id: socket.remotePublicKey }).on('error', () => {})
+  })
+
+  await relayServer.listen()
+
+  // The server classifies as behind a randomizing NAT, so starting the punch
+  // expands birthday sockets. Scoped to the server node only.
+  Object.defineProperty(Nat.prototype, 'firewall', {
+    configurable: true,
+    get() {
+      return this.dht === a ? FIREWALL.RANDOM : this._testFirewall
+    },
+    set(value) {
+      this._testFirewall = value
+    }
+  })
+  t.teardown(() => {
+    delete Nat.prototype.firewall
+  })
+
+  // Let the holder socket bind, then fail further acquisitions, like ephemeral
+  // port exhaustion hitting the birthday socket expansion. The holder close is
+  // the cleanup signal, hooked at acquisition time so it cannot be missed.
+  const acquire = a._socketPool.acquire.bind(a._socketPool)
+  const bindError = new Error('bind failed')
+  bindError.code = 'EADDRINUSE'
+  let acquired = 0
+  let onHolderClosed
+  const holderClosed = new Promise((resolve) => {
+    onHolderClosed = resolve
+  })
+  a._socketPool.acquire = () => {
+    if (++acquired > 1) throw bindError
+    const ref = acquire()
+    ref.socket.on('close', onHolderClosed)
+    return ref
+  }
+
+  const server = a.createServer({ shareLocalAddress: false }, function (socket) {
+    socket.on('error', () => {})
+  })
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey, {
+    relayThrough: relayServer.publicKey,
+    localConnection: false,
+    fastOpen: false // a randomizing NAT would eat the fast-open packets
+  })
+  socket.on('error', () => {})
+
+  // A failed punch must not tear down the working relayed connection, so the
+  // cleanup signal is the puncher holder socket closing
+  await holderClosed
+
+  t.ok(acquired > 1, 'the punch reached birthday socket expansion')
+  t.is(a._socketPool._sockets.size, 0, 'the failed punch released its sockets')
+  t.is(a._randomPunches, 0, 'the failed punch released its random-punch quota')
+  t.is(a.stats.punches.failed, 1, 'the failure is counted')
+
+  socket.destroy()
+  await server.close()
+  await relayServer.close()
+  await Promise.all([r.destroy(), a.destroy(), b.destroy()])
 })
