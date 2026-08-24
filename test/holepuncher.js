@@ -1,7 +1,6 @@
 const test = require('brittle')
 const b4a = require('b4a')
 const Holepuncher = require('../lib/holepuncher.js')
-const { FIREWALL } = require('../lib/constants.js')
 
 test('holepuncher distinguishes probe echoes from fast-open', function (t) {
   const probe = createInitiator()
@@ -24,35 +23,53 @@ test('holepuncher distinguishes probe echoes from fast-open', function (t) {
 })
 
 test('holepuncher only echoes after the remote starts punching', function (t) {
-  const sent = []
-  const responder = createHolepuncher(false, sent)
+  const responder = createHolepuncher(false)
 
   responder.puncher._onholepunchmessage(b4a.from([0]), responder.address, responder.ref)
-  t.is(sent.length, 0, 'uncommitted probe is not echoed')
+  t.is(responder.sent.length, 0, 'uncommitted probe is not echoed')
 
-  responder.puncher.updateRemote({
-    punching: true,
-    firewall: FIREWALL.UNKNOWN,
-    addresses: null,
-    verified: null
-  })
+  responder.puncher.updateRemote({ punching: true })
   responder.puncher._onholepunchmessage(b4a.from([0]), responder.address, responder.ref)
-  t.is(sent.length, 1, 'coordinated punch is echoed')
+  t.is(responder.sent.length, 1, 'coordinated punch is echoed')
 
   responder.puncher.destroy()
 })
 
+test('holepuncher fast-open uses supplied socket', async function (t) {
+  const held = []
+  const sent = []
+  const { puncher, address } = createHolepuncher(true, held)
+
+  await puncher.fastOpen(address, createSocket(sent))
+
+  t.alike(held, [], 'held socket is not used')
+  t.alike(sent, [
+    {
+      message: b4a.from([1]),
+      port: address.port,
+      host: address.host,
+      ttl: 64
+    }
+  ])
+
+  puncher.destroy()
+})
+
 function createInitiator() {
-  return createHolepuncher(true, [])
+  return createHolepuncher(true)
 }
 
-function createHolepuncher(isInitiator, sent) {
-  const socket = {
+function createSocket(sent) {
+  return {
     send(message, port, host, ttl) {
       sent.push({ message, port, host, ttl })
       return Promise.resolve()
     }
   }
+}
+
+function createHolepuncher(isInitiator, sent = []) {
+  const socket = createSocket(sent)
   const ref = { socket, release() {} }
   const dht = {
     firewalled: false,
@@ -71,6 +88,7 @@ function createHolepuncher(isInitiator, sent) {
     puncher,
     ref,
     address,
+    sent,
     get connected() {
       return connected
     }

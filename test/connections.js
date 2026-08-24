@@ -184,14 +184,14 @@ test('createServer + connect - force holepunch', async function (t) {
   await b.destroy()
 })
 
-test('createServer + connect - cold local fast-open uses analyzed socket', async function (t) {
+test('createServer + connect - cold fast-open precedes coordinated punching', async function (t) {
   // Holepuncher NAT analysis needs four samples. Keep the endpoints cold, but
   // provide enough local nodes for that analysis to complete deterministically.
   const { bootstrap } = await swarm(t, 5)
 
-  // Deliberately connect before either endpoint is fully bootstrapped. The
-  // explicit client host reproduces the asymmetric local-address setup where
-  // a probe echo used to select a socket that the server later discarded.
+  // Deliberately connect before either endpoint is fully bootstrapped. Disable
+  // local connection attempts so only the server's analyzed fast-open path can
+  // open the connection before coordinated punching starts.
   const serverDHT = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const clientDHT = new DHT({
     bootstrap,
