@@ -1,6 +1,7 @@
 const test = require('brittle')
 const b4a = require('b4a')
 const Holepuncher = require('../lib/holepuncher.js')
+const { FIREWALL } = require('../lib/constants.js')
 
 test('holepuncher distinguishes probe echoes from fast-open', function (t) {
   const probe = createInitiator()
@@ -22,7 +23,7 @@ test('holepuncher distinguishes probe echoes from fast-open', function (t) {
   punching.puncher.destroy()
 })
 
-test('holepuncher only echoes after the remote starts punching', function (t) {
+test('holepuncher only echoes after local punching starts', function (t) {
   const responder = createHolepuncher(false)
 
   responder.puncher._onholepunchmessage(b4a.from([0]), responder.address, responder.ref)
@@ -30,9 +31,95 @@ test('holepuncher only echoes after the remote starts punching', function (t) {
 
   responder.puncher.updateRemote({ punching: true })
   responder.puncher._onholepunchmessage(b4a.from([0]), responder.address, responder.ref)
-  t.is(responder.sent.length, 1, 'coordinated punch is echoed')
+  t.is(responder.sent.length, 0, 'peer intent alone does not enable echoes')
+
+  responder.puncher.punching = true
+  responder.puncher._onholepunchmessage(b4a.from([0]), responder.address, responder.ref)
+  t.is(responder.sent.length, 1, 'echoes after local punching starts')
 
   responder.puncher.destroy()
+})
+
+test('holepuncher punch refusal does not mark punching or echo', async function (t) {
+  const responder = createHolepuncher(false)
+
+  responder.puncher.updateRemote({
+    punching: true,
+    firewall: FIREWALL.RANDOM,
+    addresses: [{ host: '127.0.0.1', port: 4321 }],
+    verified: null
+  })
+
+  t.is(await responder.puncher.punch(), false, 'no verified address refuses to punch')
+  t.is(responder.puncher.punching, false, 'refused punch does not mark punching')
+
+  responder.puncher._onholepunchmessage(b4a.from([0]), responder.address, responder.ref)
+  t.is(responder.sent.length, 0, 'refused puncher does not echo')
+
+  responder.puncher.destroy()
+
+  const fallthrough = createHolepuncher(false)
+
+  fallthrough.puncher.nat.firewall = FIREWALL.RANDOM
+  fallthrough.puncher.updateRemote({
+    punching: true,
+    firewall: FIREWALL.RANDOM,
+    addresses: [{ host: '127.0.0.1', port: 4321 }],
+    verified: '127.0.0.1'
+  })
+
+  t.is(await fallthrough.puncher.punch(), false, 'double random refuses to punch')
+  t.is(fallthrough.puncher.punching, false, 'refused punch does not mark punching')
+
+  fallthrough.puncher.destroy()
+})
+
+test('holepuncher punch marks punching for each strategy', async function (t) {
+  const consistent = createHolepuncher(false)
+
+  consistent.puncher.updateRemote({
+    punching: true,
+    firewall: FIREWALL.CONSISTENT,
+    addresses: [{ host: '127.0.0.1', port: 4321 }],
+    verified: null
+  })
+
+  t.is(await consistent.puncher.punch(), true, 'consistent/consistent punches')
+  t.is(consistent.puncher.punching, true, 'consistent/consistent marks punching')
+
+  consistent.puncher._onholepunchmessage(b4a.from([0]), consistent.address, consistent.ref)
+  t.is(consistent.sent.length, 1, 'punching puncher echoes')
+
+  consistent.puncher.destroy()
+
+  const random = createHolepuncher(false)
+
+  random.puncher.updateRemote({
+    punching: true,
+    firewall: FIREWALL.RANDOM,
+    addresses: [{ host: '127.0.0.1', port: 4321 }],
+    verified: '127.0.0.1'
+  })
+
+  t.is(await random.puncher.punch(), true, 'consistent/random punches')
+  t.is(random.puncher.punching, true, 'consistent/random marks punching')
+
+  random.puncher.destroy()
+
+  const birthday = createHolepuncher(false)
+
+  birthday.puncher.nat.firewall = FIREWALL.RANDOM
+  birthday.puncher.updateRemote({
+    punching: true,
+    firewall: FIREWALL.CONSISTENT,
+    addresses: [{ host: '127.0.0.1', port: 4321 }],
+    verified: '127.0.0.1'
+  })
+
+  t.is(await birthday.puncher.punch(), true, 'random/consistent punches')
+  t.is(birthday.puncher.punching, true, 'random/consistent marks punching')
+
+  birthday.puncher.destroy()
 })
 
 test('holepuncher fast-open uses supplied socket', async function (t) {
@@ -74,6 +161,8 @@ function createHolepuncher(isInitiator, sent = []) {
   const dht = {
     firewalled: false,
     nodes: { length: 0, latest: null },
+    stats: { punches: { consistent: 0, random: 0, open: 0 } },
+    _randomPunches: 0,
     _socketPool: { acquire: () => ref }
   }
   const puncher = new Holepuncher(dht, {}, isInitiator)
