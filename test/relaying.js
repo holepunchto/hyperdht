@@ -825,10 +825,7 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
   const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-  t.teardown(() => Promise.all([r.destroy(), a.destroy(), b.destroy()]), {
-    force: true,
-    order: 0
-  })
+  t.teardown(() => Promise.all([r.destroy(), a.destroy(), b.destroy()]))
 
   await Promise.all([r.fullyBootstrapped(), a.fullyBootstrapped(), b.fullyBootstrapped()])
 
@@ -838,7 +835,7 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
     }
   })
 
-  t.teardown(() => relay.close(), { force: true, order: -10 })
+  t.teardown(() => relay.close(), { order: -10 })
 
   const relayServer = r.createServer(function (socket) {
     socket.on('error', () => {})
@@ -868,8 +865,24 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
   // Saturate the random-punch budget so the punch is postponed with TRY_LATER
   a._randomPunches = a._randomPunchLimit
 
+  let resolveTryLater
+  const tryLater = new Promise((resolve) => {
+    resolveTryLater = resolve
+  })
+
   const server = a.createServer(
-    { shareLocalAddress: false, handshakeClearWait: 100 },
+    {
+      shareLocalAddress: false,
+      holepunch(remoteFirewall, localFirewall) {
+        if (
+          (remoteFirewall >= FIREWALL.RANDOM || localFirewall >= FIREWALL.RANDOM) &&
+          a._randomPunches >= a._randomPunchLimit
+        ) {
+          resolveTryLater()
+        }
+        return true
+      }
+    },
     function (socket) {
       socket.on('error', () => {})
     }
@@ -883,16 +896,23 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
     fastOpen: false // a randomizing NAT would eat the fast-open packets
   })
   socket.on('error', () => {})
-  t.teardown(() => socket.destroy(), { force: true, order: -20 })
+  t.teardown(() => socket.destroy(), { order: -20 })
 
   // Relay pairing has cleared the initial punch timeout by the time the
-  // connection is emitted, so the postponed puncher is parked
-  await once(server, 'connection')
+  // connection is emitted. The holepunch hook runs immediately before the
+  // saturated random-punch budget makes the server reply with TRY_LATER.
+  await Promise.all([once(server, 'connection'), tryLater])
 
   const hs = server._holepunches.find((h) => {
     const p = h && h.puncher
     return (
-      p && h.relayPaired && h.prepunching === null && !p.destroyed && !p.punching && !p.connected
+      p &&
+      h.relayPaired &&
+      h.prepunching === null &&
+      p.remoteHolepunching &&
+      !p.destroyed &&
+      !p.punching &&
+      !p.connected
     )
   })
   t.ok(hs, 'server parked a live puncher after relay pairing')
@@ -900,11 +920,16 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
 
   // Close the relayed raw stream without an error before direct upgrade. The
   // puncher cleanup must not depend on the raw stream error path.
-  const punchSocket = hs.puncher.socket
-  hs.rawStream.destroy()
+  const puncher = hs.puncher
+  const punchSocket = puncher.socket
+  const rawStreamClosed = once(hs.rawStream, 'close')
 
-  await waitFor(() => hs.puncher.destroyed && !a._socketPool.lookup(punchSocket))
-  t.ok(hs.puncher.destroyed, 'server destroyed the parked puncher')
+  hs.rawStream.destroy()
+  await rawStreamClosed
+  await new Promise(setImmediate)
+  await new Promise(setImmediate)
+
+  t.ok(puncher.destroyed, 'server destroyed the parked puncher')
   t.absent(a._socketPool.lookup(punchSocket), 'server released the parked punch socket')
 
   socket.destroy()
