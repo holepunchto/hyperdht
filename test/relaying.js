@@ -825,10 +825,7 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
   const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
   const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
 
-  t.teardown(() => Promise.all([r.destroy(), a.destroy(), b.destroy()]), {
-    force: true,
-    order: 0
-  })
+  t.teardown(() => Promise.all([r.destroy(), a.destroy(), b.destroy()]))
 
   await Promise.all([r.fullyBootstrapped(), a.fullyBootstrapped(), b.fullyBootstrapped()])
 
@@ -838,7 +835,7 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
     }
   })
 
-  t.teardown(() => relay.close(), { force: true, order: -10 })
+  t.teardown(() => relay.close(), { order: -10 })
 
   const relayServer = r.createServer(function (socket) {
     socket.on('error', () => {})
@@ -899,7 +896,7 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
     fastOpen: false // a randomizing NAT would eat the fast-open packets
   })
   socket.on('error', () => {})
-  t.teardown(() => socket.destroy(), { force: true, order: -20 })
+  t.teardown(() => socket.destroy(), { order: -20 })
 
   // Relay pairing has cleared the initial punch timeout by the time the
   // connection is emitted. The holepunch hook runs immediately before the
