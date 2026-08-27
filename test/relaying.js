@@ -835,7 +835,7 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
     }
   })
 
-  t.teardown(() => relay.close(), { order: -10 })
+  t.teardown(() => relay.close())
 
   const relayServer = r.createServer(function (socket) {
     socket.on('error', () => {})
@@ -859,7 +859,7 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
     () => {
       delete Nat.prototype.firewall
     },
-    { force: true, order: 10 }
+    { force: true }
   )
 
   // Saturate the random-punch budget so the punch is postponed with TRY_LATER
@@ -896,7 +896,7 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
     fastOpen: false // a randomizing NAT would eat the fast-open packets
   })
   socket.on('error', () => {})
-  t.teardown(() => socket.destroy(), { order: -20 })
+  t.teardown(() => socket.destroy())
 
   // Relay pairing has cleared the initial punch timeout by the time the
   // connection is emitted. The holepunch hook runs immediately before the
