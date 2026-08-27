@@ -214,6 +214,25 @@ async function waitFor(fn, timeout = 2000) {
   }
 }
 
+async function withTimeout(promise, message) {
+  let timer = null
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), 5000)
+      })
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+function closed(stream) {
+  return new Promise((resolve) => stream.once('close', resolve))
+}
+
 test('relay connections through node, client side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -546,7 +565,12 @@ test('relay connection upgrades to direct connection', async function (t) {
   for (const opts of [
     { name: 'default keepalive' },
     { name: 'without keepalive', connectionKeepAlive: false, confirmWithAppData: true },
-    { name: 'idle without keepalive', connectionKeepAlive: false }
+    { name: 'idle without keepalive', connectionKeepAlive: false },
+    {
+      name: 'server relay loss while analyzing',
+      connectionKeepAlive: false,
+      relayFailure: true
+    }
   ]) {
     t.comment(opts.name)
     const { bootstrap } = await swarm(t)
@@ -564,8 +588,10 @@ test('relay connection upgrades to direct connection', async function (t) {
       ephemeral: true,
       connectionKeepAlive: opts.connectionKeepAlive
     })
+    t.teardown(() => Promise.all([relayNode.destroy(), serverNode.destroy(), clientNode.destroy()]))
 
     const resumePunching = pausePunching(t, [serverNode, clientNode])
+    const pausedAnalysis = opts.relayFailure ? pauseAnalysis(t, serverNode, true) : null
 
     const relayServer = new RelayServer({
       createStream(opts) {
@@ -582,6 +608,7 @@ test('relay connection upgrades to direct connection', async function (t) {
     })
 
     const relayTransportServer = relayNode.createServer(function (socket) {
+      if (opts.relayFailure) socket.on('error', () => {})
       relaySockets.push(socket)
       // Wait until both client and server have opened their relay transport sockets.
       if (relaySockets.length === 2) resolveRelaySockets(relaySockets)
@@ -640,7 +667,29 @@ test('relay connection upgrades to direct connection', async function (t) {
 
     const clientUpgraded = once(clientSocket.rawStream, 'remote-changed')
     const serverUpgraded = once(serverSocket.rawStream, 'remote-changed')
-    const relaySocketsClosed = relaySockets.map((socket) => once(socket, 'close'))
+    const relaySocketsClosed = relaySockets.map((socket) =>
+      opts.relayFailure ? closed(socket) : once(socket, 'close')
+    )
+
+    if (pausedAnalysis) {
+      const puncher = await withTimeout(
+        pausedAnalysis.active,
+        'Timed out waiting for the server NAT analysis'
+      )
+      const hs = appServer._holepunches.find((h) => h && h.relayPaired && h.puncher === puncher)
+
+      if (!hs) throw new Error('Missing paired server handshake')
+
+      const relaySocket = hs.relaySocket
+      const relaySocketClosed = closed(relaySocket)
+
+      relaySocket.destroy()
+      await withTimeout(relaySocketClosed, 'Timed out waiting for the server relay socket to close')
+
+      t.ok(!hs.rawStream.destroyed, 'server keeps the recoverable raw stream alive')
+
+      pausedAnalysis.resume()
+    }
 
     resumePunching()
 
@@ -658,8 +707,19 @@ test('relay connection upgrades to direct connection', async function (t) {
       t.alike((await appData)[0], Buffer.from('after upgrade'), 'app data confirms direct path')
     }
 
-    await Promise.all([clientUpgraded, serverUpgraded])
-    await Promise.all(relaySocketsClosed)
+    const upgraded = Promise.all([clientUpgraded, serverUpgraded])
+    if (opts.relayFailure) {
+      await withTimeout(upgraded, 'Timed out waiting for direct upgrade after relay loss')
+    } else {
+      await upgraded
+    }
+
+    const relaysClosed = Promise.all(relaySocketsClosed)
+    if (opts.relayFailure) {
+      await withTimeout(relaysClosed, 'Timed out waiting for relay transports to close')
+    } else {
+      await relaysClosed
+    }
     t.pass('relay transport sockets close after direct upgrade')
 
     t.is(
@@ -676,7 +736,10 @@ test('relay connection upgrades to direct connection', async function (t) {
     if (!opts.confirmWithAppData) {
       const afterUpgrade = once(clientSocket, 'data')
       clientSocket.write(Buffer.from('after upgrade'))
-      t.alike((await afterUpgrade)[0], Buffer.from('after upgrade'), 'direct path carries data')
+      const received = opts.relayFailure
+        ? await withTimeout(afterUpgrade, 'Timed out waiting for data over the direct path')
+        : await afterUpgrade
+      t.alike(received[0], Buffer.from('after upgrade'), 'direct path carries data')
     }
 
     await endAndCloseSocket(clientSocket)
@@ -778,6 +841,39 @@ function pausePunching(t, pausedNodes) {
   return resume
 }
 
+function pauseAnalysis(t, node, remoteHolepunching, stableResult) {
+  const analyze = Holepuncher.prototype.analyze
+
+  let resolveActive
+  const active = new Promise((resolve) => {
+    resolveActive = resolve
+  })
+
+  let unpause
+  const resumed = new Promise((resolve) => {
+    unpause = resolve
+  })
+
+  const resume = () => {
+    unpause()
+    Holepuncher.prototype.analyze = analyze
+  }
+
+  Holepuncher.prototype.analyze = async function (...args) {
+    if (this.dht === node && this.remoteHolepunching === remoteHolepunching) {
+      resolveActive(this)
+      await resumed
+      if (stableResult !== undefined) return stableResult
+    }
+
+    return analyze.call(this, ...args)
+  }
+
+  t.teardown(resume, { force: true })
+
+  return { active, resume }
+}
+
 test.skip('server does not support connection relaying', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -816,7 +912,7 @@ test.skip('server does not support connection relaying', async function (t) {
   await c.destroy()
 })
 
-test('relayed TRY_LATER stream close destroys the parked server puncher', async function (t) {
+test('paired relay loss clears parked and in-flight idle handshakes', async function (t) {
   const { bootstrap } = await swarm(t)
 
   const Nat = require('../lib/nat')
@@ -866,10 +962,7 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
   // Saturate the random-punch budget so the punch is postponed with TRY_LATER
   a._randomPunches = a._randomPunchLimit
 
-  let resolveTryLater
-  const tryLater = new Promise((resolve) => {
-    resolveTryLater = resolve
-  })
+  let resolveTryLater = null
 
   const server = a.createServer(
     {
@@ -879,7 +972,7 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
           (remoteFirewall >= FIREWALL.RANDOM || localFirewall >= FIREWALL.RANDOM) &&
           a._randomPunches >= a._randomPunchLimit
         ) {
-          resolveTryLater()
+          if (resolveTryLater) resolveTryLater()
         }
         return true
       }
@@ -891,48 +984,87 @@ test('relayed TRY_LATER stream close destroys the parked server puncher', async 
 
   await server.listen()
 
-  const socket = b.connect(server.publicKey, {
-    relayThrough: relayServer.publicKey,
-    localConnection: false,
-    fastOpen: false // a randomizing NAT would eat the fast-open packets
-  })
-  socket.on('error', () => {})
-  t.teardown(() => socket.destroy())
+  for (const relayFailure of ['after TRY_LATER', 'during a non-punching probe']) {
+    t.comment(relayFailure)
 
-  // Relay pairing has cleared the initial punch timeout by the time the
-  // connection is emitted. The holepunch hook runs immediately before the
-  // saturated random-punch budget makes the server reply with TRY_LATER.
-  await Promise.all([once(server, 'connection'), tryLater])
+    const probing = relayFailure.startsWith('during')
+    const tryLater = probing
+      ? null
+      : new Promise((resolve) => {
+          resolveTryLater = resolve
+        })
+    const resumePunching = probing ? pausePunching(t, [a, b]) : null
+    // Keep this request on the normal idle-return path so cleanup must come
+    // from the request's finally block rather than _abort().
+    const pausedAnalysis = probing ? pauseAnalysis(t, a, false, true) : null
 
-  const hs = server._holepunches.find((h) => {
-    const p = h && h.puncher
-    return (
-      p &&
-      h.relayPaired &&
-      h.prepunching === null &&
-      p.remoteHolepunching &&
-      !p.destroyed &&
-      !p.punching &&
-      !p.connected
+    const connection = once(server, 'connection')
+    const socket = b.connect(server.publicKey, {
+      relayThrough: relayServer.publicKey,
+      localConnection: false,
+      fastOpen: false // a randomizing NAT would eat the fast-open packets
+    })
+    socket.on('error', () => {})
+    const socketClosed = closed(socket)
+    t.teardown(() => socket.destroy())
+
+    let activePuncher = null
+    if (pausedAnalysis) {
+      const [, puncher] = await withTimeout(
+        Promise.all([connection, pausedAnalysis.active]),
+        'Timed out waiting for the relayed connection and server NAT analysis'
+      )
+      activePuncher = puncher
+      const updateRemote = puncher.updateRemote
+      puncher.updateRemote = function (state) {
+        return updateRemote.call(this, { ...state, punching: false })
+      }
+    } else {
+      // Relay pairing has cleared the initial punch timeout by the time the
+      // connection is emitted. The hook runs immediately before TRY_LATER.
+      await withTimeout(
+        Promise.all([connection, tryLater]),
+        'Timed out waiting for the relayed connection and TRY_LATER decision'
+      )
+    }
+
+    const hs = server._holepunches.find((h) => {
+      const p = h && h.puncher
+      if (!p || !h.relayPaired || p.destroyed || p.punching || p.connected) return false
+      if (activePuncher) return p === activePuncher
+      return h.prepunching === null && p.remoteHolepunching
+    })
+    if (!hs) throw new Error(`Missing ${activePuncher ? 'in-flight' : 'parked'} handshake`)
+
+    const relaySocketClosed = closed(hs.relaySocket)
+    const rawStream = hs.rawStream
+    const punchSocket = hs.puncher.socket
+    const rawStreamClosed = closed(rawStream)
+    const punchSocketClosed = closed(punchSocket)
+
+    hs.relaySocket.destroy()
+    await withTimeout(relaySocketClosed, 'Timed out waiting for the relay socket to close')
+
+    if (pausedAnalysis) {
+      t.ok(!rawStream.destroyed, 'server defers cleanup during active holepunch processing')
+      pausedAnalysis.resume()
+    }
+
+    await withTimeout(
+      Promise.all([rawStreamClosed, punchSocketClosed]),
+      'Timed out waiting for the raw stream and punch socket to close'
     )
-  })
-  t.ok(hs, 'server parked a live puncher after relay pairing')
-  if (!hs) return
 
-  // Close the relayed raw stream without an error before direct upgrade. The
-  // puncher cleanup must not depend on the raw stream error path.
-  const puncher = hs.puncher
-  const punchSocket = puncher.socket
-  const rawStreamClosed = once(hs.rawStream, 'close')
-  const punchSocketClosed = once(punchSocket, 'close')
+    t.absent(
+      a._socketPool.lookup(punchSocket),
+      `server released the ${probing ? 'in-flight' : 'parked'} punch socket`
+    )
 
-  hs.rawStream.destroy()
-  await Promise.all([rawStreamClosed, punchSocketClosed])
-
-  t.ok(puncher.destroyed, 'server destroyed the parked puncher')
-  t.absent(a._socketPool.lookup(punchSocket), 'server released the parked punch socket')
-
-  socket.destroy()
+    if (resumePunching) resumePunching()
+    resolveTryLater = null
+    socket.destroy()
+    await withTimeout(socketClosed, 'Timed out waiting for the client socket to close')
+  }
 })
 
 test('relay transport failure while pairing clears a parked handshake', async function (t) {
@@ -955,7 +1087,7 @@ test('relay transport failure while pairing clears a parked handshake', async fu
     }
   })
 
-  t.teardown(() => relay.close(), { order: -10 })
+  t.teardown(() => relay.close())
 
   // Do not accept the client side, so the server-side relay pair stays pending
   const relayServer = r.createServer(function (socket) {
@@ -981,7 +1113,7 @@ test('relay transport failure while pairing clears a parked handshake', async fu
     () => {
       delete Nat.prototype.firewall
     },
-    { force: true, order: 10 }
+    { force: true }
   )
 
   // Saturate the random-punch budget so the punch is postponed with TRY_LATER
@@ -1019,7 +1151,7 @@ test('relay transport failure while pairing clears a parked handshake', async fu
     fastOpen: false // a randomizing NAT would eat the fast-open packets
   })
   socket.on('error', () => {})
-  t.teardown(() => socket.destroy(), { order: -20 })
+  t.teardown(() => socket.destroy())
 
   // The hook runs immediately before the saturated random-punch budget makes
   // the server reply with TRY_LATER while relay pairing is still pending.
@@ -1047,20 +1179,30 @@ test('relay transport failure while pairing clears a parked handshake', async fu
 
   // Fail relay pairing and observe server cleanup before destroying the client,
   // so client shutdown cannot supply a different cleanup path.
+  const relayAborts = a.stats.relaying.aborts
+  const relaySocket = hs.relaySocket
+  const relayClient = hs.relayClient
   const rawStream = hs.rawStream
   const punchSocket = hs.puncher.socket
-  hs.relaySocket.destroy()
+  const relaySocketClosed = closed(relaySocket)
+  const relayClientClosed = closed(relayClient)
+  const rawStreamClosed = closed(rawStream)
+  const punchSocketClosed = closed(punchSocket)
 
-  await new Promise(setImmediate)
-  await new Promise(setImmediate)
+  relaySocket.destroy()
+  await withTimeout(
+    Promise.all([relaySocketClosed, relayClientClosed, rawStreamClosed, punchSocketClosed]),
+    'Timed out waiting for relay failure cleanup'
+  )
+
+  t.absent(a._socketPool.lookup(punchSocket), 'server released the parked punch socket')
+  t.is(a.stats.relaying.aborts, relayAborts + 1, 'server records one relay pairing abort')
+
   await new Promise((resolve) => setTimeout(resolve, server.handshakeClearWait * 1.2))
-
-  t.ok(rawStream.destroyed, 'server destroyed the raw stream after relay pairing failed')
   t.absent(
     server._holepunches.find((h) => h === hs),
     'server cleared the unpaired handshake'
   )
-  t.absent(a._socketPool.lookup(punchSocket), 'server released the parked punch socket')
 
   socket.destroy()
 })
@@ -1085,7 +1227,7 @@ test('relay transport failure after pairing clears an unrecoverable handshake', 
       return relayNode.createRawStream({ ...opts, framed: true })
     }
   })
-  t.teardown(() => relay.close(), { order: -10 })
+  t.teardown(() => relay.close())
 
   const relayServer = relayNode.createServer(function (socket) {
     socket.on('error', () => {})
@@ -1113,7 +1255,7 @@ test('relay transport failure after pairing clears an unrecoverable handshake', 
     localConnection: false
   })
   socket.on('error', () => {})
-  t.teardown(() => socket.destroy(), { order: -20 })
+  t.teardown(() => socket.destroy())
 
   await connection
 
@@ -1132,18 +1274,26 @@ test('relay transport failure after pairing clears an unrecoverable handshake', 
 
   t.absent(hs.puncher, 'the handshake has no direct-punch recovery path')
 
+  const relayAborts = serverNode.stats.relaying.aborts
+  const relaySocket = hs.relaySocket
+  const relayClient = hs.relayClient
   const rawStream = hs.rawStream
-  hs.relayClient.destroy(new Error('simulated relay failure'))
+  const relaySocketClosed = closed(relaySocket)
+  const relayClientClosed = closed(relayClient)
+  const rawStreamClosed = closed(rawStream)
 
-  await new Promise(setImmediate)
-  await new Promise(setImmediate)
-  t.ok(rawStream.destroyed, 'server destroyed the raw stream after relay transport failed')
+  relayClient.destroy(new Error('simulated relay failure'))
+  await withTimeout(
+    Promise.all([relaySocketClosed, relayClientClosed, rawStreamClosed]),
+    'Timed out waiting for paired relay failure cleanup'
+  )
 
   await new Promise((resolve) => setTimeout(resolve, server.handshakeClearWait * 1.2))
   t.absent(
     server._holepunches.find((h) => h === hs),
     'server cleared the paired handshake'
   )
+  t.is(serverNode.stats.relaying.aborts, relayAborts, 'paired relay loss is not a pairing abort')
 
   socket.destroy()
 })
