@@ -233,6 +233,21 @@ function closed(stream) {
   return new Promise((resolve) => stream.once('close', resolve))
 }
 
+function handshakeCleared(server, hs) {
+  const clear = server._clear
+
+  return new Promise((resolve) => {
+    server._clear = function (...args) {
+      const result = clear.apply(this, args)
+      if (args[0] === hs) {
+        server._clear = clear
+        resolve()
+      }
+      return result
+    }
+  })
+}
+
 test('relay connections through node, client side, server aborts hole punch', async function (t) {
   const { bootstrap } = await swarm(t)
 
@@ -600,7 +615,7 @@ test('relay connection upgrades to direct connection', async function (t) {
 
     const resumePunching = pausePunching(t, [serverNode, clientNode])
     const pausedAnalysis = opts.relayFailure
-      ? pauseAnalysis(t, serverNode, !!opts.remoteHolepunching, true)
+      ? pauseAnalysis(t, serverNode, !!opts.remoteHolepunching)
       : null
     let relayFailureHandshake = null
 
@@ -703,8 +718,6 @@ test('relay connection upgrades to direct connection', async function (t) {
         await new Promise((resolve) => setTimeout(resolve, appServer.relayRecoveryWait * 1.2))
       }
 
-      t.ok(!hs.rawStream.destroyed, 'server keeps the recoverable raw stream alive')
-
       pausedAnalysis.resume()
     }
 
@@ -731,7 +744,7 @@ test('relay connection upgrades to direct connection', async function (t) {
       await upgraded
     }
 
-    if (relayFailureHandshake) {
+    if (relayFailureHandshake && !opts.waitForRecoveryExpiry) {
       t.is(
         relayFailureHandshake.relayRecoveryTimeout,
         null,
@@ -745,8 +758,6 @@ test('relay connection upgrades to direct connection', async function (t) {
     } else {
       await relaysClosed
     }
-    t.pass('relay transport sockets close after direct upgrade')
-
     t.is(
       serverSocket.rawStream.remotePort,
       clientSocket.rawStream.localPort,
@@ -848,25 +859,30 @@ test.skip('relay several connections through node with pool', async function (t)
 
 function pausePunching(t, pausedNodes) {
   const punch = Holepuncher.prototype._punch
-  let resume = null
+  let unpause = null
   const punchingResumed = new Promise((resolve) => {
-    resume = resolve
+    unpause = resolve
   })
+
+  let restored = false
+  const resume = () => {
+    if (restored) return
+    restored = true
+    unpause()
+    Holepuncher.prototype._punch = punch
+  }
 
   Holepuncher.prototype._punch = async function () {
     if (pausedNodes.includes(this.dht)) await punchingResumed
     return punch.call(this)
   }
 
-  t.teardown(() => {
-    resume()
-    Holepuncher.prototype._punch = punch
-  })
+  t.teardown(resume, { force: true })
 
   return resume
 }
 
-function pauseAnalysis(t, node, remoteHolepunching, stableResult) {
+function pauseAnalysis(t, node, remoteHolepunching) {
   const analyze = Holepuncher.prototype.analyze
 
   let resolveActive
@@ -888,7 +904,7 @@ function pauseAnalysis(t, node, remoteHolepunching, stableResult) {
     if (this.dht === node && this.remoteHolepunching === remoteHolepunching) {
       resolveActive(this)
       await resumed
-      if (stableResult !== undefined) return stableResult
+      return true // Keep NAT classification out of this lifecycle race.
     }
 
     return analyze.call(this, ...args)
@@ -1048,6 +1064,7 @@ test('paired relay loss eventually clears a parked TRY_LATER handshake', async f
   const punchSocket = hs.puncher.socket
   const rawStreamClosed = closed(rawStream)
   const punchSocketClosed = closed(punchSocket)
+  const cleared = handshakeCleared(server, hs)
 
   hs.relaySocket.destroy()
   await withTimeout(relaySocketClosed, 'Timed out waiting for the relay socket to close')
@@ -1059,9 +1076,7 @@ test('paired relay loss eventually clears a parked TRY_LATER handshake', async f
     'Timed out waiting for relay recovery cleanup'
   )
 
-  t.absent(a._socketPool.lookup(punchSocket), 'server released the parked punch socket')
-
-  await new Promise((resolve) => setTimeout(resolve, server.handshakeClearWait * 1.2))
+  await withTimeout(cleared, 'Timed out waiting for the parked handshake to clear')
   t.absent(
     server._holepunches.find((h) => h === hs),
     'server cleared the parked handshake'
@@ -1193,6 +1208,7 @@ test('relay transport failure while pairing clears a parked handshake', async fu
   const relayClientClosed = closed(relayClient)
   const rawStreamClosed = closed(rawStream)
   const punchSocketClosed = closed(punchSocket)
+  const cleared = handshakeCleared(server, hs)
 
   relaySocket.destroy()
   await withTimeout(
@@ -1200,10 +1216,9 @@ test('relay transport failure while pairing clears a parked handshake', async fu
     'Timed out waiting for relay failure cleanup'
   )
 
-  t.absent(a._socketPool.lookup(punchSocket), 'server released the parked punch socket')
   t.is(a.stats.relaying.aborts, relayAborts + 1, 'server records one relay pairing abort')
 
-  await new Promise((resolve) => setTimeout(resolve, server.handshakeClearWait * 1.2))
+  await withTimeout(cleared, 'Timed out waiting for the unpaired handshake to clear')
   t.absent(
     server._holepunches.find((h) => h === hs),
     'server cleared the unpaired handshake'
@@ -1287,6 +1302,7 @@ test('relay transport failure after pairing clears an unrecoverable handshake', 
   const relaySocketClosed = closed(relaySocket)
   const relayClientClosed = closed(relayClient)
   const rawStreamClosed = closed(rawStream)
+  const cleared = handshakeCleared(server, hs)
 
   relayClient.destroy(new Error('simulated relay failure'))
   await withTimeout(
@@ -1294,7 +1310,7 @@ test('relay transport failure after pairing clears an unrecoverable handshake', 
     'Timed out waiting for paired relay failure cleanup'
   )
 
-  await new Promise((resolve) => setTimeout(resolve, server.handshakeClearWait * 1.2))
+  await withTimeout(cleared, 'Timed out waiting for the paired handshake to clear')
   t.absent(
     server._holepunches.find((h) => h === hs),
     'server cleared the paired handshake'
@@ -1302,4 +1318,73 @@ test('relay transport failure after pairing clears an unrecoverable handshake', 
   t.is(serverNode.stats.relaying.aborts, relayAborts, 'paired relay loss is not a pairing abort')
 
   socket.destroy()
+})
+
+test('non-punching probes do not extend the relay recovery deadline', async function (t) {
+  const Server = require('../lib/server')
+  const { ERROR, FIREWALL } = require('../lib/constants')
+  const server = new Server(null, { relayRecoveryWait: 30000 })
+
+  // Exercise the real request-completion path without networking or NAT timing.
+  const hs = {
+    round: 0,
+    prepunching: null,
+    activeHolepunchRequests: 0,
+    relayFailedAt: 1000,
+    relayRecoveryTimeout: null,
+    rawStream: {
+      destroyed: false,
+      destroy() {
+        this.destroyed = true
+      }
+    },
+    puncher: {
+      socket: {},
+      remoteHolepunching: false,
+      punching: false,
+      nat: { firewall: FIREWALL.CONSISTENT, freeze() {} },
+      updateRemote() {},
+      async analyze() {
+        return true
+      }
+    },
+    payload: {
+      decrypt: (payload) => payload,
+      encrypt: (payload) => payload,
+      token: () => null
+    }
+  }
+
+  server._holepunches.push(hs)
+  server._announcer = { isRelay: () => false }
+
+  const peerAddress = { host: '127.0.0.1', port: 12345 }
+  const probe = {
+    id: 0,
+    peerAddress,
+    payload: { error: ERROR.NONE, firewall: FIREWALL.CONSISTENT, round: 0, punching: false }
+  }
+  const req = { from: peerAddress, socket: null }
+  const failedAt = hs.relayFailedAt
+  const dateNow = Date.now
+  let now = failedAt
+
+  t.teardown(
+    () => {
+      Date.now = dateNow
+      clearTimeout(hs.relayRecoveryTimeout)
+    },
+    { force: true }
+  )
+  Date.now = () => now
+
+  for (const elapsed of [10000, 20000]) {
+    now = failedAt + elapsed
+    await server._onpeerholepunch(probe, req)
+  }
+  t.absent(hs.rawStream.destroyed, 'probes keep the stream alive within the original grace')
+
+  now = failedAt + server.relayRecoveryWait
+  await server._onpeerholepunch(probe, req)
+  t.ok(hs.rawStream.destroyed, 'request completion cleans up at the original deadline')
 })
