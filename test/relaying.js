@@ -814,3 +814,122 @@ test.skip('server does not support connection relaying', async function (t) {
   await b.destroy()
   await c.destroy()
 })
+
+test('relayed TRY_LATER stream close destroys the parked server puncher', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const Nat = require('../lib/nat')
+  const { FIREWALL } = require('../lib/constants')
+
+  const r = createDHT({ bootstrap, firewalled: false, ephemeral: true })
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  t.teardown(() => Promise.all([r.destroy(), a.destroy(), b.destroy()]))
+
+  await Promise.all([r.fullyBootstrapped(), a.fullyBootstrapped(), b.fullyBootstrapped()])
+
+  const relay = new RelayServer({
+    createStream(opts) {
+      return r.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relay.close())
+
+  const relayServer = r.createServer(function (socket) {
+    socket.on('error', () => {})
+    relay.accept(socket, { id: socket.remotePublicKey }).on('error', () => {})
+  })
+
+  await relayServer.listen()
+
+  // The client classifies as behind a randomizing NAT (like CGNAT), so the
+  // server rate limits the punch. Scoped to the client node only.
+  Object.defineProperty(Nat.prototype, 'firewall', {
+    configurable: true,
+    get() {
+      return this.dht === b ? FIREWALL.RANDOM : this._testFirewall
+    },
+    set(value) {
+      this._testFirewall = value
+    }
+  })
+  t.teardown(
+    () => {
+      delete Nat.prototype.firewall
+    },
+    { force: true }
+  )
+
+  // Saturate the random-punch budget so the punch is postponed with TRY_LATER
+  a._randomPunches = a._randomPunchLimit
+
+  let resolveTryLater
+  const tryLater = new Promise((resolve) => {
+    resolveTryLater = resolve
+  })
+
+  const server = a.createServer(
+    {
+      shareLocalAddress: false,
+      holepunch(remoteFirewall, localFirewall) {
+        if (
+          (remoteFirewall >= FIREWALL.RANDOM || localFirewall >= FIREWALL.RANDOM) &&
+          a._randomPunches >= a._randomPunchLimit
+        ) {
+          resolveTryLater()
+        }
+        return true
+      }
+    },
+    function (socket) {
+      socket.on('error', () => {})
+    }
+  )
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey, {
+    relayThrough: relayServer.publicKey,
+    localConnection: false,
+    fastOpen: false // a randomizing NAT would eat the fast-open packets
+  })
+  socket.on('error', () => {})
+  t.teardown(() => socket.destroy())
+
+  // Relay pairing has cleared the initial punch timeout by the time the
+  // connection is emitted. The holepunch hook runs immediately before the
+  // saturated random-punch budget makes the server reply with TRY_LATER.
+  await Promise.all([once(server, 'connection'), tryLater])
+
+  const hs = server._holepunches.find((h) => {
+    const p = h && h.puncher
+    return (
+      p &&
+      h.relayPaired &&
+      h.prepunching === null &&
+      p.remoteHolepunching &&
+      !p.destroyed &&
+      !p.punching &&
+      !p.connected
+    )
+  })
+  t.ok(hs, 'server parked a live puncher after relay pairing')
+  if (!hs) return
+
+  // Close the relayed raw stream without an error before direct upgrade. The
+  // puncher cleanup must not depend on the raw stream error path.
+  const puncher = hs.puncher
+  const punchSocket = puncher.socket
+  const rawStreamClosed = once(hs.rawStream, 'close')
+  const punchSocketClosed = once(punchSocket, 'close')
+
+  hs.rawStream.destroy()
+  await Promise.all([rawStreamClosed, punchSocketClosed])
+
+  t.ok(puncher.destroyed, 'server destroyed the parked puncher')
+  t.absent(a._socketPool.lookup(punchSocket), 'server released the parked punch socket')
+
+  socket.destroy()
+})
