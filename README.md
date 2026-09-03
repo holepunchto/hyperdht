@@ -112,10 +112,14 @@ Options include:
 
 ```js
 {
-  firewall (remotePublicKey, remoteHandshakePayload) {
+  firewall (remotePublicKey, remoteHandshakePayload, clientAddress) {
     // validate if you want a connection from remotePublicKey
     // if you do return false, else return true
     // remoteHandshakePayload contains their ip and some more info
+    // clientAddress is their observed address. For handshakes received
+    // directly this is the transport source address, but for handshakes
+    // received via a relay it is asserted by the relaying node and is NOT
+    // authenticated - do not use it for access control in that case
     return true
   }
 }
