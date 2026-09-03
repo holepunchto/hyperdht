@@ -10,11 +10,11 @@ const Router = require('./lib/router')
 const Cache = require('xache')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
+const { FIREWALL, BOOTSTRAP_NODES, COMMANDS, MAX_VALUE_SIZE } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
-const { STREAM_NOT_CONNECTED } = require('./lib/errors')
+const { STREAM_NOT_CONNECTED, VALUE_TOO_LARGE } = require('./lib/errors')
 
 const DEFAULTS = {
   ...DHT.DEFAULTS,
@@ -289,6 +289,8 @@ class HyperDHT extends DHT {
   }
 
   async immutablePut(value, opts = {}) {
+    if (value.byteLength > MAX_VALUE_SIZE) throw VALUE_TOO_LARGE()
+
     const target = b4a.allocUnsafe(32)
     sodium.crypto_generichash(target, value)
 
@@ -363,6 +365,8 @@ class HyperDHT extends DHT {
   }
 
   async mutablePut(keyPair, value, opts = {}) {
+    if (value.byteLength > MAX_VALUE_SIZE) throw VALUE_TOO_LARGE()
+
     const signMutable = opts.signMutable || Persistent.signMutable
 
     const target = b4a.allocUnsafe(32)
