@@ -2,9 +2,10 @@ const test = require('brittle')
 const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 const { encode } = require('hypercore-id-encoding')
 const { once } = require('events')
+const b4a = require('b4a')
 const DHT = require('../')
 const NoiseWrap = require('../lib/noise-wrap')
-const { FIREWALL, ERROR } = require('../lib/constants')
+const { FIREWALL, ERROR, MAX_RELAYING } = require('../lib/constants')
 const { unslabbedHash } = require('../lib/crypto')
 
 test('createServer + connect - once defaults', async function (t) {
@@ -976,6 +977,53 @@ test('peer cant flood w/ handshakes', async function (t) {
 
   rawStream.destroy()
   await server.close()
+})
+
+test('server bounds client-chosen relay connections', async function (t) {
+  const [a, b] = await swarm(t, 2)
+
+  const relayTarget = b.createServer()
+  await relayTarget.listen()
+
+  const server = a.createServer()
+  await server.listen()
+
+  let dials = 0
+  const origConnect = a.connect.bind(a)
+  a.connect = (...args) => {
+    dials++
+    return origConnect(...args)
+  }
+
+  const req = {
+    to: server.address(),
+    from: { host: '127.0.0.1', port: b.address().port },
+    socket: null
+  }
+
+  for (let i = 0; i < MAX_RELAYING + 8; i++) {
+    const handshake = new NoiseWrap(b.defaultKeyPair, server.publicKey)
+    const noise = await handshake.send({
+      error: ERROR.NONE,
+      firewall: FIREWALL.UNKNOWN,
+      holepunch: null,
+      addresses4: [],
+      addresses6: [],
+      udx: { reusableSocket: false, id: 0, seq: 0 },
+      secretStream: {},
+      relayThrough: { publicKey: relayTarget.publicKey, token: b4a.alloc(32) }
+    })
+
+    // simulate a relayed handshake so the server does not take the direct path
+    const peerAddress = { host: '127.0.0.1', port: b.address().port }
+    await server._onpeerhandshake({ noise, peerAddress }, req)
+  }
+
+  t.is(dials, MAX_RELAYING, 'outbound connections for client-chosen relays are bounded')
+  t.is(server._relaying, MAX_RELAYING, 'in-flight counter tracks the bound')
+
+  await server.close()
+  await relayTarget.close()
 })
 
 test('handshakes that arrive while the server is suspended are cleared', async function (t) {
