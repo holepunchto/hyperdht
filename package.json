@@ -3,6 +3,7 @@
   "version": "6.34.0",
   "description": "The DHT powering Hyperswarm",
   "main": "index.js",
+  "types": "index.d.ts",
   "browser": "browser.js",
   "bin": {
     "hyperdht": "./bin.js"
@@ -12,7 +13,8 @@
     "browser.js",
     "testnet.js",
     "bin.js",
-    "lib/**.js"
+    "lib/**.js",
+    "index.d.ts"
   ],
   "imports": {
     "events": {
