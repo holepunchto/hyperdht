@@ -29,8 +29,7 @@ const DEFAULTS = {
   ...DHT.DEFAULTS,
   connectionKeepAlive: 5000,
   randomPunchInterval: 20000,
-  routingTableSnapshotInterval: 120000,
-  dbMaxOpenFiles: 1000
+  routingTableSnapshotInterval: 120000
 }
 
 class HyperDHT extends DHT {
@@ -61,8 +60,7 @@ class HyperDHT extends DHT {
 
     this.db = new NamespacedDB({
       path: opts.dbPath || DB_PATH,
-      maxOpenFiles: opts.dbMaxOpenFiles || DEFAULTS.dbMaxOpenFiles,
-      optimizeFiltersForMemory: true
+      ...opts.dbOpts
     })
 
     this._router = new Router(this, router)
