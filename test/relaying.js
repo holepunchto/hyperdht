@@ -58,6 +58,9 @@ test('relay connections through node, client side', async function (t) {
 
   await lc
 
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  t.is(a.stats.relaying.aborts, 0, 'no relay abort when the direct path wins')
+
   await a.destroy()
   await b.destroy()
   await c.destroy()
@@ -785,6 +788,95 @@ test('relay connection upgrades to direct connection', async function (t) {
     await serverNode.destroy()
     await clientNode.destroy()
   }
+})
+
+test('relayed connection still upgrades when the client pauses between rounds', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  t.teardown(() => Promise.all([relayNode.destroy(), serverNode.destroy(), clientNode.destroy()]))
+
+  // The client goes quiet between its probe and its punching round, like a client waiting on
+  // its own random-punch budget. The server must keep its parked puncher meanwhile.
+  const QUIET = 2000
+  const analyze = Holepuncher.prototype.analyze
+  Holepuncher.prototype.analyze = async function (...args) {
+    if (this.dht === clientNode) await new Promise((resolve) => setTimeout(resolve, QUIET))
+    return analyze.apply(this, args)
+  }
+  t.teardown(
+    () => {
+      Holepuncher.prototype.analyze = analyze
+    },
+    { force: true }
+  )
+
+  const relayServer = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+  t.teardown(() => relayServer.close())
+
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    socket.on('error', () => {})
+    relayServer.accept(socket, { id: socket.remotePublicKey }).on('error', () => {})
+  })
+  await relayTransportServer.listen()
+
+  const appServer = serverNode.createServer(
+    {
+      relayThrough: relayTransportServer.publicKey,
+      shareLocalAddress: false,
+      relayRecoveryWait: 1000 // must not fire while the relayed connection is healthy
+    },
+    function (socket) {
+      socket.on('error', () => {})
+      socket.on('data', (data) => socket.write(data))
+      socket.on('end', () => socket.end())
+    }
+  )
+  await appServer.listen()
+
+  const connection = once(appServer, 'connection')
+  const clientSocket = clientNode.connect(appServer.publicKey, {
+    fastOpen: false,
+    localConnection: false
+  })
+  clientSocket.on('error', () => {})
+
+  const [[serverSocket]] = await withTimeout(
+    Promise.all([connection, once(clientSocket, 'open')]),
+    'Timed out waiting for the relayed connection'
+  )
+
+  t.not(
+    clientSocket.rawStream.remotePort,
+    serverSocket.rawStream.localPort,
+    'client starts on the relayed stream'
+  )
+
+  const upgraded = Promise.all([
+    once(clientSocket.rawStream, 'remote-changed'),
+    once(serverSocket.rawStream, 'remote-changed')
+  ])
+  await withTimeout(upgraded, 'Timed out waiting for the direct upgrade after the client paused')
+
+  t.is(
+    clientSocket.rawStream.remotePort,
+    serverSocket.rawStream.localPort,
+    'client switches to the server address'
+  )
+  t.is(
+    serverSocket.rawStream.remotePort,
+    clientSocket.rawStream.localPort,
+    'server switches to the client address'
+  )
+
+  await endAndCloseSocket(clientSocket)
+  if (!serverSocket.destroyed) await once(serverSocket, 'close')
 })
 
 test.skip('relay several connections through node with pool', async function (t) {
