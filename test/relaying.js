@@ -713,6 +713,8 @@ test('relay connection upgrades to direct connection', async function (t) {
       relaySocket.destroy()
       await relaySocketClosed
 
+      t.is(hs.relayRecoveryTimeout, null, 'active request owns cleanup without a recovery timer')
+
       if (opts.waitForRecoveryExpiry) {
         // This case must cross the actual recovery deadline with a request in flight.
         await new Promise((resolve) => setTimeout(resolve, appServer.relayRecoveryWait * 1.2))
