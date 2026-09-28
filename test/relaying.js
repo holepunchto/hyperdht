@@ -4,6 +4,7 @@ const { once } = require('events')
 const RelayServer = require('blind-relay').Server
 const NoiseSecretStream = require('@hyperswarm/secret-stream')
 const Holepuncher = require('../lib/holepuncher')
+const ServerHandshake = require('../lib/server-handshake')
 const { swarm, createDHT, endAndCloseSocket } = require('./helpers')
 
 test('relay connections through node, client side', async function (t) {
@@ -1333,12 +1334,75 @@ test('relay transport failure after pairing clears an unrecoverable handshake', 
   socket.destroy()
 })
 
+test('relay loss allows passive direct recovery without a server puncher', async function (t) {
+  t.timeout(5000)
+  const { serverNode, clientNode, relayServer } = await createRelayFixture(t)
+
+  const server = serverNode.createServer(
+    {
+      relayThrough: relayServer.publicKey,
+      shareLocalAddress: false,
+      holepunch: false,
+      relayRecoveryWait: 1000
+    },
+    function (socket) {
+      socket.on('error', (err) => t.fail(err))
+      socket.on('data', (data) => socket.write(data))
+      socket.on('end', () => socket.end())
+    }
+  )
+  await server.listen()
+
+  const connection = once(server, 'connection')
+  const socket = clientNode.connect(server.publicKey, {
+    relayThrough: relayServer.publicKey,
+    fastOpen: false,
+    localConnection: false
+  })
+  socket.on('error', (err) => t.fail(err))
+  t.teardown(() => socket.destroy())
+
+  const [[serverSocket]] = await Promise.all([connection, once(socket, 'open')])
+  const before = once(socket, 'data')
+  socket.write(Buffer.from('relayed'))
+  t.alike((await before)[0], Buffer.from('relayed'), 'relay path carries data')
+
+  const hs = server._holepunches.find((h) => h && h.rawStream === serverSocket.rawStream)
+  t.absent(hs.puncher, 'server does not initiate holepunching')
+
+  const rawStream = hs.rawStream
+  const relayClosed = closed(hs.relayClient)
+  hs.relayClient.destroy(new Error('simulated relay failure'))
+  await relayClosed
+
+  t.absent(rawStream.destroyed, 'server allows direct recovery during the grace period')
+  if (rawStream.destroyed) return
+
+  // Inject the direct route to isolate recovery ownership, not LAN discovery.
+  const changed = socket.rawStream.changeRemote(
+    clientNode.socket,
+    rawStream.id,
+    serverNode.io.serverSocket.address().port,
+    '127.0.0.1'
+  )
+  socket.rawStream.trySend(Buffer.alloc(0))
+  await changed
+
+  const after = once(socket, 'data')
+  socket.write(Buffer.from('direct'))
+  t.alike((await after)[0], Buffer.from('direct'), 'direct path carries data')
+  t.is(hs.rawStream, null, 'server completed the passive direct upgrade')
+
+  await endAndCloseSocket(socket)
+  if (!serverSocket.destroyed) await once(serverSocket, 'close')
+})
+
 test('non-punching probes do not extend the relay recovery deadline', async function (t) {
   const Server = require('../lib/server')
   const { ERROR, FIREWALL } = require('../lib/constants')
   const server = new Server(null, { relayRecoveryWait: 30000 })
 
-  const hs = {
+  const hs = Object.assign(new ServerHandshake(server.relayRecoveryWait), {
     round: 0,
     prepunching: null,
     activeHolepunchRequests: 0,
@@ -1365,7 +1429,7 @@ test('non-punching probes do not extend the relay recovery deadline', async func
       encrypt: (payload) => payload,
       token: () => null
     }
-  }
+  })
 
   server._holepunches.push(hs)
   server._announcer = { isRelay: () => false }
