@@ -1267,7 +1267,7 @@ test('relay transport failure while pairing clears a parked handshake', async fu
   socket.destroy()
 })
 
-test('relay transport failure after pairing clears an unrecoverable handshake', async function (t) {
+test('relay failure after pairing immediately tears down a handshake without a puncher', async function (t) {
   t.timeout(5000)
   const { serverNode, clientNode, relayServer } = await createRelayFixture(t)
 
@@ -1277,7 +1277,7 @@ test('relay transport failure after pairing clears an unrecoverable handshake', 
       shareLocalAddress: false,
       holepunch: false,
       handshakeClearWait: 100,
-      relayRecoveryWait: 100
+      relayRecoveryWait: 60000 // longer than t.timeout, so only an immediate teardown passes
     },
     function (socket) {
       socket.on('error', () => {})
@@ -1309,7 +1309,7 @@ test('relay transport failure after pairing clears an unrecoverable handshake', 
   t.ok(hs, 'server established the relayed handshake')
   if (!hs) return
 
-  t.absent(hs.puncher, 'the handshake has no direct-punch recovery path')
+  t.absent(hs.puncher, 'server does not initiate holepunching')
 
   const relayAborts = serverNode.stats.relaying.aborts
   const relaySocket = hs.relaySocket
@@ -1320,8 +1320,13 @@ test('relay transport failure after pairing clears an unrecoverable handshake', 
   const rawStreamClosed = closed(rawStream)
   const cleared = handshakeCleared(server, hs)
 
+  const failedAt = Date.now()
   relayClient.destroy(new Error('simulated relay failure'))
   await Promise.all([relaySocketClosed, relayClientClosed, rawStreamClosed])
+  t.ok(
+    Date.now() - failedAt < 1000,
+    'handshake without a puncher is torn down without waiting for relay recovery'
+  )
 
   await cleared
   t.absent(
