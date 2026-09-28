@@ -696,9 +696,7 @@ test('relay connection upgrades to direct connection', async function (t) {
 
     const clientUpgraded = once(clientSocket.rawStream, 'remote-changed')
     const serverUpgraded = once(serverSocket.rawStream, 'remote-changed')
-    const relaySocketsClosed = relaySockets.map((socket) =>
-      opts.relayFailure ? closed(socket) : once(socket, 'close')
-    )
+    const relaySocketsClosed = relaySockets.map(closed)
 
     if (pausedAnalysis) {
       const puncher = await pausedAnalysis.active
