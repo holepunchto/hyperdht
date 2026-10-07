@@ -49,6 +49,7 @@
     "bare-node-child-process": "^1.0.1",
     "brittle": "^3.0.0",
     "graceful-goodbye": "^1.3.0",
+    "hyperdht-6-33-1": "npm:hyperdht@6.33.1",
     "newline-decoder": "^1.0.2",
     "prettier": "^3.6.2",
     "prettier-config-holepunch": "^2.0.0"
