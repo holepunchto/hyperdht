@@ -1025,3 +1025,65 @@ test('handshakes that arrive while the server is suspended are cleared', async f
   t.is(server._connects.size, 0, 'the handshake entry should eventually be cleaned up')
   t.is(server._holepunches.length, 0, '... and so should the holepunch slot')
 })
+
+test('createServer + connect - fresh unfirewalled client sends punchable rounds', async function (t) {
+  // Regression: a client whose DHT is no longer firewalled but does not know its
+  // own address yet sends firewall UNKNOWN in the handshake, so its holepuncher
+  // nat starts as OPEN. OPEN used to advertise no addresses, so the server could
+  // not punch round 1, aborted, and destroyed the raw stream the client then
+  // connected to: the first write stalled until the UDX timeout (~13s).
+  const { bootstrap } = await swarm(t, 6)
+
+  // Server stays firewalled, so it answers with a holepunch instead of OPEN
+  const a = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap })
+
+  const lc = t.test('socket lifecycle')
+  lc.plan(2)
+
+  const timeout = setTimeout(() => lc.fail('server did not receive data in time'), 5000)
+
+  const server = a.createServer(function (socket) {
+    socket.once('data', function (data) {
+      clearTimeout(timeout)
+      lc.alike(data, Buffer.from('hello'))
+    })
+    socket.once('end', function () {
+      socket.end()
+    })
+  })
+
+  await server.listen()
+
+  // Delay the LAN shortcut so the server handles punch round 1 first, which is
+  // what happens on a loaded machine
+  const serverPort = a.io.serverSocket.address().port
+  const ping = b.ping.bind(b)
+
+  b.ping = async function (addr, opts) {
+    const res = await ping(addr, opts)
+    if (addr.port === serverPort) await new Promise((resolve) => setTimeout(resolve, 100))
+    return res
+  }
+
+  b.firewalled = false
+
+  const socket = b.connect(server.publicKey)
+
+  socket.once('open', function () {
+    lc.pass('client side opened')
+    socket.write('hello')
+  })
+
+  socket.once('error', function (err) {
+    lc.fail('client should not error: ' + err.code)
+  })
+
+  await lc
+
+  clearTimeout(timeout)
+  await endAndCloseSocket(socket)
+  await server.close()
+  await a.destroy()
+  await b.destroy()
+})
