@@ -112,6 +112,9 @@ Options include:
 
 ```js
 {
+  // max number of concurrent incoming handshakes - additional
+  // handshakes are dropped to shed load, defaults to 256
+  maxConcurrentHandshakes: 256,
   firewall (remotePublicKey, remoteHandshakePayload) {
     // validate if you want a connection from remotePublicKey
     // if you do return false, else return true

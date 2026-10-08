@@ -4,7 +4,7 @@ const { encode } = require('hypercore-id-encoding')
 const { once } = require('events')
 const DHT = require('../')
 const NoiseWrap = require('../lib/noise-wrap')
-const { FIREWALL, ERROR } = require('../lib/constants')
+const { FIREWALL, ERROR, MAX_CONCURRENT_HANDSHAKES } = require('../lib/constants')
 const { unslabbedHash } = require('../lib/crypto')
 
 test('createServer + connect - once defaults', async function (t) {
@@ -975,6 +975,46 @@ test('peer cant flood w/ handshakes', async function (t) {
   t.is(server._holepunches.length, 1, 'server only registered 1 holepunch')
 
   rawStream.destroy()
+  await server.close()
+})
+
+test('server caps concurrent handshakes', async function (t) {
+  const [a, b] = await swarm(t, 2)
+
+  t.is(a.createServer().maxConcurrentHandshakes, MAX_CONCURRENT_HANDSHAKES, 'expected default')
+
+  const server = a.createServer({ maxConcurrentHandshakes: 4 })
+  await server.listen()
+
+  const req = {
+    to: server.address(),
+    from: { host: '127.0.0.1', port: b.address().port },
+    socket: null
+  }
+
+  let replied = 0
+  for (let i = 0; i < 20; i++) {
+    const handshake = new NoiseWrap(b.defaultKeyPair, server.publicKey)
+    const noise = await handshake.send({
+      error: ERROR.NONE,
+      firewall: FIREWALL.UNKNOWN,
+      holepunch: null,
+      addresses4: [],
+      addresses6: [],
+      udx: { reusableSocket: false, id: 0, seq: 0 },
+      secretStream: {},
+      relayThrough: null
+    })
+
+    // simulate a relayed handshake so the server does not take the direct path
+    const peerAddress = { host: '127.0.0.1', port: b.address().port }
+    if (await server._onpeerhandshake({ noise, peerAddress }, req)) replied++
+  }
+
+  t.is(replied, 4, 'only handshakes up to the cap were processed')
+  t.is(server._connects.size, 4, 'connects are bounded by the cap')
+  t.is(server._holepunches.length, 4, 'holepunch slots are bounded by the cap')
+
   await server.close()
 })
 
