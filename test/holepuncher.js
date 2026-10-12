@@ -1,5 +1,6 @@
 const test = require('brittle')
 const Holepuncher = require('../lib/holepuncher.js')
+const { FIREWALL } = require('../lib/constants')
 
 test('holepuncher match - nothing to match', async function (t) {
   t.is(Holepuncher.matchAddress([], []), null)
@@ -138,6 +139,45 @@ test('holepuncher match - container vs container (on same host)', async function
   t.alike(Holepuncher.matchAddress([{ host: '172.17.0.2' }], [{ host: '172.17.0.3' }]), {
     host: '172.17.0.3'
   })
+})
+
+// TODO Decide if an OPEN NAT should return addresses
+test.solo('punch - remote reports OPEN firewall but no addresses', async function (t) {
+  // A minimal stand-in for the real dht, just enough for the Holepuncher/Nat
+  // constructors to run without touching the network. Same shape used by
+  // test/nat.js.
+  const fakeDht = {
+    firewalled: false,
+    nodes: { length: 0, latest: null },
+    _socketPool: {
+      acquire() {
+        return { socket: {}, release() {} }
+      }
+    }
+  }
+
+  const puncher = new Holepuncher(fakeDht, null, true)
+
+  // This is exactly what updateRemote() receives when the wire payload had
+  // firewall: FIREWALL.OPEN and addresses: null (messages.js decodes a
+  // missing addresses field to null - see holepunchPayload.decode).
+  puncher.updateRemote({
+    punching: true,
+    firewall: FIREWALL.OPEN,
+    addresses: null,
+    verified: null
+  })
+
+  t.is(puncher.remoteFirewall, FIREWALL.OPEN)
+  t.alike(puncher.remoteAddresses, [])
+
+  // _punch() bails on the empty address list before it ever looks at
+  // remoteFirewall, so an OPEN-but-addressless remote is treated the same
+  // as REMOTE_NOT_HOLEPUNCHABLE by the caller (see connect.js roundPunch).
+  t.absent(await puncher.punch())
+  t.is(puncher.punching, false)
+
+  puncher.destroy()
 })
 
 test.skip('holepuncher match - container on host vs container on virtual machine', async function (t) {})
