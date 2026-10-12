@@ -978,6 +978,49 @@ test('peer cant flood w/ handshakes', async function (t) {
   await server.close()
 })
 
+test('direct handshake cannot claim a forged peer address', async function (t) {
+  const [a, b] = await swarm(t, 2)
+
+  const seen = []
+  const server = a.createServer({
+    firewall(remotePublicKey, remotePayload, clientAddress) {
+      seen.push(clientAddress)
+      return false
+    }
+  })
+  await server.listen()
+
+  const handshake = new NoiseWrap(b.defaultKeyPair, server.publicKey)
+  const rawStream = b.createRawStream({ framed: true, firewall: () => false })
+  const noise = await handshake.send({
+    error: ERROR.NONE,
+    firewall: FIREWALL.UNKNOWN,
+    holepunch: null,
+    addresses4: [],
+    addresses6: [],
+    udx: { reusableSocket: false, id: rawStream.id, seq: 0 },
+    secretStream: {},
+    relayThrough: null
+  })
+
+  const target = unslabbedHash(server.publicKey)
+  const to = { host: server.address().host, port: server.address().port }
+  const forged = { host: '10.9.9.9', port: 1234 }
+
+  await b._router.peerHandshake(target, { noise, peerAddress: forged, socket: null }, to)
+
+  t.is(seen.length, 1, 'firewall hook was called')
+  t.is(seen[0].host, '127.0.0.1', 'firewall hook saw the real transport host, not the forged one')
+  t.is(
+    seen[0].port,
+    b.address().port,
+    'firewall hook saw the real transport port, not the forged one'
+  )
+
+  rawStream.destroy()
+  await server.close()
+})
+
 test('handshakes that arrive while the server is suspended are cleared', async function (t) {
   const [a] = await swarm(t)
 
