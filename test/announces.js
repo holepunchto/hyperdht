@@ -174,6 +174,8 @@ test('server suspends during listen', async function (t) {
   const queries = a.stats.queries.total
 
   const listening = server.listen()
+  server.suspend()
+  server.resume()
   await server.suspend()
   await listening
 
