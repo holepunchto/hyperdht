@@ -6,6 +6,7 @@ const DHT = require('../')
 const NoiseWrap = require('../lib/noise-wrap')
 const { FIREWALL, ERROR } = require('../lib/constants')
 const { unslabbedHash } = require('../lib/crypto')
+const Holepuncher = require('../lib/holepuncher')
 
 test('createServer + connect - once defaults', async function (t) {
   t.plan(2)
@@ -299,6 +300,128 @@ test('createServer + connect - same-LAN explicit keypair opens server', async fu
   await a.destroy()
   await b.destroy()
 })
+
+test('createServer + connect - unmatched LAN address skips initial fast-open probe', async function (t) {
+  await runLanFastOpenCase(t, false)
+})
+
+test('createServer + connect - matched LAN address skips initial fast-open probe', async function (t) {
+  await runLanFastOpenCase(t, true)
+})
+
+test('createServer + connect - non-LAN connection preserves intentional server fast-open', async function (t) {
+  const { bootstrap } = await swarm(t, 5)
+  const serverDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  let coordinatedHolepunch = false
+
+  t.teardown(() => Promise.all([serverDHT.destroy(), clientDHT.destroy()]), {
+    force: true,
+    order: 1
+  })
+
+  const server = serverDHT.createServer({ shareLocalAddress: false }, function (socket) {
+    socket.on('data', function (data) {
+      socket.end(data)
+    })
+  })
+
+  await server.listen()
+
+  const socket = clientDHT.connect(server.publicKey, {
+    localConnection: false,
+    holepunch() {
+      coordinatedHolepunch = true
+      return true
+    }
+  })
+  socket.end('ping')
+
+  const [data] = await once(socket, 'data')
+  t.alike(data, Buffer.from('ping'))
+  t.is(coordinatedHolepunch, false, 'connected before coordinated holepunching')
+})
+
+async function runLanFastOpenCase(t, matched) {
+  const { bootstrap } = await swarm(t, 3)
+  const serverDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  t.teardown(() => Promise.all([serverDHT.destroy(), clientDHT.destroy()]), {
+    force: true,
+    order: 1
+  })
+
+  await serverDHT.fullyBootstrapped()
+  await clientDHT.fullyBootstrapped()
+
+  const server = serverDHT.createServer()
+
+  await server.listen(DHT.keyPair())
+
+  const matchAddress = Holepuncher.matchAddress
+  const openSession = Holepuncher.prototype.openSession
+  const peerHolepunch = clientDHT._router.peerHolepunch
+  const ping = clientDHT.ping
+  const clientPort = clientDHT.io.serverSocket.address().port
+  const serverPort = serverDHT.io.serverSocket.address().port
+  let triedLan = false
+  let sentInitialProbe = false
+  let onholepunch
+  const holepunching = new Promise((resolve) => {
+    onholepunch = resolve
+  })
+
+  // Make the address classification deterministic for the client while
+  // preserving the real server-side classification.
+  Holepuncher.matchAddress = function (localAddresses, remoteAddresses) {
+    if (localAddresses[0].port === clientPort) {
+      return matched ? remoteAddresses[0] : null
+    }
+    return matchAddress(localAddresses, remoteAddresses)
+  }
+
+  Holepuncher.prototype.openSession = function (addr, socket) {
+    if (this.dht === clientDHT) {
+      sentInitialProbe = true
+      return Promise.resolve()
+    }
+    return openSession.call(this, addr, socket)
+  }
+
+  t.teardown(
+    () => {
+      Holepuncher.matchAddress = matchAddress
+      Holepuncher.prototype.openSession = openSession
+      clientDHT._router.peerHolepunch = peerHolepunch
+      clientDHT.ping = ping
+    },
+    { force: true, order: -1 }
+  )
+
+  clientDHT.ping = function (addr, ...args) {
+    if (addr.port === serverPort) {
+      triedLan = true
+      return Promise.reject(new Error('stop LAN probe'))
+    }
+    return ping.call(this, addr, ...args)
+  }
+
+  clientDHT._router.peerHolepunch = async function () {
+    onholepunch()
+    throw new Error('stop holepunch probe')
+  }
+
+  const socket = clientDHT.connect(server.publicKey)
+  socket.on('error', () => {})
+
+  await holepunching
+
+  t.ok(triedLan, 'client started the LAN attempt')
+  t.is(sentInitialProbe, false, 'client skipped the initial probe')
+
+  socket.destroy()
+}
 
 test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
