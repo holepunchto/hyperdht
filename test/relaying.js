@@ -857,6 +857,83 @@ test('relayed connection still upgrades when the client pauses between rounds', 
   if (!serverSocket.destroyed) await once(serverSocket, 'close')
 })
 
+test('server records the direct route when a relayed connection upgrades', async function (t) {
+  const { bootstrap } = await swarm(t)
+
+  const relayNode = createDHT({ bootstrap })
+  const serverNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientNode = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  t.teardown(() => Promise.all([relayNode.destroy(), serverNode.destroy(), clientNode.destroy()]))
+
+  const resumePunching = pausePunching(t, [serverNode, clientNode])
+
+  const relayServer = new RelayServer({
+    createStream(opts) {
+      return relayNode.createRawStream({ ...opts, framed: true })
+    }
+  })
+
+  t.teardown(() => relayServer.close())
+
+  const relaySockets = []
+  const relayTransportServer = relayNode.createServer(function (socket) {
+    relaySockets.push(socket)
+    const session = relayServer.accept(socket, { id: socket.remotePublicKey })
+    session.on('error', (err) => t.comment(err.message))
+  })
+
+  await relayTransportServer.listen()
+
+  let resolveServerSocket = null
+  const serverSocketOpened = new Promise((resolve) => {
+    resolveServerSocket = resolve
+  })
+
+  const appServer = serverNode.createServer(
+    {
+      relayThrough: relayTransportServer.publicKey,
+      shareLocalAddress: false,
+      reusableSocket: true
+    },
+    function (socket) {
+      resolveServerSocket(socket)
+
+      socket.on('data', (data) => socket.write(data))
+      socket.on('end', () => socket.end())
+    }
+  )
+
+  await appServer.listen()
+
+  const clientSocket = clientNode.connect(appServer.publicKey, {
+    fastOpen: false,
+    localConnection: false,
+    reusableSocket: true
+  })
+
+  const [serverSocket] = await Promise.all([serverSocketOpened, once(clientSocket, 'open')])
+
+  const serverUpgraded = once(serverSocket.rawStream, 'remote-changed')
+  const clientUpgraded = once(clientSocket.rawStream, 'remote-changed')
+
+  resumePunching()
+
+  await Promise.all([clientUpgraded, serverUpgraded])
+
+  const route = serverNode._socketPool.routes.get(clientNode.defaultKeyPair.publicKey)
+
+  t.ok(route, 'server keeps a reusable route to the client')
+  t.is(route.socket, serverSocket.rawStream.socket, 'route uses the direct socket')
+  t.is(route.address.port, clientSocket.rawStream.localPort, 'route points at the client address')
+
+  await endAndCloseSocket(clientSocket)
+  if (!serverSocket.destroyed) await once(serverSocket, 'close')
+
+  await relayNode.destroy()
+  await serverNode.destroy()
+  await clientNode.destroy()
+})
+
 test.skip('relay several connections through node with pool', async function (t) {
   const { bootstrap } = await swarm(t)
 
