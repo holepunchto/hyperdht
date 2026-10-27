@@ -228,6 +228,8 @@ An announce does a parallel lookup so the stream returned looks like the lookup 
 
 If you pass `{ lookup: true }` the nodes you announce to reply with their lookup result for the topic, and those replies are emitted on the stream as well (after the initial lookup results). Each of these entries comes from a node that has stored your announce and includes the peers it knows for the topic.
 
+If the option is not set, this is done automatically for the nodes that returned no peers in the initial lookup, to catch peers that are announcing at the same time. Pass `{ lookup: false }` to disable that.
+
 Creating a server using `dht.createServer` automatically announces itself periodically on the key-pair it is listening on. When announcing the server under a specific topic, you can access the nodes it is close to using `server.nodes`.
 
 If you pass any options they are forwarded to dht-rpc.

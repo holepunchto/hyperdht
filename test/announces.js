@@ -417,12 +417,28 @@ test('announce with lookup forwards announce replies', async function (t) {
   )
 })
 
-test('announce without lookup does not forward announce replies', async function (t) {
+test('announce auto sets lookup when a node returned no peers', async function (t) {
+  const [a, b] = await swarm(t)
+  const keyPair = DHT.keyPair()
+  const target = DHT.hash(Buffer.from('testing auto lookup flag...'))
+
+  const result = await toArray(b.announce(target, keyPair, []))
+
+  t.ok(result.length > 0, 'has at least one result')
+
+  const fromAnnounce = result.filter((data) =>
+    data.peers.some((p) => p.publicKey.equals(keyPair.publicKey))
+  )
+
+  t.ok(fromAnnounce.length > 0, 'announce replies are forwarded on the stream')
+})
+
+test('announce with lookup false does not forward announce replies', async function (t) {
   const [a, b] = await swarm(t)
   const keyPair = DHT.keyPair()
   const target = DHT.hash(Buffer.from('testing no lookup flag...'))
 
-  const result = await toArray(b.announce(target, keyPair, []))
+  const result = await toArray(b.announce(target, keyPair, [], { lookup: false }))
 
   for (const data of result) {
     t.absent(
