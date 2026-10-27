@@ -129,3 +129,15 @@ test('firewall - not quite consistent', function (t) {
   t.is(nat.firewall, FIREWALL.RANDOM)
   t.alike(nat.addresses, [{ host: '127.0.0.1', port: 0, hits: 4 }])
 })
+
+test('firewall - open advertises sampled addresses', function (t) {
+  const nat = new Nat({ firewalled: false }, null, null)
+
+  t.is(nat.firewall, FIREWALL.OPEN)
+  t.is(nat.addresses, null)
+
+  nat.add({ host: '127.0.0.1', port: 8080 }, { host: '127.0.0.1', port: 8080 })
+  t.is(nat.sampled, 1)
+  t.is(nat.firewall, FIREWALL.OPEN)
+  t.alike(nat.addresses, [{ host: '127.0.0.1', port: 8080, hits: 1 }])
+})
