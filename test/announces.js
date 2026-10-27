@@ -176,8 +176,7 @@ test('server suspend does not retry unannounces', async function (t) {
 
   const started = Date.now()
   await server.suspend()
-
-  t.ok(Date.now() - started < 2500, 'suspend did not wait for retries')
+  t.ok(Date.now() - started < 2500, 'did not retry')
 
   for (const fn of restore) fn()
 })
@@ -187,21 +186,13 @@ test('forced unannounce does not retry', async function (t) {
   const keyPair = DHT.keyPair()
   const target = DHT.hash(b4a.from('testing...'))
 
-  const q = a.announce(target, keyPair, [])
-  await q.finished()
+  await a.announce(target, keyPair, []).finished()
 
-  const restore = nodes.map(dropUnannounces)
+  nodes.forEach(dropUnannounces)
 
   const started = Date.now()
-  await a.unannounce(target, keyPair, {
-    closestNodes: q.closestNodes,
-    onlyClosestNodes: true,
-    force: true
-  })
-
-  t.ok(Date.now() - started < 2500, 'unannounce did not wait for retries')
-
-  for (const fn of restore) fn()
+  await a.unannounce(target, keyPair, { force: true })
+  t.ok(Date.now() - started < 2500, 'did not retry')
 })
 
 test('server announces relay addrs', async function (t) {
