@@ -1,6 +1,8 @@
 const test = require('brittle')
 const b4a = require('b4a')
+const c = require('compact-encoding')
 const m = require('../lib/messages')
+const { MAX_WIRE_ARRAY_LENGTH } = require('../lib/constants')
 
 test('basic noise payload', function (t) {
   const state = { start: 0, end: 0, buffer: null }
@@ -439,4 +441,55 @@ test('announce with refresh', function (t) {
   const d = m.announce.decode(state)
 
   t.alike(d, ann)
+})
+
+test('wire arrays allow entries up to the cap', function (t) {
+  const relayAddresses = []
+  for (let i = 0; i < MAX_WIRE_ARRAY_LENGTH; i++) {
+    relayAddresses.push({ host: '127.0.0.1', port: 1000 + i })
+  }
+
+  const peer = { publicKey: Buffer.alloc(32).fill('pk'), relayAddresses }
+  const state = { start: 0, end: 0, buffer: null }
+
+  m.peer.preencode(state, peer)
+  state.buffer = b4a.allocUnsafe(state.end)
+  m.peer.encode(state, peer)
+
+  state.start = 0
+  t.alike(m.peer.decode(state), peer, 'cap entries roundtrip')
+
+  relayAddresses.push({ host: '127.0.0.1', port: 9999 })
+
+  const over = { start: 0, end: 0, buffer: null }
+  m.peer.preencode(over, peer)
+  over.buffer = b4a.allocUnsafe(over.end)
+  m.peer.encode(over, peer)
+
+  over.start = 0
+  t.exception(() => m.peer.decode(over), /Array is too big/, 'cap + 1 entries on the wire throws')
+})
+
+test('crafted array length prefixes throw before allocating', function (t) {
+  // a peer record whose relayAddresses claims ~1M entries
+  const evilPeer = b4a.concat([b4a.alloc(32), c.encode(c.uint, 0x100000)])
+
+  t.exception(() => {
+    const state = { start: 0, end: evilPeer.byteLength, buffer: evilPeer }
+    m.peer.decode(state)
+  }, /Array is too big/)
+
+  // a noise payload with the addresses4 flag set and ~1M claimed entries
+  const evilPayload = b4a.concat([
+    c.encode(c.uint, 1), // version
+    c.encode(c.uint, 2), // flags = addresses4
+    c.encode(c.uint, 0), // error
+    c.encode(c.uint, 0), // firewall
+    c.encode(c.uint, 0x100000)
+  ])
+
+  t.exception(() => {
+    const state = { start: 0, end: evilPayload.byteLength, buffer: evilPayload }
+    m.noisePayload.decode(state)
+  }, /Array is too big/)
 })
