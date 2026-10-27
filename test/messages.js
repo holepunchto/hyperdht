@@ -376,7 +376,34 @@ test('announce', function (t) {
     },
     refresh: null,
     signature: null,
-    bump: 0
+    bump: 0,
+    lookup: false
+  }
+
+  m.announce.preencode(state, ann)
+  state.buffer = b4a.allocUnsafe(state.end)
+  m.announce.encode(state, ann)
+
+  t.is(state.end, state.start, 'fully encoded')
+
+  state.start = 0
+  const d = m.announce.decode(state)
+
+  t.alike(d, ann)
+})
+
+test('announce with lookup', function (t) {
+  const state = { start: 0, end: 0, buffer: null }
+
+  const ann = {
+    peer: {
+      publicKey: Buffer.alloc(32).fill('abc'),
+      relayAddresses: []
+    },
+    refresh: null,
+    signature: null,
+    bump: 0,
+    lookup: true
   }
 
   m.announce.preencode(state, ann)
@@ -401,7 +428,8 @@ test('announce with signature', function (t) {
     },
     refresh: null,
     signature: Buffer.alloc(64).fill('signature'),
-    bump: 0
+    bump: 0,
+    lookup: false
   }
 
   m.announce.preencode(state, ann)
@@ -426,7 +454,8 @@ test('announce with refresh', function (t) {
     },
     refresh: Buffer.alloc(32).fill('refresh'),
     signature: null,
-    bump: 0
+    bump: 0,
+    lookup: false
   }
 
   m.announce.preencode(state, ann)

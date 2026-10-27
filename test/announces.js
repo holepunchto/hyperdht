@@ -389,6 +389,68 @@ test('refresh-only announce does not crash persistent node', async function (t) 
   t.pass('no remote crash')
 })
 
+test('announce with lookup forwards announce replies', async function (t) {
+  const [a, b] = await swarm(t)
+  const keyPair1 = DHT.keyPair()
+  const keyPair2 = DHT.keyPair()
+  const target = DHT.hash(Buffer.from('testing lookup flag...'))
+
+  await a.announce(target, keyPair1, []).finished()
+
+  const result = await toArray(b.announce(target, keyPair2, [], { lookup: true }))
+
+  t.ok(result.length > 0, 'has at least one result')
+
+  // the lookup replies are emitted before the announce, so only the forwarded
+  // announce replies can contain keyPair2
+  const fromAnnounce = result.filter((data) =>
+    data.peers.some((p) => p.publicKey.equals(keyPair2.publicKey))
+  )
+
+  t.ok(fromAnnounce.length > 0, 'announce replies are forwarded on the stream')
+
+  const sortedByPeers = fromAnnounce.sort((a, b) => b.peers.length - a.peers.length)
+  t.is(sortedByPeers[0].peers.length, 2, 'two peers')
+  t.alike(
+    [sortedByPeers[0].peers[0].publicKey, sortedByPeers[0].peers[1].publicKey].sort(),
+    [keyPair1.publicKey, keyPair2.publicKey].sort()
+  )
+})
+
+test('announce without lookup does not forward announce replies', async function (t) {
+  const [a, b] = await swarm(t)
+  const keyPair = DHT.keyPair()
+  const target = DHT.hash(Buffer.from('testing no lookup flag...'))
+
+  const result = await toArray(b.announce(target, keyPair, []))
+
+  for (const data of result) {
+    t.absent(
+      data.peers.some((p) => p.publicKey.equals(keyPair.publicKey)),
+      'no announce reply emitted'
+    )
+  }
+})
+
+test('announce with lookup and clear', async function (t) {
+  const [a, b] = await swarm(t)
+  const keyPair = DHT.keyPair()
+  const target = DHT.hash(Buffer.from('testing lookup flag and clear...'))
+
+  await a.announce(target, keyPair, [{ host: '1.2.3.4', port: 1234 }]).finished()
+
+  const result = await toArray(b.announce(target, keyPair, [], { lookup: true, clear: true }))
+
+  t.ok(result.length > 0, 'has at least one result')
+
+  const fromAnnounce = result.filter(
+    (data) => data.peers.length === 1 && data.peers[0].relayAddresses.length === 0
+  )
+
+  t.ok(fromAnnounce.length > 0, 'announce replies with the replaced record are forwarded')
+  for (const data of fromAnnounce) t.alike(data.peers[0].publicKey, keyPair.publicKey)
+})
+
 function dropUnannounces(node) {
   const onrequest = node.onrequest
   node.onrequest = function (req) {
