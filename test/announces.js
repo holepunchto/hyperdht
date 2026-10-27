@@ -2,6 +2,7 @@ const test = require('brittle')
 const b4a = require('b4a')
 const cenc = require('compact-encoding')
 const messages = require('../lib/messages.js')
+const Persistent = require('../lib/persistent.js')
 const { swarm, toArray } = require('./helpers')
 const DHT = require('../')
 const HyperDHT = require('../')
@@ -168,6 +169,42 @@ test('server suspends and resumes', async function (t) {
   t.ok((await toArray(b.findPeer(server.publicKey))).length > 0)
 })
 
+test('server suspends during listen', async function (t) {
+  const [a, b] = await swarm(t)
+  const server = a.createServer()
+  const queries = a.stats.queries.total
+
+  const listening = server.listen()
+  server.suspend()
+  server.resume()
+  await server.suspend()
+  await listening
+
+  t.is(a.stats.queries.total, queries, 'did not announce')
+
+  await server.resume()
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+
+  t.ok((await toArray(b.findPeer(server.publicKey))).length > 0, 'announced after resume')
+})
+
+test('server suspends during first announce', async function (t) {
+  const [a, b] = await swarm(t)
+  const server = a.createServer()
+
+  const listening = server.listen()
+  await new Promise((resolve) => setImmediate(resolve))
+  await server.suspend()
+  await listening
+
+  t.is(server.relayAddresses.length, 0, 'did not announce')
+
+  await server.resume()
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+
+  t.ok((await toArray(b.findPeer(server.publicKey))).length > 0, 'announced after resume')
+})
+
 test('server suspend does not retry unannounces', async function (t) {
   const [a, ...nodes] = await swarm(t)
   const server = await a.createServer().listen()
@@ -278,6 +315,45 @@ test('announcer background does not over-trigger', async function (t) {
   t.ok(requestsSent < 50, `No background spam of ping requests (saw ${requestsSent})`)
 
   await a.destroy()
+})
+
+test('server retries announce if no relays were committed', async function (t) {
+  const testnet = await swarm(t)
+  const a = testnet.createNode() // ephemeral, so only findable through announces
+  const b = testnet.nodes[1]
+
+  let fail = true
+  let signs = 0
+  const server = a.createServer()
+  await server.listen(a.defaultKeyPair, {
+    signAnnounce(...args) {
+      signs++
+      if (fail) throw new Error('offline')
+      return Persistent.signAnnounce(...args)
+    }
+  })
+
+  t.is((await toArray(b.findPeer(server.publicKey))).length, 0, 'not announced')
+
+  const n = signs
+  await new Promise((resolve) => setTimeout(resolve, 4000))
+
+  t.ok(signs <= 2 * n, 'retries are paced')
+
+  fail = false
+
+  let found = false
+  for (let i = 0; i < 20 && !found; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    found = (await toArray(b.findPeer(server.publicKey))).length > 0
+  }
+
+  t.ok(found, 'announced')
+
+  const m = signs
+  await new Promise((resolve) => setTimeout(resolve, 4000))
+
+  t.is(signs, m, 'no retries once announced')
 })
 
 test('refresh-only announce does not crash persistent node', async function (t) {
