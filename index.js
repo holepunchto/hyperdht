@@ -239,7 +239,9 @@ class HyperDHT extends DHT {
 
       unannounces.push(
         dht
-          ._requestUnannounce(keyPair, dht, target, data.token, data.from, signUnannounce)
+          ._requestUnannounce(keyPair, dht, target, data.token, data.from, signUnannounce, {
+            retry: !opts.force
+          })
           .catch(safetyCatch)
       )
 
@@ -501,7 +503,7 @@ class HyperDHT extends DHT {
     )
   }
 
-  async _requestUnannounce(keyPair, dht, target, token, from, sign) {
+  async _requestUnannounce(keyPair, dht, target, token, from, sign, opts) {
     const unann = {
       peer: {
         publicKey: keyPair.publicKey,
@@ -521,7 +523,8 @@ class HyperDHT extends DHT {
         command: COMMANDS.UNANNOUNCE,
         value
       },
-      from
+      from,
+      opts
     )
   }
 
