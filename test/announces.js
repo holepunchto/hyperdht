@@ -169,6 +169,42 @@ test('server suspends and resumes', async function (t) {
   t.ok((await toArray(b.findPeer(server.publicKey))).length > 0)
 })
 
+test('server suspends during listen', async function (t) {
+  const [a, b] = await swarm(t)
+  const server = a.createServer()
+  const queries = a.stats.queries.total
+
+  const listening = server.listen()
+  server.suspend()
+  server.resume()
+  await server.suspend()
+  await listening
+
+  t.is(a.stats.queries.total, queries, 'did not announce')
+
+  await server.resume()
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+
+  t.ok((await toArray(b.findPeer(server.publicKey))).length > 0, 'announced after resume')
+})
+
+test('server suspends during first announce', async function (t) {
+  const [a, b] = await swarm(t)
+  const server = a.createServer()
+
+  const listening = server.listen()
+  await new Promise((resolve) => setImmediate(resolve))
+  await server.suspend()
+  await listening
+
+  t.is(server.relayAddresses.length, 0, 'did not announce')
+
+  await server.resume()
+  await new Promise((resolve) => setTimeout(resolve, 1000))
+
+  t.ok((await toArray(b.findPeer(server.publicKey))).length > 0, 'announced after resume')
+})
+
 test('server announces relay addrs', async function (t) {
   const [, a, b] = await swarm(t)
 
