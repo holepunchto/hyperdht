@@ -209,6 +209,7 @@ class HyperDHT extends DHT {
     const dht = this
     const userCommit = opts.commit || noop
     const signUnannounce = opts.signUnannounce || Persistent.signUnannounce
+    const force = !!opts.force
 
     if (this._persistent !== null) {
       // unlink self
@@ -239,9 +240,7 @@ class HyperDHT extends DHT {
 
       unannounces.push(
         dht
-          ._requestUnannounce(keyPair, dht, target, data.token, data.from, signUnannounce, {
-            retry: !opts.force
-          })
+          ._requestUnannounce(keyPair, dht, target, data.token, data.from, signUnannounce, force)
           .catch(safetyCatch)
       )
 
@@ -503,7 +502,7 @@ class HyperDHT extends DHT {
     )
   }
 
-  async _requestUnannounce(keyPair, dht, target, token, from, sign, opts) {
+  async _requestUnannounce(keyPair, dht, target, token, from, sign, force) {
     const unann = {
       peer: {
         publicKey: keyPair.publicKey,
@@ -524,7 +523,7 @@ class HyperDHT extends DHT {
         value
       },
       from,
-      opts
+      { retry: !force }
     )
   }
 
