@@ -205,6 +205,33 @@ test('server suspends during first announce', async function (t) {
   t.ok((await toArray(b.findPeer(server.publicKey))).length > 0, 'announced after resume')
 })
 
+test('server suspend does not retry unannounces', async function (t) {
+  const [a, ...nodes] = await swarm(t)
+  const server = await a.createServer().listen()
+
+  const restore = nodes.map(dropUnannounces)
+
+  const started = Date.now()
+  await server.suspend()
+  t.ok(Date.now() - started < 2500, 'did not retry')
+
+  for (const fn of restore) fn()
+})
+
+test('forced unannounce does not retry', async function (t) {
+  const [a, ...nodes] = await swarm(t)
+  const keyPair = DHT.keyPair()
+  const target = DHT.hash(b4a.from('testing...'))
+
+  await a.announce(target, keyPair, []).finished()
+
+  nodes.forEach(dropUnannounces)
+
+  const started = Date.now()
+  await a.unannounce(target, keyPair, { force: true })
+  t.ok(Date.now() - started < 2500, 'did not retry')
+})
+
 test('server announces relay addrs', async function (t) {
   const [, a, b] = await swarm(t)
 
@@ -361,3 +388,14 @@ test('refresh-only announce does not crash persistent node', async function (t) 
 
   t.pass('no remote crash')
 })
+
+function dropUnannounces(node) {
+  const onrequest = node.onrequest
+  node.onrequest = function (req) {
+    if (req.command === COMMANDS.UNANNOUNCE) return true
+    return onrequest.call(this, req)
+  }
+  return () => {
+    node.onrequest = onrequest
+  }
+}
