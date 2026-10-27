@@ -39,12 +39,6 @@ class HyperDHT extends DHT {
         ? 0
         : opts.connectionKeepAlive || DEFAULTS.connectionKeepAlive
 
-    // stats is inherited from dht-rpc so fwd the ones from there
-    this.stats = {
-      punches: { consistent: 0, random: 0, open: 0 },
-      relaying: { attempts: 0, successes: 0, aborts: 0 },
-      ...this.stats
-    }
     this.rawStreams = new RawStreamSet(this)
     this.plugins = new Map()
 
@@ -60,6 +54,20 @@ class HyperDHT extends DHT {
     this._randomPunchInterval = opts.randomPunchInterval || DEFAULTS.randomPunchInterval // min 20s between random punches...
     this._randomPunches = 0
     this._randomPunchLimit = 1 // set to one for extra safety for now
+
+    // stats is inherited from dht-rpc so fwd the ones from there
+    this.stats = {
+      punches: {
+        consistent: 0,
+        random: 0,
+        open: 0,
+        tryLater: 0,
+        tryLaterRelayedHandshakesAtLeastOnce: 0
+      },
+      relaying: { attempts: 0, successes: 0, aborts: 0 },
+      socketPool: this._socketPool.stats,
+      ...this.stats
+    }
 
     this.once('persistent', () => {
       this._persistent = new Persistent(this, persistent)
@@ -201,6 +209,7 @@ class HyperDHT extends DHT {
     const dht = this
     const userCommit = opts.commit || noop
     const signUnannounce = opts.signUnannounce || Persistent.signUnannounce
+    const force = !!opts.force
 
     if (this._persistent !== null) {
       // unlink self
@@ -231,7 +240,7 @@ class HyperDHT extends DHT {
 
       unannounces.push(
         dht
-          ._requestUnannounce(keyPair, dht, target, data.token, data.from, signUnannounce)
+          ._requestUnannounce(keyPair, dht, target, data.token, data.from, signUnannounce, force)
           .catch(safetyCatch)
       )
 
@@ -493,7 +502,7 @@ class HyperDHT extends DHT {
     )
   }
 
-  async _requestUnannounce(keyPair, dht, target, token, from, sign) {
+  async _requestUnannounce(keyPair, dht, target, token, from, sign, force) {
     const unann = {
       peer: {
         publicKey: keyPair.publicKey,
@@ -513,7 +522,8 @@ class HyperDHT extends DHT {
         command: COMMANDS.UNANNOUNCE,
         value
       },
-      from
+      from,
+      { retry: !force }
     )
   }
 
