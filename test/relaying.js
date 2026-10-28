@@ -926,6 +926,24 @@ test('server records the direct route when a relayed connection upgrades', async
   t.is(route.socket, serverSocket.rawStream.socket, 'route uses the direct socket')
   t.is(route.address.port, clientSocket.rawStream.localPort, 'route points at the client address')
 
+  // A reusable connect back to the client tries the stored route first
+  const clientServer = clientNode.createServer(function (socket) {
+    socket.on('data', (data) => socket.write(data))
+    socket.on('end', () => socket.end())
+  })
+
+  await clientServer.listen(clientNode.defaultKeyPair)
+
+  const reconnect = serverNode.connect(clientNode.defaultKeyPair.publicKey, {
+    reusableSocket: true,
+    localConnection: false
+  })
+
+  const reply = once(reconnect, 'data')
+  reconnect.write(Buffer.from('over the route'))
+  t.alike((await reply)[0], Buffer.from('over the route'), 'server reconnects over the route')
+
+  await endAndCloseSocket(reconnect)
   await endAndCloseSocket(clientSocket)
   if (!serverSocket.destroyed) await once(serverSocket, 'close')
 
