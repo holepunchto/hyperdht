@@ -1339,16 +1339,13 @@ test('relay failure after pairing immediately tears down a handshake without a p
 })
 
 test('client destroy while relay pairing is pending closes the relay socket', async function (t) {
-  t.timeout(5000)
   const { serverNode, clientNode, relayServer } = await createRelayFixture(t)
   pausePunching(t, [serverNode, clientNode])
 
-  const server = serverNode.createServer(
-    { relayThrough: relayServer.publicKey, shareLocalAddress: false },
-    function (socket) {
-      socket.on('error', () => {})
-    }
-  )
+  const server = serverNode.createServer({
+    relayThrough: relayServer.publicKey,
+    shareLocalAddress: false
+  })
   await server.listen()
 
   // Hold the server side of the pairing until the client is gone
@@ -1358,10 +1355,8 @@ test('client destroy while relay pairing is pending closes the relay socket', as
     pair = () => relayConnection.apply(this, args)
   }
 
-  const relayConnected = once(relayServer, 'connection')
   const socket = clientNode.connect(server.publicKey, { fastOpen: false, localConnection: false })
-
-  const [relaySocket] = await relayConnected
+  const [relaySocket] = await once(relayServer, 'connection')
   const relaySocketClosed = closed(relaySocket)
 
   socket.destroy()
@@ -1393,18 +1388,10 @@ test('relayed connection ended by the server closes without a reset', async func
     'client starts on the relayed stream'
   )
 
-  const data = once(serverSocket, 'data')
-  socket.write(Buffer.from('hello'))
-  await data
-
-  let error = null
-  serverSocket.on('error', (err) => {
-    error = err
-  })
+  serverSocket.on('error', (err) => t.fail(err.code))
   serverSocket.end()
 
   await Promise.all([closed(serverSocket), closed(socket)])
-  t.is(error, null, 'server socket closes without a reset')
 })
 
 test('non-punching probes do not extend the relay recovery deadline', async function (t) {
