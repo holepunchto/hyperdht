@@ -1338,6 +1338,62 @@ test('relay failure after pairing immediately tears down a handshake without a p
   socket.destroy()
 })
 
+test('client destroy while relay pairing is pending closes the relay socket', async function (t) {
+  const { serverNode, clientNode, relayServer } = await createRelayFixture(t)
+  pausePunching(t, [serverNode, clientNode])
+
+  const server = serverNode.createServer({
+    relayThrough: relayServer.publicKey,
+    shareLocalAddress: false
+  })
+  await server.listen()
+
+  // Hold the server side of the pairing until the client is gone
+  let pair = null
+  const relayConnection = server._relayConnection
+  server._relayConnection = function (...args) {
+    pair = () => relayConnection.apply(this, args)
+  }
+
+  const socket = clientNode.connect(server.publicKey, { fastOpen: false, localConnection: false })
+  const [relaySocket] = await once(relayServer, 'connection')
+  const relaySocketClosed = closed(relaySocket)
+
+  socket.destroy()
+  await closed(socket)
+  pair()
+
+  await relaySocketClosed
+  t.pass('client closed its relay socket')
+})
+
+test('relayed connection ended by the server closes without a reset', async function (t) {
+  const { serverNode, clientNode, relayServer } = await createRelayFixture(t)
+  pausePunching(t, [serverNode, clientNode])
+
+  const server = serverNode.createServer({
+    relayThrough: relayServer.publicKey,
+    shareLocalAddress: false
+  })
+  await server.listen()
+
+  const connection = once(server, 'connection')
+  const socket = clientNode.connect(server.publicKey, { fastOpen: false, localConnection: false })
+  socket.on('end', () => socket.end())
+
+  const [[serverSocket]] = await Promise.all([connection, once(socket, 'open')])
+  t.not(
+    socket.rawStream.remotePort,
+    serverSocket.rawStream.localPort,
+    'client starts on the relayed stream'
+  )
+
+  serverSocket.on('error', (err) => t.fail(err.code))
+  serverSocket.end()
+
+  await Promise.all([closed(serverSocket), closed(socket)])
+})
+
 test('non-punching probes do not extend the relay recovery deadline', async function (t) {
   const Server = require('../lib/server')
   const { ERROR, FIREWALL } = require('../lib/constants')
