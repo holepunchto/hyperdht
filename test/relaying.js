@@ -1338,6 +1338,75 @@ test('relay failure after pairing immediately tears down a handshake without a p
   socket.destroy()
 })
 
+test('client destroy while relay pairing is pending closes the relay socket', async function (t) {
+  t.timeout(5000)
+  const { serverNode, clientNode, relayServer } = await createRelayFixture(t)
+  pausePunching(t, [serverNode, clientNode])
+
+  const server = serverNode.createServer(
+    { relayThrough: relayServer.publicKey, shareLocalAddress: false },
+    function (socket) {
+      socket.on('error', () => {})
+    }
+  )
+  await server.listen()
+
+  // Hold the server side of the pairing until the client is gone
+  let pair = null
+  const relayConnection = server._relayConnection
+  server._relayConnection = function (...args) {
+    pair = () => relayConnection.apply(this, args)
+  }
+
+  const relayConnected = once(relayServer, 'connection')
+  const socket = clientNode.connect(server.publicKey, { fastOpen: false, localConnection: false })
+
+  const [relaySocket] = await relayConnected
+  const relaySocketClosed = closed(relaySocket)
+
+  socket.destroy()
+  await closed(socket)
+  pair()
+
+  await relaySocketClosed
+  t.pass('client closed its relay socket')
+})
+
+test('relayed connection ended by the server closes without a reset', async function (t) {
+  const { serverNode, clientNode, relayServer } = await createRelayFixture(t)
+  pausePunching(t, [serverNode, clientNode])
+
+  const server = serverNode.createServer({
+    relayThrough: relayServer.publicKey,
+    shareLocalAddress: false
+  })
+  await server.listen()
+
+  const connection = once(server, 'connection')
+  const socket = clientNode.connect(server.publicKey, { fastOpen: false, localConnection: false })
+  socket.on('end', () => socket.end())
+
+  const [[serverSocket]] = await Promise.all([connection, once(socket, 'open')])
+  t.not(
+    socket.rawStream.remotePort,
+    serverSocket.rawStream.localPort,
+    'client starts on the relayed stream'
+  )
+
+  const data = once(serverSocket, 'data')
+  socket.write(Buffer.from('hello'))
+  await data
+
+  let error = null
+  serverSocket.on('error', (err) => {
+    error = err
+  })
+  serverSocket.end()
+
+  await Promise.all([closed(serverSocket), closed(socket)])
+  t.is(error, null, 'server socket closes without a reset')
+})
+
 test('non-punching probes do not extend the relay recovery deadline', async function (t) {
   const Server = require('../lib/server')
   const { ERROR, FIREWALL } = require('../lib/constants')
