@@ -255,9 +255,9 @@ class HyperDHT extends DHT {
   announce(target, keyPair, relayAddresses, opts = {}) {
     const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
     const bump = opts.bump || 0
-    const lookup = opts.lookup === true
+    const forwardCommit = opts.forwardCommit === true
 
-    opts = { ...opts, commit, forwardCommit: lookup }
+    opts = { ...opts, commit }
 
     return opts.clear ? this.lookupAndUnannounce(target, keyPair, opts) : this.lookup(target, opts)
 
@@ -271,7 +271,7 @@ class HyperDHT extends DHT {
         relayAddresses,
         signAnnounce,
         bump,
-        lookup
+        forwardCommit
       )
     }
   }
@@ -478,7 +478,17 @@ class HyperDHT extends DHT {
     return this.rawStreams.add(opts)
   }
 
-  async _requestAnnounce(keyPair, dht, target, token, from, relayAddresses, sign, bump, lookup) {
+  async _requestAnnounce(
+    keyPair,
+    dht,
+    target,
+    token,
+    from,
+    relayAddresses,
+    sign,
+    bump,
+    forwardCommit
+  ) {
     const ann = {
       peer: {
         publicKey: keyPair.publicKey,
@@ -487,7 +497,7 @@ class HyperDHT extends DHT {
       refresh: null,
       signature: null,
       bump,
-      lookup
+      forwardCommit
     }
 
     ann.signature = await sign(target, token, from.id, ann, keyPair)

@@ -376,7 +376,8 @@ test('announce', function (t) {
     },
     refresh: null,
     signature: null,
-    bump: 0
+    bump: 0,
+    forwardCommit: false
   }
 
   m.announce.preencode(state, ann)
@@ -401,7 +402,8 @@ test('announce with signature', function (t) {
     },
     refresh: null,
     signature: Buffer.alloc(64).fill('signature'),
-    bump: 0
+    bump: 0,
+    forwardCommit: false
   }
 
   m.announce.preencode(state, ann)
@@ -426,7 +428,8 @@ test('announce with refresh', function (t) {
     },
     refresh: Buffer.alloc(32).fill('refresh'),
     signature: null,
-    bump: 0
+    bump: 0,
+    forwardCommit: false
   }
 
   m.announce.preencode(state, ann)

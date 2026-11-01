@@ -230,6 +230,8 @@ Creating a server using `dht.createServer` automatically announces itself period
 
 If you pass any options they are forwarded to dht-rpc.
 
+Set `options.forwardCommit` to include peers observed by the announce commits after they are applied.
+
 #### `await node.unannounce(topic, keyPair, [options])`
 
 Unannounce a key-pair.

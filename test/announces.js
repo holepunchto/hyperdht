@@ -84,21 +84,6 @@ test('announce to group and lookup', async function (t) {
   }
 })
 
-test('announce can return peers observed after committing', async function (t) {
-  const [a, b] = await swarm(t)
-  const keyPair1 = DHT.keyPair()
-  const keyPair2 = DHT.keyPair()
-  const target = DHT.hash(Buffer.from('testing...'))
-
-  await a.announce(target, keyPair1, []).finished()
-
-  const result = await toArray(b.announce(target, keyPair2, [], { lookup: true }))
-
-  const committed = result.filter((data) => data.token === null)
-  t.ok(committed.length > 0, 'forwarded a commit reply')
-  t.alike(committed[0].peers[0].publicKey, keyPair1.publicKey, 'returns the remote peer')
-})
-
 test('announce to group and bump and lookup', async function (t) {
   const [a, b] = await swarm(t)
   const keyPair1 = DHT.keyPair()
@@ -402,6 +387,26 @@ test('refresh-only announce does not crash persistent node', async function (t) 
   await new Promise((resolve) => setTimeout(resolve, 200))
 
   t.pass('no remote crash')
+})
+
+test('announce can return peers observed after committing', async function (t) {
+  const [a, b] = await swarm(t)
+  const keyPair1 = DHT.keyPair()
+  const keyPair2 = DHT.keyPair()
+  const target = DHT.hash(Buffer.from('testing...'))
+
+  await a.announce(target, keyPair1, []).finished()
+
+  const result = await toArray(b.announce(target, keyPair2, [], { forwardCommit: true }))
+
+  const committed = result.filter((data) => data.token === null)
+  t.ok(committed.length > 0, 'forwarded a commit reply')
+  t.ok(
+    committed.some((data) =>
+      data.peers.some((peer) => b4a.equals(peer.publicKey, keyPair1.publicKey))
+    ),
+    'returns previously announced peers'
+  )
 })
 
 function dropUnannounces(node) {
