@@ -401,12 +401,19 @@ test('announce can return peers observed after committing', async function (t) {
 
   const committed = result.filter((data) => data.token === null)
   t.ok(committed.length > 0, 'forwarded a commit reply')
-  t.ok(
-    committed.some((data) =>
-      data.peers.some((peer) => b4a.equals(peer.publicKey, keyPair1.publicKey))
-    ),
-    'returns previously announced peers'
-  )
+
+  let hasPrevious = false
+  let hasOwn = false
+
+  for (const record of committed) {
+    for (const peer of record.peers) {
+      hasPrevious ||= b4a.equals(peer.publicKey, keyPair1.publicKey)
+      hasOwn ||= b4a.equals(peer.publicKey, keyPair2.publicKey)
+    }
+  }
+
+  t.ok(hasPrevious, 'returns previously announced peers')
+  t.ok(hasOwn, 'returns the announced peer')
 })
 
 function dropUnannounces(node) {
