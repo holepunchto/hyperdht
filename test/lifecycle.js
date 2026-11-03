@@ -1,4 +1,5 @@
 const test = require('brittle')
+const b4a = require('b4a')
 const safetyCatch = require('safety-catch')
 const hypCrypto = require('hypercore-crypto')
 const { swarm, toArray } = require('./helpers')
@@ -61,30 +62,47 @@ test('Can listen with the same keypair while the previous server is closing', as
   const testnet = await swarm(t)
   const [a, b] = testnet
   const keyPair = hypCrypto.keyPair()
+  const target = DHT.hash(keyPair.publicKey)
 
-  const s1 = a.createServer()
-  const s2 = a.createServer((socket) => socket.on('error', safetyCatch))
-
-  // Hold the old server's unannounce until the new server has announced
-  const s2Listening = new Promise((resolve) => {
-    s2.once('listening', resolve)
-    setTimeout(resolve, 2000)
+  let release = null
+  const released = new Promise((resolve) => {
+    release = resolve
+  })
+  let unannouncing = null
+  const unannounceStarted = new Promise((resolve) => {
+    unannouncing = resolve
   })
 
+  // Hold the old server's unannounce until released
+  const s1 = a.createServer()
   await s1.listen(keyPair, {
     async signUnannounce(...args) {
-      await s2Listening
+      unannouncing()
+      await released
       return Persistent.signUnannounce(...args)
     }
   })
 
   const closing = s1.close()
+  await unannounceStarted
+
+  let announcing = false
+  const findPeer = a.findPeer
+  a.findPeer = function (...args) {
+    if (b4a.equals(args[0], target)) announcing = true
+    return findPeer.apply(this, args)
+  }
+
+  const s2 = a.createServer((socket) => socket.on('error', safetyCatch))
+  const listening = s2.listen(keyPair)
   await new Promise((resolve) => setImmediate(resolve))
 
-  await s2.listen(keyPair)
-  await closing
+  t.absent(announcing, 'waits for the old server to unannounce before announcing')
 
-  const target = DHT.hash(keyPair.publicKey)
+  release()
+  await closing
+  await listening
+
   const relays = s2._announcer.relays.map((r) => r.relayAddress.port)
   const unrouted = relays.filter((port) => {
     const relay = testnet.nodes.find((node) => node.address().port === port)
