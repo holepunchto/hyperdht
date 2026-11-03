@@ -2,6 +2,8 @@ const test = require('brittle')
 const safetyCatch = require('safety-catch')
 const hypCrypto = require('hypercore-crypto')
 const { swarm, toArray } = require('./helpers')
+const Persistent = require('../lib/persistent')
+const DHT = require('../')
 
 test('Can destroy a DHT node while server.listen() is called', async function (t) {
   const [a] = await swarm(t)
@@ -53,6 +55,54 @@ test('Can close a server during a background announce', async function (t) {
   await server.close()
 
   t.is((await toArray(b.findPeer(publicKey))).length, 0, 'unannounced')
+})
+
+test('Can listen with the same keypair while the previous server is closing', async function (t) {
+  const testnet = await swarm(t)
+  const [a, b] = testnet
+  const keyPair = hypCrypto.keyPair()
+
+  const s1 = a.createServer()
+  const s2 = a.createServer((socket) => socket.on('error', safetyCatch))
+
+  // Hold the old server's unannounce until the new server has announced
+  const s2Listening = new Promise((resolve) => {
+    s2.once('listening', resolve)
+    setTimeout(resolve, 2000)
+  })
+
+  await s1.listen(keyPair, {
+    async signUnannounce(...args) {
+      await s2Listening
+      return Persistent.signUnannounce(...args)
+    }
+  })
+
+  const closing = s1.close()
+  await new Promise((resolve) => setImmediate(resolve))
+
+  await s2.listen(keyPair)
+  await closing
+
+  const target = DHT.hash(keyPair.publicKey)
+  const relays = s2._announcer.relays.map((r) => r.relayAddress.port)
+  const unrouted = relays.filter((port) => {
+    const relay = testnet.nodes.find((node) => node.address().port === port)
+    return !relay._router.get(target)
+  })
+  t.ok(relays.length > 0, 'announced')
+  t.alike(unrouted, [], 'every relay the new server announced to still routes to it')
+
+  const socket = b.connect(keyPair.publicKey)
+  socket.on('error', safetyCatch)
+  const opened = await new Promise((resolve) => {
+    socket.once('open', () => resolve(true))
+    socket.once('close', () => resolve(false))
+  })
+  t.ok(opened, 'connected to the new server')
+
+  socket.destroy()
+  await s2.close()
 })
 
 test('Cannot listen on multiple servers with the same keypair', async function (t) {
