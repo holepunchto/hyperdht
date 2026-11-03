@@ -105,6 +105,18 @@ test('Can listen with the same keypair while the previous server is closing', as
   await s2.close()
 })
 
+test('Cannot listen on a closed server', async function (t) {
+  const [a] = await swarm(t)
+
+  const server = a.createServer()
+  await server.listen()
+  await server.close()
+
+  await t.exception(async () => await server.listen(), /SERVER_CLOSED/)
+  t.is(server.listening, false, 'not listening')
+  t.is(a.listening.has(server), false, 'not tracked by the dht')
+})
+
 test('Cannot listen on multiple servers with the same keypair', async function (t) {
   const [a] = await swarm(t)
 
