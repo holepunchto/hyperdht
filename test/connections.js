@@ -184,6 +184,37 @@ test('createServer + connect - force holepunch', async function (t) {
   await b.destroy()
 })
 
+test('createServer + connect - fast-open without coordinated punching', async function (t) {
+  // Connect before bootstrapping so the server has to holepunch. NAT analysis
+  // needs four samples, so provide enough local nodes for it to complete.
+  const { bootstrap } = await swarm(t, 5)
+
+  const a = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const b = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+
+  const server = a.createServer({ shareLocalAddress: false }, function (socket) {
+    socket.on('data', (data) => socket.end(data))
+  })
+
+  await server.listen()
+
+  // Refuse coordinated punching so only the server's fast-open can connect
+  const socket = b.connect(server.publicKey, {
+    localConnection: false,
+    holepunch: () => false
+  })
+
+  socket.end('hello')
+
+  const [data] = await once(socket, 'data')
+  t.is(data.toString(), 'hello')
+
+  socket.destroy()
+  await server.close()
+  await a.destroy()
+  await b.destroy()
+})
+
 test('createServer + connect - failed LAN ping falls back to holepunch', async function (t) {
   const { bootstrap } = await swarm(t)
 
