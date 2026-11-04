@@ -9,6 +9,61 @@ test('firewall - open', function (t) {
   t.is(nat.firewall, FIREWALL.OPEN)
 })
 
+// If the Nat is updated and dht.firewalled switches from `true` to `false`,
+// `nat.firewall` flips straight to OPEN. `_updateAddresses()` should return a
+// sample address if available.
+test('firewall - open - returns 1st sample', function (t) {
+  const dht = {
+    firewalled: true,
+    remoteAddress() {
+      return { host: '203.0.113.5', port: 44201 }
+    }
+  }
+
+  const nat = new Nat(dht, null, null)
+
+  t.is(nat.sampled, 0)
+  t.is(nat.firewall, FIREWALL.UNKNOWN)
+  t.is(nat.addresses, null)
+
+  // The background self-check resolves: we are not firewalled after all.
+  dht.firewalled = false
+  nat.add({ host: '127.0.0.1', port: 8080 }, { host: '203.0.113.7', port: 44201 })
+
+  t.is(nat.firewall, FIREWALL.OPEN)
+  t.alike(
+    nat.addresses,
+    [{ host: '127.0.0.1', port: 8080, hits: 1 }],
+    'an OPEN nat with a sample already collected should use it instead of dht.remoteAddress()'
+  )
+})
+
+// If the Nat is unfrozen and `dht.firewalled === false`, `nat.firewall` flips
+// straight to OPEN. `_updateAddresses()` should return a its remoteAddress if a
+// sample isnt available and remoteAddress is.
+test('firewall - open with zero samples falls back to dht.remoteAddress', function (t) {
+  const dht = {
+    firewalled: false,
+    remoteAddress() {
+      return { host: '203.0.113.5', port: 44201 }
+    }
+  }
+
+  const nat = new Nat(dht, null, null)
+
+  t.is(nat.sampled, 0)
+  t.is(nat.firewall, FIREWALL.OPEN)
+  t.is(nat.addresses, null)
+
+  nat.unfreeze()
+
+  t.alike(
+    nat.addresses,
+    [{ host: '203.0.113.5', port: 44201, hits: 1 }],
+    'an OPEN nat with no samples yet must still expose an address via dht.remoteAddress()'
+  )
+})
+
 test('firewall - random', function (t) {
   const nat = new Nat({ firewalled: true }, null, null)
 
