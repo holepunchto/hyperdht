@@ -74,3 +74,18 @@ test('Cannot listen on multiple servers with the same keypair', async function (
   await t.exception(async () => await s4.listen(keyPair), /KEYPAIR_ALREADY_USED/)
   await s5.listen(hypCrypto.keyPair())
 })
+
+test('Destroying a DHT node clears the bumps cache and stops its gc', async function (t) {
+  const [, a] = await swarm(t, 2)
+  const persistent = a._persistent
+
+  const k = hypCrypto.randomBytes(32).toString('hex')
+  persistent.bumps.set(k, Date.now())
+
+  t.ok(persistent.bumps._interval, 'bumps cache has a gc interval')
+
+  await a.destroy()
+
+  t.is(persistent.bumps.size, 0, 'bumps cache is cleared')
+  t.is(persistent.bumps._interval, null, 'bumps gc interval is stopped')
+})
