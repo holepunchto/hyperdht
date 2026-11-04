@@ -440,12 +440,7 @@ test('announce with lookup false does not forward announce replies', async funct
 
   const result = await toArray(b.announce(target, keyPair, [], { lookup: false }))
 
-  for (const data of result) {
-    t.absent(
-      data.peers.some((p) => p.publicKey.equals(keyPair.publicKey)),
-      'no announce reply emitted'
-    )
-  }
+  t.is(result.length, 0, 'doesnt return a result')
 })
 
 test('announce with lookup and clear', async function (t) {
