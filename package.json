@@ -31,7 +31,7 @@
     "blind-relay": "^1.3.0",
     "bogon": "^1.0.0",
     "compact-encoding": "^3.0.0",
-    "dht-rpc": "^6.15.1",
+    "dht-rpc": "^6.28.0",
     "hypercore-crypto": "^3.3.0",
     "hypercore-id-encoding": "^1.2.0",
     "hyperdht-address": "^1.0.1",

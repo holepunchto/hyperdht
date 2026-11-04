@@ -255,12 +255,16 @@ class HyperDHT extends DHT {
   announce(target, keyPair, relayAddresses, opts = {}) {
     const signAnnounce = opts.signAnnounce || Persistent.signAnnounce
     const bump = opts.bump || 0
+    const lookup = opts.lookup
 
-    opts = { ...opts, commit }
+    // announce replies only carry a value when the lookup flag is set, so always forwarding is safe
+    opts = { ...opts, commit, forwardCommit: true }
 
     return opts.clear ? this.lookupAndUnannounce(target, keyPair, opts) : this.lookup(target, opts)
 
     function commit(reply, dht) {
+      // if the node had no peers for us in the lookup, ask for them again in the announce reply
+      // (unless explicitly disabled) in case some arrived in between
       return dht._requestAnnounce(
         keyPair,
         dht,
@@ -269,7 +273,8 @@ class HyperDHT extends DHT {
         reply.from,
         relayAddresses,
         signAnnounce,
-        bump
+        bump,
+        lookup === undefined ? !reply.value : !!lookup
       )
     }
   }
@@ -476,7 +481,7 @@ class HyperDHT extends DHT {
     return this.rawStreams.add(opts)
   }
 
-  async _requestAnnounce(keyPair, dht, target, token, from, relayAddresses, sign, bump) {
+  async _requestAnnounce(keyPair, dht, target, token, from, relayAddresses, sign, bump, lookup) {
     const ann = {
       peer: {
         publicKey: keyPair.publicKey,
@@ -484,7 +489,8 @@ class HyperDHT extends DHT {
       },
       refresh: null,
       signature: null,
-      bump
+      bump,
+      lookup: !!lookup
     }
 
     ann.signature = await sign(target, token, from.id, ann, keyPair)
