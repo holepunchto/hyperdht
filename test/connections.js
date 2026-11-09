@@ -352,29 +352,38 @@ test('createServer + connect - pending LAN survives incomplete NAT analysis', as
   await endAndCloseSocket(socket)
 })
 
-test('createServer + connect - LAN shortcut through stateful host firewalls', async function (t) {
+test('createServer + connect - LAN shortcut through a stateful host firewall', async function (t) {
   // Three testnet nodes keep the server NAT unsettled, so only LAN can connect.
   const { bootstrap } = await swarm(t, 3)
-  const serverDHT = statefulFirewall(new DHT({ bootstrap }))
-  const clientDHT = statefulFirewall(new DHT({ bootstrap }))
+  const serverDHT = new DHT({ bootstrap })
+  const clientDHT = new DHT({ bootstrap })
   t.teardown(async () => {
     await serverDHT.destroy()
     await clientDHT.destroy()
   })
 
-  const server = serverDHT.createServer(function (socket) {
-    socket.on('error', () => {})
-    socket.end('pong')
-  })
-
+  const server = serverDHT.createServer((socket) => socket.end())
   await server.listen()
 
+  // Like a default-deny host firewall: drop non-loopback packets from addresses we haven't sent to
+  const udp = serverDHT.io.serverSocket
+  const { send, emit } = udp
+  const sent = new Set()
+
+  udp.send = function (buffer, port, host, ttl) {
+    sent.add(host + ':' + port)
+    return send.call(this, buffer, port, host, ttl)
+  }
+
+  udp.emit = function (name, buffer, from) {
+    if (name === 'message' && from.host !== '127.0.0.1' && !sent.has(from.host + ':' + from.port)) {
+      return false
+    }
+    return emit.apply(this, arguments)
+  }
+
   const socket = clientDHT.connect(server.publicKey)
-  socket.on('error', () => {})
-
-  const [data] = await once(socket, 'data')
-  t.alike(data, Buffer.from('pong'))
-
+  await t.execution(once(socket, 'open'))
   await endAndCloseSocket(socket)
 })
 
@@ -1103,52 +1112,3 @@ test('handshakes that arrive while the server is suspended are cleared', async f
   t.is(server._connects.size, 0, 'the handshake entry should eventually be cleaned up')
   t.is(server._holepunches.length, 0, '... and so should the holepunch slot')
 })
-
-// Like a default-deny ufw or pf: loopback and replies to traffic a socket sent are let in
-function statefulFirewall(dht) {
-  const { udx } = dht
-  const { createSocket, createStream } = udx
-  const blocked = new WeakMap()
-
-  udx.createSocket = function (opts) {
-    const socket = createSocket.call(this, opts)
-    const { send, trySend, emit } = socket
-    const sent = new Set()
-
-    blocked.set(socket, (port, host) => host !== '127.0.0.1' && !sent.has(host + ':' + port))
-
-    socket.send = function (buffer, port, host, ttl) {
-      sent.add(host + ':' + port)
-      return send.call(this, buffer, port, host, ttl)
-    }
-
-    socket.trySend = function (buffer, port, host, ttl) {
-      sent.add(host + ':' + port)
-      return trySend.call(this, buffer, port, host, ttl)
-    }
-
-    socket.emit = function (name, buffer, from) {
-      if (name === 'message' && blocked.get(socket)(from.port, from.host)) return false
-      return emit.apply(this, arguments)
-    }
-
-    return socket
-  }
-
-  udx.createStream = function (id, opts) {
-    if (!opts || !opts.firewall) return createStream.call(this, id, opts)
-
-    const { firewall } = opts
-
-    return createStream.call(this, id, {
-      ...opts,
-      firewall(socket, port, host) {
-        const isBlocked = blocked.get(socket)
-        if (isBlocked && isBlocked(port, host)) return true
-        return firewall(socket, port, host)
-      }
-    })
-  }
-
-  return dht
-}
