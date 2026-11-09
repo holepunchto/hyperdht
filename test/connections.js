@@ -354,32 +354,40 @@ test('createServer + connect - pending LAN survives incomplete NAT analysis', as
 
 test('createServer + connect - LAN shortcut through a stateful host firewall', async function (t) {
   // Three testnet nodes keep the server NAT unsettled, so only LAN can connect.
-  const { bootstrap } = await swarm(t, 3)
-  const serverDHT = new DHT({ bootstrap })
-  const clientDHT = new DHT({ bootstrap })
+  const testnet = await swarm(t, 3)
+  const serverDHT = new DHT({ bootstrap: testnet.bootstrap })
+  const clientDHT = new DHT({ bootstrap: testnet.bootstrap })
   t.teardown(async () => {
     await serverDHT.destroy()
     await clientDHT.destroy()
   })
 
+  // Loopback plus any real LAN, in opposite orders, so each side prefers a different pair
+  const lans = [{ family: 4, internal: false, host: '127.0.0.1' }]
+  for (const n of serverDHT.udx.networkInterfaces()) if (n.family === 4 && !n.internal) lans.push(n)
+  serverDHT.udx.networkInterfaces = () => lans
+  clientDHT.udx.networkInterfaces = () => lans.slice().reverse()
+
   const server = serverDHT.createServer((socket) => socket.end())
   await server.listen()
 
-  // Like a default-deny host firewall: drop non-loopback packets from addresses we haven't sent to
+  // Like a default-deny host firewall: only the DHT nodes and addresses we sent to get in
+  const allowed = new Set(testnet.nodes.map((node) => key(node.address())))
   const udp = serverDHT.io.serverSocket
   const { send, emit } = udp
-  const sent = new Set()
 
   udp.send = function (buffer, port, host, ttl) {
-    sent.add(host + ':' + port)
+    allowed.add(key({ host, port }))
     return send.call(this, buffer, port, host, ttl)
   }
 
   udp.emit = function (name, buffer, from) {
-    if (name === 'message' && from.host !== '127.0.0.1' && !sent.has(from.host + ':' + from.port)) {
-      return false
-    }
+    if (name === 'message' && !allowed.has(key(from))) return false
     return emit.apply(this, arguments)
+  }
+
+  function key({ host, port }) {
+    return host + ':' + port
   }
 
   const socket = clientDHT.connect(server.publicKey)
