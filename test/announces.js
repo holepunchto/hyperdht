@@ -342,26 +342,21 @@ test('connect when we relay ourself', async function (t) {
 })
 
 test('announcer background does not over-trigger', async function (t) {
-  // Note: Not a great test, since it accesses private prop of dht-rpc/io
-  // Feel free to remove this test if _tid behaviour changes, since it's
-  // mostly used to document a previous bug
+  // Mostly used to document a previous bug
 
   const testnet = await swarm(t, 2) // must be <=3 (less than announcer MIN_ACTIVE) to trigger previous bug
   const bootstrap = testnet.bootstrap
 
   const a = new HyperDHT({ bootstrap })
 
-  const initTid = a.io._tid
+  const initRequests = a.stats.requests.total
   const server = a.createServer()
   await server.listen()
 
   // give some time for possible background spam
   await new Promise((resolve) => setTimeout(resolve, 500))
 
-  const requestsSent =
-    initTid > a.io._tid // it wrapped?
-      ? a.io._tid // close enough for this test (ignoring those before wrapping)
-      : a.io._tid - initTid
+  const requestsSent = a.stats.requests.total - initRequests
 
   t.ok(requestsSent < 50, `No background spam of ping requests (saw ${requestsSent})`)
 
