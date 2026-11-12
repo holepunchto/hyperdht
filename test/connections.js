@@ -352,6 +352,34 @@ test('createServer + connect - pending LAN survives incomplete NAT analysis', as
   await endAndCloseSocket(socket)
 })
 
+test('createServer + connect - same-host LAN shortcut through a host firewall', async function (t) {
+  // Three testnet nodes keep the server NAT unsettled, so only the LAN shortcut can connect.
+  const testnet = await swarm(t, 3)
+  const serverDHT = new DHT({ bootstrap: testnet.bootstrap })
+  const clientDHT = new DHT({ bootstrap: testnet.bootstrap })
+  t.teardown(async () => {
+    await serverDHT.destroy()
+    await clientDHT.destroy()
+  })
+
+  const server = serverDHT.createServer((socket) => socket.end())
+  await server.listen()
+
+  // Like a host firewall that filters traffic to our own LAN address: only loopback gets in
+  const udp = serverDHT.io.serverSocket
+  const { emit } = udp
+
+  udp.emit = function (name, buffer, from) {
+    if (name === 'message' && from.host !== '127.0.0.1') return false
+    return emit.apply(this, arguments)
+  }
+
+  const socket = clientDHT.connect(server.publicKey)
+  await once(socket, 'open')
+  t.is(socket.rawStream.remoteHost, '127.0.0.1')
+  await endAndCloseSocket(socket)
+})
+
 test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
 
