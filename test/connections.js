@@ -1077,3 +1077,40 @@ test('handshakes that arrive while the server is suspended are cleared', async f
   t.is(server._connects.size, 0, 'the handshake entry should eventually be cleaned up')
   t.is(server._holepunches.length, 0, '... and so should the holepunch slot')
 })
+
+test('firewall can reply busy', async function (t) {
+  const [a, b] = await swarm(t, 2)
+  await assertBusy(t, a, b) // b sends the handshake straight to a
+})
+
+test('firewall can reply busy to a relayed handshake', async function (t) {
+  const nodes = await swarm(t, 2)
+  await assertBusy(t, nodes.createNode(), nodes.createNode())
+})
+
+test('firewall returning true drops the handshake', async function (t) {
+  const nodes = await swarm(t, 2)
+  const a = nodes.createNode()
+  const b = nodes.createNode()
+
+  const server = a.createServer({ firewall: () => true })
+  await server.listen()
+
+  const [err] = await once(b.connect(server.publicKey), 'error')
+  t.is(err.code, 'PEER_CONNECTION_FAILED')
+})
+
+async function assertBusy(t, serverNode, clientNode) {
+  const server = serverNode.createServer({ firewall: () => DHT.ERROR.TRY_LATER }, () => {
+    t.fail('server should not connect')
+  })
+  await server.listen()
+
+  const started = Date.now()
+  const [err] = await once(clientNode.connect(server.publicKey), 'error')
+
+  t.is(err.code, 'PEER_BUSY')
+  t.ok(Date.now() - started < 2000, 'failed fast')
+  t.is(serverNode.rawStreams.size, 0, 'server opened no raw stream')
+  t.is(server._holepunches[0].puncher, null, 'server started no holepuncher')
+}
