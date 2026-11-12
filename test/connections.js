@@ -354,15 +354,19 @@ test('createServer + connect - pending LAN survives incomplete NAT analysis', as
 
 test('createServer + connect - same-host LAN shortcut through a host firewall', async function (t) {
   // Three testnet nodes keep the server NAT unsettled, so only the LAN shortcut can connect.
-  const testnet = await swarm(t, 3)
-  const serverDHT = new DHT({ bootstrap: testnet.bootstrap })
-  const clientDHT = new DHT({ bootstrap: testnet.bootstrap })
+  const { bootstrap } = await swarm(t, 3)
+  const serverDHT = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientDHT = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
   t.teardown(async () => {
     await serverDHT.destroy()
     await clientDHT.destroy()
   })
 
-  const server = serverDHT.createServer((socket) => socket.end())
+  const server = serverDHT.createServer(function (socket) {
+    socket.on('error', () => {})
+    socket.end('pong')
+  })
+
   await server.listen()
 
   // Like a host firewall that filters traffic to our own LAN address: only loopback gets in
@@ -375,7 +379,10 @@ test('createServer + connect - same-host LAN shortcut through a host firewall', 
   }
 
   const socket = clientDHT.connect(server.publicKey)
-  await once(socket, 'open')
+  socket.on('error', () => {})
+
+  const [data] = await once(socket, 'data')
+  t.alike(data, Buffer.from('pong'))
   t.is(socket.rawStream.remoteHost, '127.0.0.1')
   await endAndCloseSocket(socket)
 })
