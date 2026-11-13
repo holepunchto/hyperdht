@@ -153,7 +153,10 @@ test('server listen returns server', async function (t) {
 })
 
 test('server suspends and resumes', async function (t) {
-  const [a, b] = await swarm(t)
+  const testnet = await swarm(t)
+  // Ephemeral, so lookups only reach the server through its relays
+  const a = testnet.createNode()
+  const b = testnet.nodes[1]
   const server = await a.createServer().listen()
 
   t.ok((await toArray(b.findPeer(server.publicKey))).length > 0)
@@ -346,7 +349,7 @@ test('announcer background does not over-trigger', async function (t) {
   // Feel free to remove this test if _tid behaviour changes, since it's
   // mostly used to document a previous bug
 
-  const testnet = await swarm(t, 2) // must be <=3 (less than announcer MIN_ACTIVE) to trigger previous bug
+  const testnet = await swarm(t, 2) // must be <=2 (less than announcer MIN_ACTIVE) to trigger previous bug
   const bootstrap = testnet.bootstrap
 
   const a = new HyperDHT({ bootstrap })
