@@ -1088,6 +1088,13 @@ test('accept returning false replies busy to a relayed handshake', async functio
   await assertBusy(t, nodes.createNode(), nodes.createNode())
 })
 
+test('accept throwing replies busy', async function (t) {
+  const [a, b] = await swarm(t, 2)
+  await assertBusy(t, a, b, async () => {
+    throw new Error('busy')
+  })
+})
+
 test('firewall returning true drops the handshake without calling accept', async function (t) {
   const nodes = await swarm(t, 2)
   const a = nodes.createNode()
@@ -1103,8 +1110,8 @@ test('firewall returning true drops the handshake without calling accept', async
   t.is(err.code, 'PEER_CONNECTION_FAILED')
 })
 
-async function assertBusy(t, serverNode, clientNode) {
-  const server = serverNode.createServer({ accept: () => false }, () => {
+async function assertBusy(t, serverNode, clientNode, accept = () => false) {
+  const server = serverNode.createServer({ accept }, () => {
     t.fail('server should not connect')
   })
   await server.listen()

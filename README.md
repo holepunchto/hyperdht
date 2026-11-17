@@ -139,7 +139,7 @@ Refresh the server, causing it to reannounce its address. This is automatically 
 
 #### `server.on('connection', socket)`
 
-Emitted when a new encrypted connection has passed the firewall check.
+Emitted when a new encrypted connection has passed the firewall and accept checks.
 
 `socket` is a [NoiseSecretStream](https://github.com/holepunchto/hyperswarm-secret-stream) instance.
 
