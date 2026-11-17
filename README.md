@@ -115,8 +115,12 @@ Options include:
   firewall (remotePublicKey, remoteHandshakePayload) {
     // validate if you want a connection from remotePublicKey
     // if you do return false, else return true
-    // or return DHT.ERROR.TRY_LATER to reply busy, so the connect fails fast with PEER_BUSY
     // remoteHandshakePayload contains their ip and some more info
+    return true
+  },
+  accept (remotePublicKey, remoteHandshakePayload) {
+    // called after the firewall lets the connection through
+    // return false if you are busy, the connect then fails fast with PEER_BUSY
     return true
   }
 }

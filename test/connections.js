@@ -1078,22 +1078,25 @@ test('handshakes that arrive while the server is suspended are cleared', async f
   t.is(server._holepunches.length, 0, '... and so should the holepunch slot')
 })
 
-test('firewall can reply busy', async function (t) {
+test('accept returning false replies busy', async function (t) {
   const [a, b] = await swarm(t, 2)
   await assertBusy(t, a, b) // b sends the handshake straight to a
 })
 
-test('firewall can reply busy to a relayed handshake', async function (t) {
+test('accept returning false replies busy to a relayed handshake', async function (t) {
   const nodes = await swarm(t, 2)
   await assertBusy(t, nodes.createNode(), nodes.createNode())
 })
 
-test('firewall returning true drops the handshake', async function (t) {
+test('firewall returning true drops the handshake without calling accept', async function (t) {
   const nodes = await swarm(t, 2)
   const a = nodes.createNode()
   const b = nodes.createNode()
 
-  const server = a.createServer({ firewall: () => true })
+  const server = a.createServer({
+    firewall: () => true,
+    accept: () => t.fail('accept should not be called')
+  })
   await server.listen()
 
   const [err] = await once(b.connect(server.publicKey), 'error')
@@ -1101,7 +1104,7 @@ test('firewall returning true drops the handshake', async function (t) {
 })
 
 async function assertBusy(t, serverNode, clientNode) {
-  const server = serverNode.createServer({ firewall: () => DHT.ERROR.TRY_LATER }, () => {
+  const server = serverNode.createServer({ accept: () => false }, () => {
     t.fail('server should not connect')
   })
   await server.listen()

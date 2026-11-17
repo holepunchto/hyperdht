@@ -10,7 +10,7 @@ const Router = require('./lib/router')
 const Cache = require('xache')
 const Server = require('./lib/server')
 const connect = require('./lib/connect')
-const { FIREWALL, ERROR, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
+const { FIREWALL, BOOTSTRAP_NODES, COMMANDS } = require('./lib/constants')
 const { hash, createKeyPair } = require('./lib/crypto')
 const RawStreamSet = require('./lib/raw-stream-set')
 const ConnectionPool = require('./lib/connection-pool')
@@ -541,7 +541,6 @@ class HyperDHT extends DHT {
 
 HyperDHT.BOOTSTRAP = BOOTSTRAP_NODES
 HyperDHT.FIREWALL = FIREWALL
-HyperDHT.ERROR = ERROR
 
 module.exports = HyperDHT
 
