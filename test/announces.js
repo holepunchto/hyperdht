@@ -170,6 +170,31 @@ test('server suspends and resumes', async function (t) {
   t.ok((await toArray(b.findPeer(server.publicKey))).length > 0)
 })
 
+test('server suspends and resumes on a persistent node', async function (t) {
+  // Fewer than k nodes, so lookups always reach the server's own node
+  const [, a, b] = await swarm(t, 8)
+  const server = a.createServer()
+  const found = async () => (await toArray(b.findPeer(server.publicKey))).length > 0
+
+  const listening = server.listen()
+  await server.suspend()
+  await listening
+
+  t.absent(await found(), 'not found when suspended during listen')
+
+  await server.resume()
+
+  t.ok(await found(), 'found after resume')
+
+  await server.suspend()
+
+  t.absent(await found(), 'not found while suspended')
+
+  await server.resume()
+
+  t.ok(await found(), 'found after resume')
+})
+
 test('server suspends during listen', async function (t) {
   const [a, b] = await swarm(t)
   const server = a.createServer()
