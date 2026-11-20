@@ -257,7 +257,8 @@ test('createServer + connect - failed LAN ping falls back to holepunch', async f
 test('createServer + connect - same-LAN explicit keypair opens server', async function (t) {
   // Regression: advertising the prepunch socket as the server address can make
   // the client mark punching done before the LAN shortcut opens the stream.
-  const { bootstrap } = await swarm(t, 3)
+  // Two testnet nodes are too few for NAT analysis, so only LAN can connect.
+  const { bootstrap } = await swarm(t, 2)
 
   const a = new DHT({ bootstrap })
   const b = new DHT({ bootstrap })
@@ -301,9 +302,9 @@ test('createServer + connect - same-LAN explicit keypair opens server', async fu
 })
 
 test('createServer + connect - pending LAN survives incomplete NAT analysis', async function (t) {
-  // Keep both endpoints cold. Three testnet nodes provide only two samples to
+  // Keep both endpoints cold. Two testnet nodes provide only two samples to
   // the server puncher, so coordinated NAT analysis cannot finish before LAN.
-  const { bootstrap } = await swarm(t, 3)
+  const { bootstrap } = await swarm(t, 2)
   const serverDHT = new DHT({ bootstrap })
   const clientDHT = new DHT({ bootstrap })
   t.teardown(async () => {

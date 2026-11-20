@@ -19,6 +19,12 @@ module.exports = async function createTestnet(size = 10, opts = {}) {
     host: bindHost
   })
 
+  // Without peers the first node can't learn its address, so it would stay ephemeral and out of
+  // every routing table. Tell it, like DHT.bootstrapper() does.
+  if (bootstrap.length === 0) {
+    first.once('listening', () => first._nat.add(host, first.address().port))
+  }
+
   await first.fullyBootstrapped()
 
   if (bootstrap.length === 0) bootstrap.push({ host, port: first.address().port })
