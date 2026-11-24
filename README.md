@@ -117,6 +117,11 @@ Options include:
     // if you do return false, else return true
     // remoteHandshakePayload contains their ip and some more info
     return true
+  },
+  accept (remotePublicKey, remoteHandshakePayload) {
+    // called after the firewall lets the connection through
+    // return false if you are busy, the connect then fails fast with PEER_BUSY
+    return true
   }
 }
 ```
@@ -134,7 +139,7 @@ Refresh the server, causing it to reannounce its address. This is automatically 
 
 #### `server.on('connection', socket)`
 
-Emitted when a new encrypted connection has passed the firewall check.
+Emitted when a new encrypted connection has passed the firewall and accept checks.
 
 `socket` is a [NoiseSecretStream](https://github.com/holepunchto/hyperswarm-secret-stream) instance.
 
