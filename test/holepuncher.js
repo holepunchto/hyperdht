@@ -192,3 +192,20 @@ test('holepuncher match - custom made', async function (t) {
     'Same subnet (third segment)'
   )
 })
+
+test('holepuncher match - every address at the best level', async function (t) {
+  // Wi-Fi and Ethernet on one LAN, plus docker0 and another subnet
+  t.alike(
+    Holepuncher.matchAddresses(
+      [{ host: '10.0.0.20' }, { host: '10.0.0.21' }],
+      [{ host: '172.17.0.1' }, { host: '10.0.1.5' }, { host: '10.0.0.10' }, { host: '10.0.0.11' }]
+    ),
+    [{ host: '10.0.0.10' }, { host: '10.0.0.11' }]
+  )
+
+  t.alike(Holepuncher.matchAddresses([{ host: '192.168.0.20' }], [{ host: '10.0.0.1' }]), [])
+
+  const many = []
+  for (let i = 1; i < 255; i++) many.push({ host: '192.168.0.' + i })
+  t.is(Holepuncher.matchAddresses([{ host: '192.168.0.20' }], many).length, 8)
+})
