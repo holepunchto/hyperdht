@@ -400,6 +400,76 @@ test('server choosing to abort holepunch', async function (t) {
   await b.destroy()
 })
 
+test('server not accepting a connection', async function (t) {
+  const [a, b] = await swarm(t)
+
+  const lc = t.test('socket lifecycle')
+  lc.plan(3)
+
+  const server = a.createServer(
+    {
+      accept(remotePublicKey) {
+        lc.alike(remotePublicKey, b.defaultKeyPair.publicKey, 'server should trigger accept hook')
+        return false
+      }
+    },
+    function (socket) {
+      lc.fail('server should not make a connection')
+    }
+  )
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey)
+
+  socket.once('open', function () {
+    lc.fail('client should not make a connection')
+  })
+
+  socket.once('error', function (err) {
+    lc.is(err.code, 'NOT_ACCEPTED')
+    lc.is(err.message, 'NOT_ACCEPTED: Server did not accept the connection')
+  })
+
+  await lc
+
+  await server.close()
+})
+
+test('server accepting a connection', async function (t) {
+  const [a, b] = await swarm(t)
+
+  const lc = t.test('socket lifecycle')
+  lc.plan(3)
+
+  const server = a.createServer(
+    {
+      async accept() {
+        lc.pass('server should trigger accept hook')
+        return true
+      }
+    },
+    function (socket) {
+      lc.pass('server side opened')
+      socket.on('error', () => {})
+      socket.end()
+    }
+  )
+
+  await server.listen()
+
+  const socket = b.connect(server.publicKey)
+
+  socket.once('open', function () {
+    lc.pass('client side opened')
+    socket.end()
+  })
+
+  await lc
+
+  await server.close()
+})
+
 test('client choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
 

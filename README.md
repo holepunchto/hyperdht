@@ -117,6 +117,12 @@ Options include:
     // if you do return false, else return true
     // remoteHandshakePayload contains their ip and some more info
     return true
+  },
+  accept (remotePublicKey, remoteHandshakePayload) {
+    // runs after the firewall, return false to reject the connection
+    // unlike the firewall, which silently drops the handshake, this replies
+    // to the client, whose socket fails with a NOT_ACCEPTED error
+    return true
   }
 }
 ```
@@ -134,7 +140,7 @@ Refresh the server, causing it to reannounce its address. This is automatically 
 
 #### `server.on('connection', socket)`
 
-Emitted when a new encrypted connection has passed the firewall check.
+Emitted when a new encrypted connection has passed the firewall and accept checks.
 
 `socket` is a [NoiseSecretStream](https://github.com/holepunchto/hyperswarm-secret-stream) instance.
 
