@@ -6,6 +6,7 @@ const DHT = require('../')
 const NoiseWrap = require('../lib/noise-wrap')
 const { FIREWALL, ERROR } = require('../lib/constants')
 const { unslabbedHash } = require('../lib/crypto')
+const Holepuncher = require('../lib/holepuncher')
 
 test('createServer + connect - once defaults', async function (t) {
   t.plan(2)
@@ -351,6 +352,156 @@ test('createServer + connect - pending LAN survives incomplete NAT analysis', as
 
   await endAndCloseSocket(socket)
 })
+
+test('createServer + connect - LAN shortcut reaches a dual-homed server', async function (t) {
+  // Two testnet nodes are too few for NAT analysis, so only LAN can connect.
+  const { bootstrap } = await swarm(t, 2)
+  const serverDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  t.teardown(async () => {
+    await serverDHT.destroy()
+    await clientDHT.destroy()
+  })
+
+  await serverDHT.fullyBootstrapped()
+  await clientDHT.fullyBootstrapped()
+
+  const server = serverDHT.createServer(function (socket) {
+    socket.on('error', () => {})
+    socket.end('pong')
+  })
+
+  // Lists 127.0.0.2 and .4 first but replies from 127.0.0.1, like Wi-Fi plus a preferred dock
+  const port = serverDHT.io.serverSocket.address().port
+  server._localAddresses = async () => [
+    { host: '127.0.0.2', port },
+    { host: '127.0.0.4', port },
+    { host: '127.0.0.1', port }
+  ]
+
+  await server.listen()
+
+  stubLocalAddresses(t, clientDHT, ['127.0.0.3'])
+
+  // The reply to .2 is dropped, as by dht-rpc #139, and the one to .4 comes from .1
+  const pinged = {}
+  const ping = clientDHT.ping
+  clientDHT.ping = function (addr, opts) {
+    pinged[addr.host] = Date.now()
+    if (addr.host === '127.0.0.2') return new Promise(() => {})
+    if (addr.host === '127.0.0.4') addr = { host: '127.0.0.1', port: addr.port }
+    return ping.call(this, addr, opts)
+  }
+
+  const socket = clientDHT.connect(server.publicKey)
+  socket.on('error', () => {})
+
+  const [data] = await once(socket, 'data')
+  t.alike(data, Buffer.from('pong'))
+  t.ok(pinged['127.0.0.4'] - pinged['127.0.0.2'] >= 200, 'pinged the best match alone first')
+
+  await endAndCloseSocket(socket)
+})
+
+test('createServer + connect - LAN shortcut skips our own bridges', async function (t) {
+  // Two testnet nodes are too few for NAT analysis, so only LAN can connect.
+  const { bootstrap } = await swarm(t, 2)
+  const serverDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  t.teardown(async () => {
+    await serverDHT.destroy()
+    await clientDHT.destroy()
+  })
+
+  await serverDHT.fullyBootstrapped()
+  await clientDHT.fullyBootstrapped()
+
+  const server = serverDHT.createServer(function (socket) {
+    socket.on('error', () => {})
+    socket.end('pong')
+  })
+
+  // 127.0.1.3 is a bridge like docker0 that we have too, 127.0.9.9 one that is idle on our side
+  const port = serverDHT.io.serverSocket.address().port
+  server._localAddresses = async () => [
+    { host: '127.0.0.1', port },
+    { host: '127.0.1.3', port },
+    { host: '127.0.9.9', port }
+  ]
+
+  await server.listen()
+
+  // Our LAN matches the server's only at /16, the bridge at /24
+  stubLocalAddresses(t, clientDHT, ['127.0.1.3', '127.0.5.5'])
+
+  // The server answers late, so we also ping 127.0.9.9, which we don't list but reaches us
+  const ping = clientDHT.ping
+  clientDHT.ping = async function (addr, opts) {
+    if (addr.host === '127.0.9.9') return { from: addr, to: addr }
+    const res = await ping.call(this, addr, opts)
+    if (addr.port === port) await new Promise((resolve) => setTimeout(resolve, 300))
+    return res
+  }
+
+  const socket = clientDHT.connect(server.publicKey)
+  socket.on('error', () => {})
+
+  const [data] = await once(socket, 'data')
+  t.alike(data, Buffer.from('pong'))
+
+  await endAndCloseSocket(socket)
+})
+
+test('createServer + connect - LAN shortcut skips our own address', async function (t) {
+  // Four testnet nodes are enough for NAT analysis, so holepunch can connect.
+  const { bootstrap } = await swarm(t, 4)
+  const serverDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientDHT = createDHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  t.teardown(async () => {
+    await serverDHT.destroy()
+    await clientDHT.destroy()
+  })
+
+  await serverDHT.fullyBootstrapped()
+  await clientDHT.fullyBootstrapped()
+
+  const server = serverDHT.createServer(function (socket) {
+    socket.on('error', () => {})
+    socket.end('pong')
+  })
+
+  // A twin, like a VM guest behind the same NAT, has our address and port
+  const port = clientDHT.io.serverSocket.address().port
+  server._localAddresses = async () => [{ host: '127.0.0.1', port }]
+
+  await server.listen()
+
+  const socket = clientDHT.connect(server.publicKey)
+  socket.on('error', () => {})
+
+  const [data] = await once(socket, 'data')
+  t.alike(data, Buffer.from('pong'))
+
+  await endAndCloseSocket(socket)
+})
+
+function stubLocalAddresses(t, dht, hosts) {
+  const localAddresses = Holepuncher.localAddresses
+  Holepuncher.localAddresses = function (socket) {
+    if (socket !== dht.io.serverSocket) return localAddresses(socket)
+    return hosts.map((host) => ({ host, port: socket.address().port }))
+  }
+  t.teardown(() => {
+    Holepuncher.localAddresses = localAddresses
+  })
+
+  // Other nodes see us at our first address
+  const ping = dht.ping
+  dht.ping = async function (addr, opts) {
+    const res = await ping.call(this, addr, opts)
+    return { ...res, to: { host: hosts[0], port: res.to.port } }
+  }
+}
 
 test('server choosing to abort holepunch', async function (t) {
   const [boot] = await swarm(t)
