@@ -1365,6 +1365,7 @@ test('client destroy while relay pairing is pending closes the relay socket', as
 
   await relaySocketClosed
   t.pass('client closed its relay socket')
+  t.is(serverNode.stats.relaying.successes, 0, 'server got no relayed connection')
 })
 
 test('relayed connection ended by the server closes without a reset', async function (t) {
@@ -1392,6 +1393,31 @@ test('relayed connection ended by the server closes without a reset', async func
   serverSocket.end()
 
   await Promise.all([closed(serverSocket), closed(socket)])
+})
+
+test('client destroy on the relayed stream connect closes the raw stream', async function (t) {
+  const { serverNode, clientNode, relayServer } = await createRelayFixture(t)
+  pausePunching(t, [serverNode, clientNode])
+
+  const server = serverNode.createServer({
+    relayThrough: relayServer.publicKey,
+    shareLocalAddress: false
+  })
+  await server.listen()
+
+  // Destroy from the synchronous 'connect', before the secret stream starts
+  let rawStream = null
+  const createRawStream = clientNode.createRawStream
+  clientNode.createRawStream = function (opts) {
+    clientNode.createRawStream = createRawStream
+    rawStream = createRawStream.call(this, opts)
+    rawStream.once('connect', () => socket.destroy())
+    return rawStream
+  }
+
+  const socket = clientNode.connect(server.publicKey, { fastOpen: false, localConnection: false })
+  await closed(rawStream)
+  t.pass('client closed its raw stream')
 })
 
 test('non-punching probes do not extend the relay recovery deadline', async function (t) {
