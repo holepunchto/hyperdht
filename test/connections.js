@@ -304,8 +304,8 @@ test('createServer + connect - pending LAN survives incomplete NAT analysis', as
   // Keep both endpoints cold. Three testnet nodes provide only two samples to
   // the server puncher, so coordinated NAT analysis cannot finish before LAN.
   const { bootstrap } = await swarm(t, 3)
-  const serverDHT = new DHT({ bootstrap })
-  const clientDHT = new DHT({ bootstrap })
+  const serverDHT = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
+  const clientDHT = new DHT({ bootstrap, quickFirewall: false, ephemeral: true })
   t.teardown(async () => {
     await serverDHT.destroy()
     await clientDHT.destroy()
